@@ -82,7 +82,33 @@ means the customer may receive both an email and a text/share — that's
 intentional. The email is the system's automatic notification; the share is the
 user's personal outreach.
 
-### 6. "Customer View" link is removed
+### 6. Action feedback: before and after
+
+Users need to know what the system will do (before) and what it did (after).
+The two send surfaces have different transparency needs:
+
+**Share button** — the button label ("Send to Customer") and the native share
+sheet already communicate that you're sending something. No pre-action
+confirmation needed. After the transition completes, a toast confirms what
+happened:
+
+- *"Sent. Email notification delivered to jane@example.com."*
+- *"Sent. No email on file — share the link directly."*
+
+**Status dropdown → sent** — this path is less obvious. Picking "sent" from a
+dropdown doesn't visually communicate that an email is about to fire. This
+surface needs both:
+
+- **Pre-action:** Before the transition executes, show what will happen:
+  *"This will email jane@example.com."* or *"No email on file — the customer
+  won't be notified automatically."* (The no-email warning partially exists
+  today; the has-email notice is new.)
+- **Post-action:** Same toast as the share button, confirming the outcome.
+
+This ensures that regardless of which path the user takes, they always know
+what the system did on their behalf. No silent side effects.
+
+### 7. "Customer View" link is removed
 
 The current new-tab link to the public preview is replaced by the share button.
 Internal users who want to preview the public page can use print preview or a
@@ -95,15 +121,16 @@ The backend lifecycle is strict: one state machine, one set of audit events, one
 set of side effects. The frontend offers multiple paths to the same outcome
 because users operate in different contexts:
 
-| Context | Path | What happens |
-|---------|------|-------------|
-| Mobile, on job site | Share button → Messages | draft → sent + SMS to customer + auto-email |
-| Desktop, composing | Share button → clipboard | draft → sent + link copied + auto-email |
-| Desktop, power user | Status dropdown → sent | draft → sent + auto-email (no share sheet) |
-| Re-send (any device) | Share button on sent doc | re-send event + share sheet (no status change) |
+| Context | Path | What happens | Feedback |
+|---------|------|-------------|----------|
+| Mobile, on job site | Share button → Messages | draft → sent + SMS to customer + auto-email | Post-toast: "Sent. Email delivered to..." |
+| Desktop, composing | Share button → clipboard | draft → sent + link copied + auto-email | Post-toast: "Sent. Link copied. Email delivered to..." |
+| Desktop, power user | Status dropdown → sent | draft → sent + auto-email (no share sheet) | Pre-warning: "This will email..." / Post-toast: "Sent. Email delivered to..." |
+| Re-send (any device) | Share button on sent doc | re-send event + share sheet (no status change) | Post-toast: "Re-sent. Email delivered to..." |
 
 All four paths produce the same backend state. The difference is only in how the
-link reaches the customer.
+link reaches the customer. Every path gives the user clear post-action feedback
+about what the system did.
 
 ## Desktop behavior — open question
 
