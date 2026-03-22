@@ -953,8 +953,47 @@
 }
 
 .lifecycleActionButtonActive {
-  border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-border);
+}
+
+.actionButtonSent {
+  background: var(--status-amber-solid);
+  border-color: var(--status-amber-border);
+  color: var(--status-amber-solid-text);
+}
+
+.actionButtonSent:hover {
+  border-color: var(--status-amber-solid-text);
+}
+
+.actionButtonApproved {
+  background: var(--status-green-solid);
+  border-color: var(--status-green-solid);
+  color: var(--status-green-solid-text);
+}
+
+.actionButtonApproved:hover {
+  border-color: var(--status-green-solid-text);
+}
+
+.actionButtonRejected {
+  background: var(--status-red-solid);
+  border-color: var(--status-red-border);
+  color: var(--status-red-solid-text);
+}
+
+.actionButtonRejected:hover {
+  border-color: var(--status-red-solid-text);
+}
+
+.actionButtonVoid {
+  background: var(--status-gray-solid);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-solid-text);
+}
+
+.actionButtonVoid:hover {
+  border-color: var(--status-gray-solid-text);
 }
 
 .actionButtons {

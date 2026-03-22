@@ -55,6 +55,17 @@ const statusClasses: Record<string, string> = {
 // Action button definitions
 // ---------------------------------------------------------------------------
 
+/** Map a status value to its action button color class. */
+function actionButtonColorClass(statusValue: string): string {
+  switch (statusValue) {
+    case "sent": return styles.actionButtonSent;
+    case "approved": return styles.actionButtonApproved;
+    case "rejected": return styles.actionButtonRejected;
+    case "void": return styles.actionButtonVoid;
+    default: return "";
+  }
+}
+
 /** Map a status transition to a user-facing action label. */
 function actionLabel(statusValue: string, optionLabel: string): string {
   switch (statusValue) {
@@ -154,14 +165,13 @@ function EstimateActionPanel({
           {nextStatusOptions.map((option) => {
             const label = actionLabel(option.value, option.label);
             const isActive = pendingAction === option.value;
-            const isPrimary = option.value === "sent";
             return (
               <button
                 key={option.value}
                 type="button"
-                className={`${styles.lifecycleActionButton} ${
-                  isPrimary ? styles.lifecycleActionButtonPrimary : ""
-                } ${isActive ? styles.lifecycleActionButtonActive : ""}`}
+                className={`${styles.lifecycleActionButton} ${actionButtonColorClass(option.value)} ${
+                  isActive ? styles.lifecycleActionButtonActive : ""
+                }`}
                 onClick={() => handleActionClick(option.value)}
                 aria-pressed={isActive}
               >
@@ -208,7 +218,7 @@ function EstimateActionPanel({
             </button>
             <button
               type="button"
-              className={`${styles.lifecycleActionButton} ${styles.lifecycleActionButtonPrimary}`}
+              className={`${styles.lifecycleActionButton} ${actionButtonColorClass(pendingAction)}`}
               onClick={handleConfirm}
             >
               Confirm {actionLabel(pendingAction, pendingOption.label)}
