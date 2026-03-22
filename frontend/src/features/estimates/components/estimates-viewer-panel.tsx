@@ -127,15 +127,17 @@ function EstimateActionPanel({
   setStatusNote: (note: string) => void;
   actionMessage: string;
   actionTone: string;
-  handleUpdateEstimateStatus: () => void;
+  handleUpdateEstimateStatus: () => Promise<EstimateRecord | null>;
   handleAddEstimateStatusNote: () => void;
   canSubmitStatusNote: boolean;
 }) {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [shareMessage, setShareMessage] = useState("");
   const customerName = selectedProject?.customer_display_name || "";
   const customerEmail = (selectedProject?.customer_email || "").trim();
 
   function handleActionClick(statusValue: string) {
+    setShareMessage("");
     if (pendingAction === statusValue) {
       setPendingAction(null);
       setSelectedStatus("");
@@ -145,9 +147,31 @@ function EstimateActionPanel({
     setSelectedStatus(statusValue);
   }
 
-  function handleConfirm() {
-    handleUpdateEstimateStatus();
+  async function handleConfirm() {
+    const updated = await handleUpdateEstimateStatus();
+    if (!updated) return; // failed — error message shown by handler
     setPendingAction(null);
+
+    // Trigger share mechanism for send/re-send actions
+    if (pendingAction === "sent" && updated.public_ref) {
+      const publicUrl = `${window.location.origin}/estimate/${updated.public_ref}`;
+      const shareText = `${customerName ? customerName + " — " : ""}Estimate #${updated.id}: ${publicUrl}`;
+
+      if (typeof navigator.share === "function") {
+        try {
+          await navigator.share({ title: `Estimate #${updated.id}`, text: shareText, url: publicUrl });
+        } catch {
+          // User cancelled share sheet — not an error
+        }
+      } else {
+        try {
+          await navigator.clipboard.writeText(publicUrl);
+          setShareMessage("Link copied to clipboard.");
+        } catch {
+          // Clipboard API not available
+        }
+      }
+    }
   }
 
   function handleCancel() {
@@ -246,6 +270,9 @@ function EstimateActionPanel({
       {actionMessage && actionTone === "error" ? (
         <p className={styles.actionError}>{actionMessage}</p>
       ) : null}
+      {shareMessage ? (
+        <p className={styles.actionSuccess}>{shareMessage}</p>
+      ) : null}
 
       {!pendingAction ? (
         <div className={styles.lifecycleActions}>
@@ -312,7 +339,7 @@ export type EstimatesViewerPanelProps = {
   actionMessage: string;
   actionTone: string;
   canSubmitStatusNote: boolean;
-  handleUpdateEstimateStatus: () => void;
+  handleUpdateEstimateStatus: () => Promise<EstimateRecord | null>;
   handleAddEstimateStatusNote: () => void;
   statusEvents: EstimateStatusEventRecord[];
 };

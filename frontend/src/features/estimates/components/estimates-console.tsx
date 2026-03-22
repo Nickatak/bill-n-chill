@@ -1072,12 +1072,12 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     }
   }
 
-  /** Apply a status transition to the selected estimate. */
-  async function handleUpdateEstimateStatus() {
+  /** Apply a status transition to the selected estimate. Returns the updated record on success, null on failure. */
+  async function handleUpdateEstimateStatus(): Promise<EstimateRecord | null> {
     const estimateId = Number(selectedEstimateId);
     if (!estimateId) {
       setActionMessage("Select an estimate first.");
-      return;
+      return null;
     }
 
     setActionMessage("");
@@ -1091,7 +1091,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       if (!response.ok) {
         setActionMessage(readEstimateApiError(payload, "Status update failed."));
         setActionTone("error");
-        return;
+        return null;
       }
       const updated = payload.data as EstimateRecord;
       const scrollY = window.scrollY;
@@ -1108,9 +1108,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       const emailNote = updated.status === "sent" && payload.email_sent === false ? " No email sent — customer has no email on file." : "";
       setActionMessage(`Updated estimate #${updated.id} to ${updated.status.replace(/_/g, " ")}. History updated.${emailNote}`);
       setActionTone("success");
+      return updated;
     } catch {
       setActionMessage("Could not reach estimate status endpoint.");
       setActionTone("error");
+      return null;
     }
   }
 
