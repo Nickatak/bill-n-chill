@@ -1,24 +1,24 @@
 /**
  * Presentational component for the change-orders viewer panel.
  *
- * Renders the estimate rail, CO list with pagination, status & actions,
- * audit event history, line items detail, and contract breakdown. All
- * data and handlers are received via props -- no hooks or side effects
- * live here.
+ * Renders the estimate rail, CO list with pagination, action buttons
+ * with confirmation, audit event history, line items detail, and
+ * contract breakdown. All data and handlers are received via props —
+ * no hooks or side effects live here (except the action panel which
+ * owns local UI state).
  *
  * Parent: ChangeOrdersConsole
  */
 
+import { useState } from "react";
 import Link from "next/link";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 import { PaginationControls } from "@/shared/components/pagination-controls";
 import {
   coLabel,
-  publicChangeOrderHref,
 } from "../helpers";
 import {
   statusLabel,
-  quickStatusControlLabel,
   formatEventDateTime,
   eventActorLabel,
   eventActorHref,
@@ -40,14 +40,6 @@ import creatorStyles from "@/shared/document-creator/creator-foundation.module.c
 // ---------------------------------------------------------------------------
 // Pure display helpers (CSS-dependent -- kept local)
 // ---------------------------------------------------------------------------
-
-function quickStatusToneClass(status: string): string {
-  const key = `quickStatus${status
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join("")}`;
-  return styles[key] ?? "";
-}
 
 function statusEventActionClass(event: AuditEventRecord): string {
   const toStatus = event.to_status || "";
@@ -83,6 +75,250 @@ function renderEventActor(event: AuditEventRecord) {
     <Link href={href} className={styles.eventActorLink}>
       {label}
     </Link>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Action button helpers
+// ---------------------------------------------------------------------------
+
+function coActionButtonColorClass(status: string): string {
+  switch (status) {
+    case "pending_approval": return styles.actionButtonPending;
+    case "approved": return styles.actionButtonApproved;
+    case "rejected": return styles.actionButtonRejected;
+    case "void": return styles.actionButtonVoid;
+    default: return "";
+  }
+}
+
+function coActionLabel(statusValue: string, currentStatus?: string): string {
+  if (statusValue === "pending_approval") {
+    return currentStatus === "pending_approval" ? "Re-send" : "Send for Approval";
+  }
+  if (statusValue === "approved") return "Mark Accepted";
+  if (statusValue === "rejected") return "Mark Rejected";
+  if (statusValue === "void") return "Void CO";
+  return statusValue;
+}
+
+function coConfirmationMessage(
+  statusValue: string,
+  co: ChangeOrderRecord,
+  customerName: string,
+  currentStatus?: string,
+): string {
+  const label = coLabel(co);
+  const isResend = statusValue === "pending_approval" && currentStatus === "pending_approval";
+  if (statusValue === "pending_approval") {
+    return `${isResend ? "Re-send" : "Send"} ${label} to ${customerName || "customer"} for approval.`;
+  }
+  if (statusValue === "approved") return `Mark ${label} as accepted.`;
+  if (statusValue === "rejected") return `Mark ${label} as rejected.`;
+  if (statusValue === "void") return `Void ${label}.`;
+  return `Transition ${label} to ${statusValue}.`;
+}
+
+function coEmailNotice(customerEmail: string): string {
+  if (customerEmail) return `Email notification will be sent to ${customerEmail}.`;
+  return "No email on file — customer won't be notified automatically.";
+}
+
+/** Action confirmation panel for change orders. */
+function ChangeOrderActionPanel({
+  selectedViewerChangeOrder,
+  quickStatusOptions,
+  selectedProjectCustomerEmail,
+  selectedProjectName,
+  quickStatus,
+  setQuickStatus,
+  quickStatusNote,
+  setQuickStatusNote,
+  actionMessage,
+  actionTone,
+  onQuickUpdateStatus,
+  onAddChangeOrderStatusNote,
+  canMutateChangeOrders,
+  changeOrderStatusLabels,
+}: {
+  selectedViewerChangeOrder: ChangeOrderRecord;
+  quickStatusOptions: string[];
+  selectedProjectCustomerEmail: string;
+  selectedProjectName: string;
+  quickStatus: string;
+  setQuickStatus: (status: string) => void;
+  quickStatusNote: string;
+  setQuickStatusNote: (note: string) => void;
+  actionMessage: string;
+  actionTone: string;
+  onQuickUpdateStatus: () => Promise<ChangeOrderRecord | null>;
+  onAddChangeOrderStatusNote: () => void;
+  canMutateChangeOrders: boolean;
+  changeOrderStatusLabels: Record<string, string>;
+}) {
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [shareMessage, setShareMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const customerEmail = (selectedProjectCustomerEmail || "").trim();
+  const customerName = selectedProjectName || "";
+
+  function handleActionClick(statusValue: string) {
+    setShareMessage("");
+    if (pendingAction === statusValue) {
+      setPendingAction(null);
+      setQuickStatus("");
+      return;
+    }
+    setPendingAction(statusValue);
+    setQuickStatus(statusValue);
+  }
+
+  async function handleConfirm() {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const updated = await onQuickUpdateStatus();
+      if (!updated) return;
+      setPendingAction(null);
+
+      if (pendingAction === "pending_approval" && updated.public_ref) {
+        const publicUrl = `${window.location.origin}/change-order/${updated.public_ref}`;
+        const senderName = (updated.sender_name || "").trim();
+        const from = senderName ? ` from ${senderName}` : "";
+        const shareText = `Hi ${customerName} — here's a change order${from} for your review:\n${publicUrl}`;
+
+        if (typeof navigator.share === "function") {
+          try {
+            await navigator.share({ title: coLabel(updated), text: shareText });
+          } catch { /* cancelled */ }
+        } else {
+          try {
+            await navigator.clipboard.writeText(publicUrl);
+            setShareMessage("Link copied to clipboard.");
+          } catch { /* clipboard unavailable */ }
+        }
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleCancel() {
+    setPendingAction(null);
+    setQuickStatus("");
+    setQuickStatusNote("");
+  }
+
+  const pendingLabel = pendingAction
+    ? coActionLabel(pendingAction, selectedViewerChangeOrder.status)
+    : "";
+
+  return (
+    <div className={styles.viewerSectionContent}>
+      {quickStatusOptions.length > 0 ? (
+        <div className={styles.actionButtons}>
+          {quickStatusOptions.map((status) => {
+            const label = coActionLabel(status, selectedViewerChangeOrder.status);
+            const isActive = pendingAction === status;
+            return (
+              <button
+                key={status}
+                type="button"
+                className={`${styles.viewerStatusActionButton} ${coActionButtonColorClass(status)} ${
+                  isActive ? styles.actionButtonActive : ""
+                }`}
+                onClick={() => handleActionClick(status)}
+                aria-pressed={isActive}
+                disabled={!canMutateChangeOrders}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {pendingAction ? (
+        <div className={styles.actionConfirmPanel}>
+          <p className={styles.actionConfirmMessage}>
+            {coConfirmationMessage(
+              pendingAction,
+              selectedViewerChangeOrder,
+              customerName,
+              selectedViewerChangeOrder.status,
+            )}
+          </p>
+          <label className={creatorStyles.lifecycleField}>
+            <span className={creatorStyles.lifecycleFieldLabel}>Note (optional)</span>
+            <textarea
+              className={creatorStyles.statusNote}
+              value={quickStatusNote}
+              onChange={(event) => setQuickStatusNote(event.target.value)}
+              placeholder="Optional note for this action"
+              rows={2}
+            />
+          </label>
+          {pendingAction === "pending_approval" ? (
+            <p className={styles.actionConfirmDetail}>
+              {coEmailNotice(customerEmail)}
+            </p>
+          ) : null}
+          <div className={styles.actionConfirmActions}>
+            <button
+              type="button"
+              className={styles.viewerStatusActionButton}
+              onClick={handleCancel}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={`${styles.viewerStatusActionButton} ${coActionButtonColorClass(pendingAction)}`}
+              onClick={handleConfirm}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? <span className={styles.sendingDots}>Sending</span> : `Confirm ${pendingLabel}`}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!pendingAction ? (
+        <label className={creatorStyles.lifecycleField}>
+          <span className={creatorStyles.lifecycleFieldLabel}>Status note</span>
+          <textarea
+            className={creatorStyles.statusNote}
+            value={quickStatusNote}
+            onChange={(event) => setQuickStatusNote(event.target.value)}
+            placeholder="Add a note without changing status."
+            rows={2}
+          />
+        </label>
+      ) : null}
+
+      {actionMessage && actionTone === "success" ? (
+        <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
+      ) : null}
+      {actionMessage && actionTone === "error" ? (
+        <p className={creatorStyles.actionError}>{actionMessage}</p>
+      ) : null}
+      {shareMessage ? (
+        <p className={creatorStyles.actionSuccess}>{shareMessage}</p>
+      ) : null}
+
+      {!pendingAction ? (
+        <div className={`${creatorStyles.lifecycleActions} ${styles.viewerStatusActionRow}`}>
+          <button
+            type="button"
+            className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonSecondary}`}
+            onClick={onAddChangeOrderStatusNote}
+            disabled={!canMutateChangeOrders || !quickStatusNote.trim()}
+          >
+            Add CO Status Note
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -133,7 +369,7 @@ export type ChangeOrdersViewerPanelProps = {
   setQuickStatus: (status: string) => void;
   quickStatusNote: string;
   setQuickStatusNote: (note: string) => void;
-  onQuickUpdateStatus: () => void;
+  onQuickUpdateStatus: () => Promise<ChangeOrderRecord | null>;
   onAddChangeOrderStatusNote: () => void;
 
   // Action feedback
@@ -327,19 +563,6 @@ export function ChangeOrdersViewerPanel({
                           ) : (
                             <span className={styles.viewerHistoryMetaText}>No status events yet.</span>
                           )}
-                          {changeOrder.public_ref ? (
-                            <Link
-                              href={publicChangeOrderHref(changeOrder.public_ref)}
-                              className={styles.viewerCardLinkBar}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label={`Open customer view for ${coLabel(changeOrder)}`}
-                              title="Open customer view"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Customer View →
-                            </Link>
-                          ) : null}
                         </div>
                       );
                     })}
@@ -359,72 +582,22 @@ export function ChangeOrdersViewerPanel({
                           <span className={styles.viewerSectionArrow}>▼</span>
                         </button>
                         {isStatusSectionOpen ? (
-                          <div className={styles.viewerSectionContent}>
-                            {quickStatusOptions.length > 0 ? (
-                              <>
-                                <span className={creatorStyles.lifecycleFieldLabel}>Next status</span>
-                                <div className={styles.quickStatusPills}>
-                                  {quickStatusOptions.map((status) => {
-                                    const isSelected = quickStatus === status;
-                                    return (
-                                      <button
-                                        key={status}
-                                        type="button"
-                                        className={`${styles.quickStatusButton} ${
-                                          isSelected
-                                            ? `${styles.quickStatusButtonActive} ${quickStatusToneClass(status)}`
-                                            : styles.quickStatusButtonInactive
-                                        }`}
-                                        onClick={() => setQuickStatus(status)}
-                                        aria-pressed={isSelected}
-                                      >
-                                        {quickStatusControlLabel(status, changeOrderStatusLabels, selectedViewerChangeOrder?.status)}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                                {quickStatus === "pending_approval" && !selectedProjectCustomerEmail.trim() ? (
-                                  <p className={creatorStyles.actionError}>WARNING: This customer has no email on file and will not receive an automated email.</p>
-                                ) : null}
-                              </>
-                            ) : null}
-                            <label className={creatorStyles.lifecycleField}>
-                              Status note
-                              <textarea
-                                className={creatorStyles.statusNote}
-                                value={quickStatusNote}
-                                onChange={(event) => setQuickStatusNote(event.target.value)}
-                                placeholder={quickStatusOptions.length > 0 ? "Optional note for this status action." : "Add a note without changing status."}
-                                rows={2}
-                              />
-                            </label>
-                            {actionMessage && actionTone === "success" ? (
-                              <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
-                            ) : null}
-                            {actionMessage && actionTone === "error" ? (
-                              <p className={creatorStyles.actionError}>{actionMessage}</p>
-                            ) : null}
-                            <div className={`${creatorStyles.lifecycleActions} ${styles.viewerStatusActionRow}`}>
-                              {quickStatusOptions.length > 0 ? (
-                                <button
-                                  type="button"
-                                  className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonPrimary}`}
-                                  onClick={onQuickUpdateStatus}
-                                  disabled={!canMutateChangeOrders || !quickStatusOptions.length || !quickStatus}
-                                >
-                                  Update CO Status
-                                </button>
-                              ) : null}
-                              <button
-                                type="button"
-                                className={`${styles.viewerStatusActionButton} ${styles.viewerStatusActionButtonSecondary}`}
-                                onClick={onAddChangeOrderStatusNote}
-                                disabled={!canMutateChangeOrders || !quickStatusNote.trim()}
-                              >
-                                Add CO Status Note
-                              </button>
-                            </div>
-                          </div>
+                          <ChangeOrderActionPanel
+                            selectedViewerChangeOrder={selectedViewerChangeOrder}
+                            quickStatusOptions={quickStatusOptions}
+                            selectedProjectCustomerEmail={selectedProjectCustomerEmail}
+                            selectedProjectName={selectedProjectName}
+                            quickStatus={quickStatus}
+                            setQuickStatus={setQuickStatus}
+                            quickStatusNote={quickStatusNote}
+                            setQuickStatusNote={setQuickStatusNote}
+                            actionMessage={actionMessage}
+                            actionTone={actionTone}
+                            onQuickUpdateStatus={onQuickUpdateStatus}
+                            onAddChangeOrderStatusNote={onAddChangeOrderStatusNote}
+                            canMutateChangeOrders={canMutateChangeOrders}
+                            changeOrderStatusLabels={changeOrderStatusLabels}
+                          />
                         ) : null}
                       </div>
 

@@ -498,20 +498,20 @@ export function ChangeOrdersConsole({
     }
   }
 
-  /** Apply a quick status transition (or resend) to the selected viewer change order. */
-  async function handleQuickUpdateStatus() {
+  /** Apply a quick status transition (or resend) to the selected viewer change order. Returns the updated record on success, null on failure. */
+  async function handleQuickUpdateStatus(): Promise<ChangeOrderRecord | null> {
     if (!viewer.canMutateChangeOrders) {
       projectData.setFeedback(`Role ${role} is read-only for change order mutations.`, "error");
-      return;
+      return null;
     }
     const projectId = Number(projectData.selectedProjectId);
     if (!viewer.selectedViewerChangeOrder || !form.quickStatus) {
       projectData.setFeedback("Select a change order and next status first.", "error");
-      return;
+      return null;
     }
     if (!projectId) {
       projectData.setFeedback("Select a project first.", "error");
-      return;
+      return null;
     }
 
     const isResend =
@@ -530,7 +530,7 @@ export function ChangeOrdersConsole({
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
         projectData.setFeedback(readChangeOrderApiError(payload, "Status update failed."), "error");
-        return;
+        return null;
       }
       const updated = payload.data as ChangeOrderRecord;
       const { rows } = await projectData.fetchProjectChangeOrders(projectId);
@@ -554,8 +554,10 @@ export function ChangeOrdersConsole({
       }
       form.setQuickStatus("");
       form.setQuickStatusNote("");
+      return updated;
     } catch {
       projectData.setFeedback("Could not reach change order detail endpoint.", "error");
+      return null;
     }
   }
 

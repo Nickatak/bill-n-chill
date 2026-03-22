@@ -420,6 +420,97 @@
   color: var(--status-gray-text);
 }
 
+.actionButtons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.actionButtonPending {
+  background: var(--status-amber-solid);
+  border-color: var(--status-amber-border);
+  color: var(--status-amber-solid-text);
+}
+
+.actionButtonPending:hover {
+  border-color: var(--status-amber-solid-text);
+}
+
+.actionButtonApproved {
+  background: var(--status-green-solid);
+  border-color: var(--status-green-solid);
+  color: var(--status-green-solid-text);
+}
+
+.actionButtonApproved:hover {
+  border-color: var(--status-green-solid-text);
+}
+
+.actionButtonRejected {
+  background: var(--status-red-solid);
+  border-color: var(--status-red-border);
+  color: var(--status-red-solid-text);
+}
+
+.actionButtonRejected:hover {
+  border-color: var(--status-red-solid-text);
+}
+
+.actionButtonVoid {
+  background: var(--status-gray-solid);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-solid-text);
+}
+
+.actionButtonVoid:hover {
+  border-color: var(--status-gray-solid-text);
+}
+
+.actionButtonActive {
+  border-color: transparent !important;
+  outline: 3px solid var(--accent);
+}
+
+.actionConfirmPanel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--accent-lighter);
+}
+
+.actionConfirmMessage {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: var(--font-base);
+}
+
+.actionConfirmDetail {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
+.actionConfirmActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.sendingDots::after {
+  content: "";
+  animation: dots 1.2s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}
+
 .cloneRevisionButton {
   composes: toolbarSecondaryButton from "../../../shared/document-creator/creator-foundation.module.css";
   width: fit-content;
