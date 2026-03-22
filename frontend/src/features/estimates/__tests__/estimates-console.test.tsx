@@ -446,6 +446,145 @@ describe("EstimatesConsole", () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Confirm action → PATCH + success message
+  // ---------------------------------------------------------------------------
+
+  it("sends PATCH and shows success message on confirm send", async () => {
+    setupDefaultFetch({
+      estimates: [makeEstimate({ id: 42, status: "draft", public_ref: "foundation-work--abc123" })],
+    });
+    render(<EstimatesConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Foundation Work")).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByText("Foundation Work").closest("[role='button']")!);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Send to Customer" })).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Send to Customer" }));
+
+    // Mock the PATCH response
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === "PATCH") {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            data: makeEstimate({ id: 42, status: "sent", public_ref: "foundation-work--abc123", sender_name: "Test Org" }),
+            email_sent: true,
+          }),
+        });
+      }
+      // Status events reload
+      if (String(url).includes("/status-events")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: {} }) });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Send to Customer" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Updated estimate #42 to sent/)).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    // Confirmation panel should be closed
+    expect(screen.queryByText(/Send estimate #42 v1/)).not.toBeInTheDocument();
+
+    // Verify PATCH was called with correct body
+    const patchCall = mockFetch.mock.calls.find(
+      (call: unknown[]) => (call[1] as RequestInit)?.method === "PATCH",
+    );
+    expect(patchCall).toBeTruthy();
+    const patchBody = JSON.parse((patchCall![1] as RequestInit).body as string);
+    expect(patchBody.status).toBe("sent");
+  });
+
+  it("shows success message on confirm mark approved", async () => {
+    setupDefaultFetch({
+      estimates: [makeEstimate({ id: 42, status: "sent" })],
+    });
+    render(<EstimatesConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Foundation Work")).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByText("Foundation Work").closest("[role='button']")!);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Mark Approved" })).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark Approved" }));
+    expect(screen.getByText(/Mark estimate #42 v1 as approved/)).toBeInTheDocument();
+
+    mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === "PATCH") {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            data: makeEstimate({ id: 42, status: "approved" }),
+          }),
+        });
+      }
+      if (String(url).includes("/status-events")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: {} }) });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Mark Approved" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Updated estimate #42 to approved/)).toBeInTheDocument();
+    }, { timeout: 3000 });
+  });
+
+  it("shows error message on confirm when PATCH fails", async () => {
+    setupDefaultFetch({
+      estimates: [makeEstimate({ id: 42, status: "draft" })],
+    });
+    render(<EstimatesConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Foundation Work")).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByText("Foundation Work").closest("[role='button']")!);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Send to Customer" })).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Send to Customer" }));
+
+    mockFetch.mockImplementation((_url: string, opts?: RequestInit) => {
+      if (opts?.method === "PATCH") {
+        return Promise.resolve({
+          ok: false,
+          json: () => Promise.resolve({
+            error: { message: "Invalid status transition." },
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: {} }) });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Send to Customer" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Invalid status transition/)).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    // Confirmation panel should remain open on error
+    expect(screen.getByRole("button", { name: "Confirm Send to Customer" })).toBeInTheDocument();
+  });
+
   // -------------------------------------------------------------------------
   // Terminal project guards
   // -------------------------------------------------------------------------
