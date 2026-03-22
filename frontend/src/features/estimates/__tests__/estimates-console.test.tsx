@@ -272,10 +272,53 @@ describe("EstimatesConsole", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // No-email customer warning
+  // Action buttons & confirmation panel
   // ---------------------------------------------------------------------------
 
-  it("shows no-email warning when Sent is selected and customer has no email", async () => {
+  it("shows action buttons for a draft estimate", async () => {
+    setupDefaultFetch({
+      estimates: [makeEstimate({ id: 42, status: "draft" })],
+    });
+    render(<EstimatesConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Foundation Work")).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    // Click the family card to select the estimate
+    const familyCard = screen.getByText("Foundation Work").closest("[role='button']")!;
+    fireEvent.click(familyCard);
+
+    await waitFor(() => {
+      // Policy fixture allows draft → sent only
+      expect(screen.getByRole("button", { name: "Send to Customer" })).toBeInTheDocument();
+    }, { timeout: 3000 });
+  });
+
+  it("shows confirmation panel when Send to Customer is clicked", async () => {
+    setupDefaultFetch({
+      estimates: [makeEstimate({ id: 42, status: "draft" })],
+    });
+    render(<EstimatesConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Foundation Work")).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByText("Foundation Work").closest("[role='button']")!);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Send to Customer" })).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Send to Customer" }));
+
+    expect(screen.getByText(/Send estimate #42 v1/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Confirm Send to Customer" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+  });
+
+  it("shows no-email notice in confirmation when customer has no email", async () => {
     setupDefaultFetch({
       estimates: [
         makeEstimate({
@@ -293,13 +336,114 @@ describe("EstimatesConsole", () => {
     });
     render(<EstimatesConsole scopedProjectId={7} />);
 
-    // Wait for the estimate to auto-select and the "Sent" transition pill to appear
-    const sentButton = await screen.findByRole("button", { name: "Sent" }, { timeout: 3000 });
-    fireEvent.click(sentButton);
+    await waitFor(() => {
+      expect(screen.getByText("Foundation Work")).toBeInTheDocument();
+    }, { timeout: 3000 });
 
-    expect(
-      screen.getByText(/WARNING.*no email on file/),
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Foundation Work").closest("[role='button']")!);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Send to Customer" })).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Send to Customer" }));
+
+    expect(screen.getByText(/No email on file/)).toBeInTheDocument();
+  });
+
+  it("shows email notice in confirmation when customer has email", async () => {
+    setupDefaultFetch({
+      projects: [makeProject({ customer_email: "jane@example.com" })],
+      estimates: [
+        makeEstimate({
+          id: 42,
+          status: "draft",
+          project_context: {
+            id: 7,
+            name: "Kitchen Remodel",
+            status: "active",
+            customer_display_name: "Jane Smith",
+            customer_email: "jane@example.com",
+          },
+        }),
+      ],
+    });
+    render(<EstimatesConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Foundation Work")).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByText("Foundation Work").closest("[role='button']")!);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Send to Customer" })).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Send to Customer" }));
+
+    expect(screen.getByText(/Email notification will be sent to jane@example.com/)).toBeInTheDocument();
+  });
+
+  it("closes confirmation panel when Cancel is clicked", async () => {
+    setupDefaultFetch({
+      estimates: [makeEstimate({ id: 42, status: "draft" })],
+    });
+    render(<EstimatesConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Foundation Work")).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByText("Foundation Work").closest("[role='button']")!);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Send to Customer" })).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByRole("button", { name: "Send to Customer" }));
+    expect(screen.getByText(/Send estimate #42 v1/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByText(/Send estimate #42 v1/)).not.toBeInTheDocument();
+  });
+
+  it("shows Re-send and Mark Approved buttons for a sent estimate", async () => {
+    setupDefaultFetch({
+      estimates: [makeEstimate({ id: 42, status: "sent" })],
+    });
+    render(<EstimatesConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Foundation Work")).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByText("Foundation Work").closest("[role='button']")!);
+
+    await waitFor(() => {
+      // Policy fixture allows sent → approved, rejected
+      expect(screen.getByRole("button", { name: "Mark Approved" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Mark Rejected" })).toBeInTheDocument();
+    }, { timeout: 3000 });
+  });
+
+  it("shows no action buttons for an approved estimate", async () => {
+    setupDefaultFetch({
+      estimates: [makeEstimate({ id: 42, status: "approved" })],
+    });
+    render(<EstimatesConsole scopedProjectId={7} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Foundation Work")).toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    fireEvent.click(screen.getByText("Foundation Work").closest("[role='button']")!);
+
+    // Approved is terminal — no action buttons should appear
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Send to Customer" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Void Estimate" })).not.toBeInTheDocument();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -322,32 +466,5 @@ describe("EstimatesConsole", () => {
     await waitFor(() => {
       expect(screen.getByText("READ-ONLY")).toBeInTheDocument();
     }, { timeout: 3000 });
-  });
-
-  it("does not show no-email warning when Sent is selected and customer has email", async () => {
-    setupDefaultFetch({
-      projects: [makeProject({ customer_email: "jane@example.com" })],
-      estimates: [
-        makeEstimate({
-          id: 42,
-          status: "draft",
-          project_context: {
-            id: 7,
-            name: "Kitchen Remodel",
-            status: "active",
-            customer_display_name: "Jane Smith",
-            customer_email: "jane@example.com",
-          },
-        }),
-      ],
-    });
-    render(<EstimatesConsole scopedProjectId={7} />);
-
-    const sentButton = await screen.findByRole("button", { name: "Sent" }, { timeout: 3000 });
-    fireEvent.click(sentButton);
-
-    expect(
-      screen.queryByText(/WARNING.*no email on file/),
-    ).not.toBeInTheDocument();
   });
 });
