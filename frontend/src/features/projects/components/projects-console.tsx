@@ -333,7 +333,7 @@ export function ProjectsConsole() {
       for (const changeOrder of rows) {
         if (changeOrder.status === "draft") {
           draft += 1;
-        } else if (changeOrder.status === "pending_approval" || changeOrder.status === "sent") {
+        } else if (changeOrder.status === "sent") {
           sent += 1;
         } else if (changeOrder.status === "approved") {
           accepted += 1;

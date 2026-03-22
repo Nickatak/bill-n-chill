@@ -192,6 +192,14 @@ class ChangeOrderTests(TestCase):
 
     def test_public_change_order_detail_view_allows_unauthenticated_access(self):
         change_order_id = self._create_change_order()
+
+        # Must send (leave draft) before public access is allowed
+        self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
         change_order = ChangeOrder.objects.get(id=change_order_id)
 
         response = self.client.get(f"/api/v1/public/change-orders/{change_order.public_token}/")
@@ -205,12 +213,12 @@ class ChangeOrderTests(TestCase):
         self.assertIn("display_name", payload["organization_context"])
         self.assertIn("help_email", payload["organization_context"])
 
-    def test_public_change_order_decision_view_approves_pending_approval(self):
+    def test_public_change_order_decision_view_approves_sent(self):
         change_order_id = self._create_change_order(amount_delta="1500.00")
 
         to_pending = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -242,12 +250,12 @@ class ChangeOrderTests(TestCase):
         self.project.refresh_from_db()
         self.assertEqual(str(self.project.contract_value_current), "101500.00")
 
-    def test_public_change_order_decision_view_rejects_pending_approval(self):
+    def test_public_change_order_decision_view_rejects_sent(self):
         change_order_id = self._create_change_order()
 
         to_pending = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -616,7 +624,7 @@ class ChangeOrderTests(TestCase):
         base_id = self._create_change_order(amount_delta="800.00")
         to_pending = self.client.patch(
             f"/api/v1/change-orders/{base_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -731,7 +739,7 @@ class ChangeOrderTests(TestCase):
 
         self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -850,12 +858,12 @@ class ChangeOrderTests(TestCase):
 
         to_pending = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(to_pending.status_code, 200)
-        self.assertEqual(to_pending.json()["data"]["status"], "pending_approval")
+        self.assertEqual(to_pending.json()["data"]["status"], "sent")
 
         to_approved = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
@@ -887,7 +895,7 @@ class ChangeOrderTests(TestCase):
         rejected_co_id = self._create_change_order(amount_delta="300.00")
         self.client.patch(
             f"/api/v1/change-orders/{rejected_co_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -907,12 +915,12 @@ class ChangeOrderTests(TestCase):
         )
         self._assert_validation_error(invalid_after_rejected)
 
-    def test_pending_approval_cannot_transition_back_to_draft(self):
+    def test_sent_cannot_transition_back_to_draft(self):
         change_order_id = self._create_change_order(amount_delta="900.00")
 
         to_pending = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -926,12 +934,12 @@ class ChangeOrderTests(TestCase):
         )
         self._assert_validation_error(back_to_draft)
 
-    def test_change_order_patch_rejects_content_edits_when_pending_approval(self):
+    def test_change_order_patch_rejects_content_edits_when_sent(self):
         change_order_id = self._create_change_order(amount_delta="900.00")
 
         to_pending = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -950,7 +958,7 @@ class ChangeOrderTests(TestCase):
         approved_id = self._create_change_order(title="Approved lock", amount_delta="900.00")
         self.client.patch(
             f"/api/v1/change-orders/{approved_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -971,7 +979,7 @@ class ChangeOrderTests(TestCase):
         rejected_void_id = self._create_change_order(title="Rejected/void lock", amount_delta="450.00")
         self.client.patch(
             f"/api/v1/change-orders/{rejected_void_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -1025,7 +1033,7 @@ class ChangeOrderTests(TestCase):
         base_id = self._create_change_order(amount_delta="800.00")
         to_pending = self.client.patch(
             f"/api/v1/change-orders/{base_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -1047,7 +1055,7 @@ class ChangeOrderTests(TestCase):
             change_order_id=base_id,
             decision_status=ChangeOrderSnapshot.DecisionStatus.VOID,
         ).latest("id")
-        self.assertEqual(snapshot.snapshot_json["decision_context"]["previous_status"], "pending_approval")
+        self.assertEqual(snapshot.snapshot_json["decision_context"]["previous_status"], "sent")
         self.assertEqual(snapshot.snapshot_json["decision_context"]["applied_financial_delta"], "0.00")
 
     def test_change_order_approved_status_creates_immutable_snapshot(self):
@@ -1078,7 +1086,7 @@ class ChangeOrderTests(TestCase):
 
         self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -1097,7 +1105,7 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(snapshot.decided_by_id, self.user.id)
         self.assertEqual(snapshot.snapshot_json["change_order"]["status"], "approved")
         self.assertEqual(snapshot.snapshot_json["change_order"]["amount_delta"], "250.00")
-        self.assertEqual(snapshot.snapshot_json["decision_context"]["previous_status"], "pending_approval")
+        self.assertEqual(snapshot.snapshot_json["decision_context"]["previous_status"], "sent")
         self.assertEqual(snapshot.snapshot_json["decision_context"]["applied_financial_delta"], "250.00")
         self.assertEqual(len(snapshot.snapshot_json["line_items"]), 1)
 
@@ -1106,7 +1114,7 @@ class ChangeOrderTests(TestCase):
 
         self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -1124,7 +1132,7 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(rejected_snapshot.decision_status, ChangeOrderSnapshot.DecisionStatus.REJECTED)
         self.assertEqual(rejected_snapshot.decided_by_id, self.user.id)
         self.assertEqual(rejected_snapshot.snapshot_json["change_order"]["status"], "rejected")
-        self.assertEqual(rejected_snapshot.snapshot_json["decision_context"]["previous_status"], "pending_approval")
+        self.assertEqual(rejected_snapshot.snapshot_json["decision_context"]["previous_status"], "sent")
         self.assertEqual(rejected_snapshot.snapshot_json["decision_context"]["applied_financial_delta"], "0.00")
 
         voided = self.client.patch(
@@ -1195,7 +1203,7 @@ class ChangeOrderTests(TestCase):
 
         to_pending = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -1225,7 +1233,7 @@ class ChangeOrderTests(TestCase):
 
         to_pending = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -1247,7 +1255,7 @@ class ChangeOrderTests(TestCase):
 
         self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -1284,7 +1292,7 @@ class ChangeOrderTests(TestCase):
 
         self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -1305,4 +1313,176 @@ class ChangeOrderTests(TestCase):
 
         self.project.refresh_from_db()
         self.assertEqual(str(self.project.contract_value_current), "100900.00")
+
+    # -----------------------------------------------------------------------
+    # ChangeOrderStatusEvent tests
+    # -----------------------------------------------------------------------
+
+    def test_change_order_create_records_status_event(self):
+        change_order_id = self._create_change_order()
+        events = ChangeOrderStatusEvent.objects.filter(change_order_id=change_order_id)
+        self.assertEqual(events.count(), 1)
+        event = events.first()
+        self.assertIsNone(event.from_status)
+        self.assertEqual(event.to_status, "draft")
+        self.assertEqual(event.changed_by, self.user)
+
+    def test_status_transition_records_event(self):
+        change_order_id = self._create_change_order()
+
+        self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        events = ChangeOrderStatusEvent.objects.filter(change_order_id=change_order_id)
+        self.assertEqual(events.count(), 2)
+        latest = events.first()
+        self.assertEqual(latest.from_status, "draft")
+        self.assertEqual(latest.to_status, "sent")
+
+    def test_resend_records_sent_to_sent_event(self):
+        change_order_id = self._create_change_order()
+
+        self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        events = ChangeOrderStatusEvent.objects.filter(change_order_id=change_order_id)
+        self.assertEqual(events.count(), 3)
+        latest = events.first()
+        self.assertEqual(latest.from_status, "sent")
+        self.assertEqual(latest.to_status, "sent")
+        self.assertIn("re-sent", latest.note.lower())
+
+    def test_status_note_records_same_status_event(self):
+        change_order_id = self._create_change_order()
+
+        self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status_note": "Internal discussion note."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        events = ChangeOrderStatusEvent.objects.filter(change_order_id=change_order_id)
+        self.assertEqual(events.count(), 2)
+        latest = events.first()
+        self.assertEqual(latest.from_status, "draft")
+        self.assertEqual(latest.to_status, "draft")
+        self.assertEqual(latest.note, "Internal discussion note.")
+
+    def test_public_decision_records_status_event(self):
+        change_order_id = self._create_change_order(amount_delta="1500.00")
+
+        self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        co = ChangeOrder.objects.get(id=change_order_id)
+        session = _verified_session(
+            co.public_token, "change_order", co.id, self.customer.email,
+        )
+        self.client.post(
+            f"/api/v1/public/change-orders/{co.public_token}/decision/",
+            data={
+                "decision": "approve",
+                "session_token": session.session_token,
+                "signer_name": "Owner",
+                "consent_accepted": True,
+            },
+            content_type="application/json",
+        )
+
+        events = ChangeOrderStatusEvent.objects.filter(change_order_id=change_order_id)
+        self.assertEqual(events.count(), 3)
+        latest = events.first()
+        self.assertEqual(latest.from_status, "sent")
+        self.assertEqual(latest.to_status, "approved")
+        self.assertIn("via public link", latest.note.lower())
+
+    def test_clone_revision_records_events_for_clone_and_source(self):
+        change_order_id = self._create_change_order()
+
+        self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        clone_response = self.client.post(
+            f"/api/v1/change-orders/{change_order_id}/clone-revision/",
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(clone_response.status_code, 201)
+        clone_id = clone_response.json()["data"]["id"]
+
+        # Source should have: create + sent + auto-void = 3 events
+        source_events = ChangeOrderStatusEvent.objects.filter(change_order_id=change_order_id)
+        self.assertEqual(source_events.count(), 3)
+        void_event = source_events.first()
+        self.assertEqual(void_event.from_status, "sent")
+        self.assertEqual(void_event.to_status, "void")
+        self.assertIn("auto-voided", void_event.note.lower())
+
+        # Clone should have: create = 1 event
+        clone_events = ChangeOrderStatusEvent.objects.filter(change_order_id=clone_id)
+        self.assertEqual(clone_events.count(), 1)
+        self.assertIsNone(clone_events.first().from_status)
+        self.assertEqual(clone_events.first().to_status, "draft")
+
+    def test_status_events_endpoint_returns_events(self):
+        change_order_id = self._create_change_order()
+
+        self.client.patch(
+            f"/api/v1/change-orders/{change_order_id}/",
+            data={"status": "sent", "status_note": "Sending to customer."},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+
+        response = self.client.get(
+            f"/api/v1/change-orders/{change_order_id}/status-events/",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()["data"]
+        self.assertEqual(len(data), 2)
+        # Newest first
+        self.assertEqual(data[0]["from_status"], "draft")
+        self.assertEqual(data[0]["to_status"], "sent")
+        self.assertIn("action_type", data[0])
+        self.assertIn("changed_by_email", data[0])
+        # Oldest
+        self.assertIsNone(data[1]["from_status"])
+        self.assertEqual(data[1]["to_status"], "draft")
+
+    def test_status_events_endpoint_rejects_cross_org_access(self):
+        change_order_id = self._create_change_order()
+
+        other_user = User.objects.create_user(username="other_org", email="other@example.com", password="secret123")
+        _bootstrap_org(other_user)
+        other_token = Token.objects.create(user=other_user)
+
+        response = self.client.get(
+            f"/api/v1/change-orders/{change_order_id}/status-events/",
+            HTTP_AUTHORIZATION=f"Token {other_token.key}",
+        )
+        self.assertEqual(response.status_code, 404)
 

@@ -13,12 +13,13 @@ from rest_framework.response import Response
 from core.models import (
     ChangeOrder,
     ChangeOrderSnapshot,
+    ChangeOrderStatusEvent,
     Estimate,
     Project,
     SigningCeremonyRecord,
 )
 from core.policies import get_change_order_policy_contract
-from core.serializers import ChangeOrderSerializer, ChangeOrderWriteSerializer, EstimateLineItemSerializer
+from core.serializers import ChangeOrderSerializer, ChangeOrderStatusEventSerializer, ChangeOrderWriteSerializer, EstimateLineItemSerializer
 from core.serializers import ChangeOrderSerializer as _ChangeOrderSerializerForHash
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.utils.request import get_client_ip
@@ -129,7 +130,7 @@ def public_change_order_detail_view(request, public_token):
 def public_change_order_decision_view(request, public_token):
     """Apply a customer approve/reject decision through a public change-order link.
 
-    Validates the decision, confirms the CO is in ``pending_approval``
+    Validates the decision, confirms the CO is in ``sent``
     status, runs signing ceremony verification, then atomically
     transitions the status, propagates financial deltas to the project
     contract value, and records audit snapshots and signing ceremony.
@@ -154,7 +155,7 @@ def public_change_order_decision_view(request, public_token):
     Errors:
         - 400: Invalid decision value.
         - 404: Change order not found.
-        - 409: Change order not in ``pending_approval`` status.
+        - 409: Change order not in ``sent`` status.
     """
     try:
         change_order = _prefetch_change_order_qs(
@@ -173,7 +174,7 @@ def public_change_order_decision_view(request, public_token):
             status=400,
         )
 
-    if change_order.status != ChangeOrder.Status.PENDING_APPROVAL:
+    if change_order.status != ChangeOrder.Status.SENT:
         return Response(
             {
                 "error": {
@@ -249,6 +250,15 @@ def public_change_order_decision_view(request, public_token):
             consent_text_snapshot=consent_text,
             note=str(request.data.get("note", "") or "").strip(),
             access_session=ceremony_session,
+        )
+        ChangeOrderStatusEvent.record(
+            change_order=change_order,
+            from_status=previous_status,
+            to_status=next_status,
+            note=f"{decision_note} (via public link)",
+            changed_by=change_order.requested_by,
+            ip_address=client_ip,
+            user_agent=client_ua,
         )
 
     refreshed = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
@@ -497,6 +507,14 @@ def project_change_orders_view(request, project_id):
                 {"error": {"code": "validation_error", "message": "Change-order line items are invalid for this project/budget context.", "fields": fields}},
                 status=400,
             )
+        change_order.refresh_from_db()
+        ChangeOrderStatusEvent.record(
+            change_order=change_order,
+            from_status=None,
+            to_status=change_order.status,
+            note="Change order created.",
+            changed_by=request.user,
+        )
         created = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
         return Response({"data": ChangeOrderSerializer(created).data}, status=201)
 
@@ -527,7 +545,7 @@ def change_order_detail_view(request, change_order_id):
 
     Request body (PATCH)::
 
-        { "status": "pending_approval" }
+        { "status": "sent" }
 
     Success 200::
 
@@ -567,7 +585,7 @@ def change_order_detail_view(request, change_order_id):
         # Status-transition capability gates
         if "status" in data:
             requested_status = data["status"]
-            if requested_status == ChangeOrder.Status.PENDING_APPROVAL:
+            if requested_status == ChangeOrder.Status.SENT:
                 permission_error, _ = _capability_gate(request.user, "change_orders", "send")
                 if permission_error:
                     return Response(permission_error, status=403)
@@ -604,8 +622,8 @@ def change_order_detail_view(request, change_order_id):
         is_actual_transition = status_changing and previous_status != next_status
         is_resend = (
             status_changing
-            and previous_status == ChangeOrder.Status.PENDING_APPROVAL
-            and next_status == ChangeOrder.Status.PENDING_APPROVAL
+            and previous_status == ChangeOrder.Status.SENT
+            and next_status == ChangeOrder.Status.SENT
         )
         status_note = (data.get("status_note", "") or "").strip()
 
@@ -626,7 +644,7 @@ def change_order_clone_revision_view(request, change_order_id):
 
     Copies title, amounts, reason, terms, origin estimate, and line items
     into a new draft revision.  The source must be the latest family
-    revision.  If the source is in draft or pending_approval status, it
+    revision.  If the source is in draft or sent status, it
     is auto-voided to prevent two live revisions.
 
     Flow:
@@ -634,7 +652,7 @@ def change_order_clone_revision_view(request, change_order_id):
         2. Capability gate: ``change_orders.create``.
         3. Validate source is the latest family revision.
         4. Create cloned draft with line items (atomic).
-        5. Auto-void source if it was draft or pending_approval.
+        5. Auto-void source if it was draft or sent.
 
     URL: ``POST /api/v1/change-orders/<change_order_id>/clone-revision/``
 
@@ -724,7 +742,7 @@ def change_order_clone_revision_view(request, change_order_id):
                 if line.cost_code_id
             },
         )
-        if change_order.status in {ChangeOrder.Status.DRAFT, ChangeOrder.Status.PENDING_APPROVAL}:
+        if change_order.status in {ChangeOrder.Status.DRAFT, ChangeOrder.Status.SENT}:
             previous_status = change_order.status
             change_order.status = ChangeOrder.Status.VOID
             change_order.save(update_fields=["status", "updated_at"])
@@ -735,6 +753,62 @@ def change_order_clone_revision_view(request, change_order_id):
                 applied_financial_delta=MONEY_ZERO,
                 decided_by=request.user,
             )
+            ChangeOrderStatusEvent.record(
+                change_order=change_order,
+                from_status=previous_status,
+                to_status=ChangeOrder.Status.VOID,
+                note="Auto-voided by revision clone.",
+                changed_by=request.user,
+            )
+        clone.refresh_from_db()
+        ChangeOrderStatusEvent.record(
+            change_order=clone,
+            from_status=None,
+            to_status=clone.status,
+            note="Cloned from previous revision.",
+            changed_by=request.user,
+        )
 
     created = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=clone.id)).get()
     return Response({"data": ChangeOrderSerializer(created).data}, status=201)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def change_order_status_events_view(request, change_order_id):
+    """Return the immutable status-transition audit trail for a change order.
+
+    Flow:
+        1. Look up change order scoped to user's org.
+        2. Query all status events with related user and project data.
+
+    URL: ``GET /api/v1/change-orders/<change_order_id>/status-events/``
+
+    Request body: (none)
+
+    Success 200::
+
+        { "data": [{ "from_status": "draft", "to_status": "sent", ... }, ...] }
+
+    Errors:
+        - 404: Change order not found.
+    """
+    membership = _ensure_org_membership(request.user)
+    try:
+        change_order = ChangeOrder.objects.get(
+            id=change_order_id,
+            project__organization_id=membership.organization_id,
+        )
+    except ChangeOrder.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "Change order not found.", "fields": {}}},
+            status=404,
+        )
+
+    status_events = ChangeOrderStatusEvent.objects.filter(
+        change_order=change_order,
+    ).select_related(
+        "changed_by",
+        "change_order__project__customer",
+    )
+    return Response({"data": ChangeOrderStatusEventSerializer(status_events, many=True).data})

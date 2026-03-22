@@ -426,13 +426,13 @@
   flex-wrap: wrap;
 }
 
-.actionButtonPending {
+.actionButtonSent {
   background: var(--status-amber-solid);
   border-color: var(--status-amber-border);
   color: var(--status-amber-solid-text);
 }
 
-.actionButtonPending:hover {
+.actionButtonSent:hover {
   border-color: var(--status-amber-solid-text);
 }
 

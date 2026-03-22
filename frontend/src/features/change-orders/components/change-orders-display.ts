@@ -21,19 +21,19 @@ import type {
 /** Fallback human-readable labels for change order statuses when policy contract is unavailable. */
 export const CHANGE_ORDER_STATUS_LABELS_FALLBACK: Record<string, string> = {
   draft: "Draft",
-  pending_approval: "Pending Approval",
+  sent: "Sent",
   approved: "Approved",
   rejected: "Rejected",
   void: "Void",
 };
 
 /** Fallback ordered status list when policy contract is unavailable. */
-export const CHANGE_ORDER_STATUSES_FALLBACK = ["draft", "pending_approval", "approved", "rejected", "void"];
+export const CHANGE_ORDER_STATUSES_FALLBACK = ["draft", "sent", "approved", "rejected", "void"];
 
 /** Fallback allowed status transition map when policy contract is unavailable. */
 export const CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
-  draft: ["pending_approval", "void"],
-  pending_approval: ["approved", "rejected", "void"],
+  draft: ["sent", "void"],
+  sent: ["approved", "rejected", "void"],
   approved: [],
   rejected: ["void"],
   void: [],
@@ -70,7 +70,7 @@ export function quickStatusControlLabel(
   statusLabels: Record<string, string>,
   currentStatus?: string,
 ): string {
-  if (status === "pending_approval" || status === "sent") {
+  if (status === "sent" || status === "sent") {
     return currentStatus === status ? "Re-send" : "Send";
   }
   if (status === "void") {
@@ -172,7 +172,7 @@ export function eventActorHref(event: AuditEventRecord): string | null {
 
 /**
  * Derive a past-tense action label from a status audit event.
- * Maps transition patterns (e.g. draft -> pending_approval) to user-friendly
+ * Maps transition patterns (e.g. draft -> sent) to user-friendly
  * labels like "Sent", "Approved", "Re-sent", etc.
  */
 export function statusEventActionLabel(
@@ -194,10 +194,10 @@ export function statusEventActionLabel(
   if (fromStatus === toStatus && (event.note || "").trim()) {
     return "Notated";
   }
-  if (fromStatus === "pending_approval" && toStatus === "pending_approval") {
+  if (fromStatus === "sent" && toStatus === "sent") {
     return "Re-sent";
   }
-  if (fromStatus === "draft" && toStatus === "pending_approval") {
+  if (fromStatus === "draft" && toStatus === "sent") {
     return "Sent";
   }
   if (toStatus === "approved") {

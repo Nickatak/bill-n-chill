@@ -203,6 +203,12 @@ export function ChangeOrdersConsole({
     return () => setPrintable(false);
   }, [form.selectedChangeOrderId, setPrintable]);
 
+  /** Effect: Load status events when a change order is selected. */
+  useEffect(() => {
+    if (!form.selectedChangeOrderId || !authToken) return;
+    void projectData.loadChangeOrderStatusEvents(Number(form.selectedChangeOrderId));
+  }, [form.selectedChangeOrderId, authToken, projectData.loadChangeOrderStatusEvents]);
+
   /** Effect: Bootstrap — fetch projects and cascade into all data loads. */
   useEffect(() => {
     if (!authToken) {
@@ -372,11 +378,11 @@ export function ChangeOrdersConsole({
         projectData.setChangeOrders(rows);
         const persisted = rows.find((row) => row.id === created.id);
         form.hydrateEditForm(persisted ?? created);
-        await projectData.loadProjectAuditEvents(projectId);
+        await projectData.loadChangeOrderStatusEvents(created.id);
       } else {
         projectData.setChangeOrders((current) => [created, ...current]);
         form.hydrateEditForm(created);
-        await projectData.loadProjectAuditEvents(projectId);
+        await projectData.loadChangeOrderStatusEvents(created.id);
       }
       projectData.setFeedback(`Created change order #${created.id}.`, "success");
       form.resetCreateForm(projectData.selectedProjectName, defaultChangeOrderTerms);
@@ -421,7 +427,7 @@ export function ChangeOrdersConsole({
         projectData.setChangeOrders(rows);
         const persisted = rows.find((row) => row.id === created.id);
         form.hydrateEditForm(persisted ?? created);
-        await projectData.loadProjectAuditEvents(projectId);
+        await projectData.loadChangeOrderStatusEvents(created.id);
       }
       projectData.setFeedback(`Duplicated as ${coLabel(created)}.`, "success");
       flashEdit();
@@ -483,14 +489,14 @@ export function ChangeOrdersConsole({
         projectData.setChangeOrders(rows);
         const persisted = rows.find((row) => row.id === updated.id);
         form.hydrateEditForm(persisted ?? updated);
-        await projectData.loadProjectAuditEvents(projectId);
+        await projectData.loadChangeOrderStatusEvents(updated.id);
         projectData.setFeedback(`Saved change order ${coLabel(updated)} (${statusLabel(updated.status, changeOrderStatusLabels)}).`, "success");
       } else {
         projectData.setChangeOrders((current) =>
           current.map((row) => (row.id === updated.id ? updated : row)),
         );
         form.hydrateEditForm(updated);
-        await projectData.loadProjectAuditEvents(projectId);
+        await projectData.loadChangeOrderStatusEvents(updated.id);
         projectData.setFeedback(`Saved change order ${coLabel(updated)} (${statusLabel(updated.status, changeOrderStatusLabels)}).`, "success");
       }
     } catch {
@@ -515,7 +521,7 @@ export function ChangeOrdersConsole({
     }
 
     const isResend =
-      viewer.selectedViewerChangeOrder.status === form.quickStatus && form.quickStatus === "pending_approval";
+      viewer.selectedViewerChangeOrder.status === form.quickStatus && form.quickStatus === "sent";
 
     projectData.setFeedback("");
     try {
@@ -538,17 +544,17 @@ export function ChangeOrdersConsole({
         projectData.setChangeOrders(rows);
         const persisted = rows.find((row) => row.id === updated.id);
         form.hydrateEditForm(persisted ?? updated);
-        await projectData.loadProjectAuditEvents(projectId);
+        await projectData.loadChangeOrderStatusEvents(updated.id);
       } else {
         projectData.setChangeOrders((current) =>
           current.map((row) => (row.id === updated.id ? updated : row)),
         );
         form.hydrateEditForm(updated);
-        await projectData.loadProjectAuditEvents(projectId);
+        await projectData.loadChangeOrderStatusEvents(updated.id);
       }
-      const emailNote = form.quickStatus === "pending_approval" && payload.email_sent === false ? " No email sent — customer has no email on file." : "";
+      const emailNote = form.quickStatus === "sent" && payload.email_sent === false ? " No email sent — customer has no email on file." : "";
       const actionFeedback: Record<string, string> = {
-        pending_approval: isResend
+        sent: isResend
           ? `Re-sent ${coLabel(updated)} for approval.${emailNote}`
           : `Sent ${coLabel(updated)} for approval.${emailNote}`,
         approved: `Marked ${coLabel(updated)} as accepted.`,
@@ -609,13 +615,13 @@ export function ChangeOrdersConsole({
         projectData.setChangeOrders(rows);
         const persisted = rows.find((row) => row.id === updated.id);
         form.hydrateEditForm(persisted ?? updated);
-        await projectData.loadProjectAuditEvents(projectId);
+        await projectData.loadChangeOrderStatusEvents(updated.id);
       } else {
         projectData.setChangeOrders((current) =>
           current.map((row) => (row.id === updated.id ? updated : row)),
         );
         form.hydrateEditForm(updated);
-        await projectData.loadProjectAuditEvents(projectId);
+        await projectData.loadChangeOrderStatusEvents(updated.id);
       }
       form.setQuickStatusNote("");
       projectData.setFeedback(`Added status note on ${coLabel(updated)}. History updated.`, "success");

@@ -27,7 +27,7 @@ function makeEvent(overrides: Partial<AuditEventRecord> = {}): AuditEventRecord 
     object_type: "change_order",
     object_id: 10,
     from_status: "draft",
-    to_status: "pending_approval",
+    to_status: "sent",
     note: "",
     created_by: 5,
     created_by_email: null,
@@ -63,7 +63,7 @@ function makeCO(overrides: Partial<ChangeOrderRecord> = {}): ChangeOrderRecord {
 describe("statusLabel", () => {
   it("returns label from map when present", () => {
     expect(statusLabel("draft", LABELS)).toBe("Draft");
-    expect(statusLabel("pending_approval", LABELS)).toBe("Pending Approval");
+    expect(statusLabel("sent", LABELS)).toBe("Sent");
   });
 
   it("title-cases unknown statuses with underscore splitting", () => {
@@ -80,12 +80,12 @@ describe("statusLabel", () => {
 // ---------------------------------------------------------------------------
 
 describe("quickStatusControlLabel", () => {
-  it("returns 'Send' for pending_approval when current is different", () => {
-    expect(quickStatusControlLabel("pending_approval", LABELS, "draft")).toBe("Send");
+  it("returns 'Send' for 'sent' when current is different", () => {
+    expect(quickStatusControlLabel("sent", LABELS, "draft")).toBe("Send");
   });
 
-  it("returns 'Re-send' for pending_approval when current matches", () => {
-    expect(quickStatusControlLabel("pending_approval", LABELS, "pending_approval")).toBe("Re-send");
+  it("returns 'Re-send' for 'sent' when current matches", () => {
+    expect(quickStatusControlLabel("sent", LABELS, "sent")).toBe("Re-send");
   });
 
   it("returns 'Void' for void status", () => {
@@ -212,12 +212,12 @@ describe("statusEventActionLabel", () => {
     expect(statusEventActionLabel(makeEvent({ from_status: "", to_status: "draft" }), LABELS)).toBe("Created");
   });
 
-  it("returns 'Sent' for draft -> pending_approval", () => {
-    expect(statusEventActionLabel(makeEvent({ from_status: "draft", to_status: "pending_approval" }), LABELS)).toBe("Sent");
+  it("returns 'Sent' for draft → sent", () => {
+    expect(statusEventActionLabel(makeEvent({ from_status: "draft", to_status: "sent" }), LABELS)).toBe("Sent");
   });
 
-  it("returns 'Re-sent' for pending_approval -> pending_approval", () => {
-    expect(statusEventActionLabel(makeEvent({ from_status: "pending_approval", to_status: "pending_approval" }), LABELS)).toBe("Re-sent");
+  it("returns 'Re-sent' for sent → sent", () => {
+    expect(statusEventActionLabel(makeEvent({ from_status: "sent", to_status: "sent" }), LABELS)).toBe("Re-sent");
   });
 
   it("returns 'Approved' for -> approved", () => {
@@ -254,7 +254,7 @@ describe("statusEventActionLabel", () => {
   });
 
   it("returns 'Returned to Draft' for -> draft with prior status", () => {
-    expect(statusEventActionLabel(makeEvent({ from_status: "pending_approval", to_status: "draft" }), LABELS)).toBe("Returned to Draft");
+    expect(statusEventActionLabel(makeEvent({ from_status: "sent", to_status: "draft" }), LABELS)).toBe("Returned to Draft");
   });
 
   it("falls back to 'From -> To' for unrecognized transitions", () => {
@@ -334,7 +334,7 @@ describe("lastStatusEventForChangeOrder", () => {
   it("returns the most recent status event for the CO", () => {
     const events = [
       makeEvent({ id: 1, object_id: 10, created_at: "2026-03-14T10:00:00Z", from_status: "", to_status: "draft" }),
-      makeEvent({ id: 2, object_id: 10, created_at: "2026-03-15T10:00:00Z", from_status: "draft", to_status: "pending_approval" }),
+      makeEvent({ id: 2, object_id: 10, created_at: "2026-03-15T10:00:00Z", from_status: "draft", to_status: "sent" }),
       makeEvent({ id: 3, object_id: 20, created_at: "2026-03-16T10:00:00Z" }), // wrong CO
     ];
     const result = lastStatusEventForChangeOrder(10, events);

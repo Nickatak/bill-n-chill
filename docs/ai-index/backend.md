@@ -1533,8 +1533,8 @@ _Seed four demo accounts representing different adoption stages of the platform.
 - `_assert_validation_rule(response, expected_rule: str)`
 - `test_change_order_contract_requires_authentication()`
 - `test_public_change_order_detail_view_allows_unauthenticated_access()`
-- `test_public_change_order_decision_view_approves_pending_approval()`
-- `test_public_change_order_decision_view_rejects_pending_approval()`
+- `test_public_change_order_decision_view_approves_sent()`
+- `test_public_change_order_decision_view_rejects_sent()`
 - `test_change_order_contract_matches_model_transition_policy()`
 - `test_change_order_create_and_numbering()`
 - `test_change_order_create_defaults_reason_to_empty_when_omitted()`
@@ -1558,8 +1558,8 @@ _Seed four demo accounts representing different adoption stages of the platform.
 - `test_change_order_model_rejects_cross_project_origin_estimate_on_direct_save()`
 - `test_change_order_model_rejects_cross_project_previous_change_order_on_direct_save()`
 - `test_change_order_status_lifecycle_validation()`
-- `test_pending_approval_cannot_transition_back_to_draft()`
-- `test_change_order_patch_rejects_content_edits_when_pending_approval()`
+- `test_sent_cannot_transition_back_to_draft()`
+- `test_change_order_patch_rejects_content_edits_when_sent()`
 - `test_change_order_patch_rejects_content_edits_when_approved_rejected_or_void()`
 - `test_change_order_clone_revision_requires_latest_revision()`
 - `test_change_order_clone_from_open_revision_auto_voids_source_revision()`

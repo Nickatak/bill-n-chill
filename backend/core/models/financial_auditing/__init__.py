@@ -1,5 +1,6 @@
 from core.models.financial_auditing.accounting_sync_record import AccountingSyncRecord
 from core.models.financial_auditing.change_order_snapshot import ChangeOrderSnapshot
+from core.models.financial_auditing.change_order_status_event import ChangeOrderStatusEvent
 from core.models.financial_auditing.customer_record import CustomerRecord
 from core.models.financial_auditing.estimate_status_event import EstimateStatusEvent
 from core.models.financial_auditing.invoice_status_event import InvoiceStatusEvent
@@ -12,6 +13,7 @@ from core.models.financial_auditing.vendor_bill_snapshot import VendorBillSnapsh
 __all__ = [
     "AccountingSyncRecord",
     "ChangeOrderSnapshot",
+    "ChangeOrderStatusEvent",
     "CustomerRecord",
     "EstimateStatusEvent",
     "InvoiceStatusEvent",

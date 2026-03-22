@@ -105,6 +105,14 @@ class InvoiceTests(TestCase):
 
     def test_public_invoice_detail_view_allows_unauthenticated_access(self):
         invoice_id = self._create_invoice()
+
+        # Must send (leave draft) before public access is allowed
+        self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
         invoice = Invoice.objects.get(id=invoice_id)
 
         response = self.client.get(f"/api/v1/public/invoices/{invoice.public_token}/")

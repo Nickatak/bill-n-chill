@@ -49,8 +49,8 @@ function statusEventActionClass(event: AuditEventRecord): string {
   if (statusAction === "resend") return styles.statusEventSent;
   if (!fromStatus && toStatus === "draft") return styles.statusEventCreated;
   if (fromStatus === toStatus && (event.note || "").trim()) return styles.statusEventNeutral;
-  if (fromStatus === "pending_approval" && toStatus === "pending_approval") return styles.statusEventSent;
-  if (fromStatus === "draft" && toStatus === "pending_approval") return styles.statusEventSent;
+  if (fromStatus === "sent" && toStatus === "sent") return styles.statusEventSent;
+  if (fromStatus === "draft" && toStatus === "sent") return styles.statusEventSent;
   if (toStatus === "approved") return styles.statusEventApproved;
   if (toStatus === "rejected") return styles.statusEventRejected;
   if (toStatus === "void") return styles.statusEventVoid;
@@ -84,7 +84,7 @@ function renderEventActor(event: AuditEventRecord) {
 
 function coActionButtonColorClass(status: string): string {
   switch (status) {
-    case "pending_approval": return styles.actionButtonPending;
+    case "sent": return styles.actionButtonSent;
     case "approved": return styles.actionButtonApproved;
     case "rejected": return styles.actionButtonRejected;
     case "void": return styles.actionButtonVoid;
@@ -93,8 +93,8 @@ function coActionButtonColorClass(status: string): string {
 }
 
 function coActionLabel(statusValue: string, currentStatus?: string): string {
-  if (statusValue === "pending_approval") {
-    return currentStatus === "pending_approval" ? "Re-send" : "Send for Approval";
+  if (statusValue === "sent") {
+    return currentStatus === "sent" ? "Re-send" : "Send for Approval";
   }
   if (statusValue === "approved") return "Mark Accepted";
   if (statusValue === "rejected") return "Mark Rejected";
@@ -109,8 +109,8 @@ function coConfirmationMessage(
   currentStatus?: string,
 ): string {
   const label = coLabel(co);
-  const isResend = statusValue === "pending_approval" && currentStatus === "pending_approval";
-  if (statusValue === "pending_approval") {
+  const isResend = statusValue === "sent" && currentStatus === "sent";
+  if (statusValue === "sent") {
     return `${isResend ? "Re-send" : "Send"} ${label} to ${customerName || "customer"} for approval.`;
   }
   if (statusValue === "approved") return `Mark ${label} as accepted.`;
@@ -181,7 +181,7 @@ function ChangeOrderActionPanel({
       if (!updated) return;
       setPendingAction(null);
 
-      if (pendingAction === "pending_approval" && updated.public_ref) {
+      if (pendingAction === "sent" && updated.public_ref) {
         const publicUrl = `${window.location.origin}/change-order/${updated.public_ref}`;
         const senderName = (updated.sender_name || "").trim();
         const from = senderName ? ` from ${senderName}` : "";
@@ -258,7 +258,7 @@ function ChangeOrderActionPanel({
               rows={2}
             />
           </label>
-          {pendingAction === "pending_approval" ? (
+          {pendingAction === "sent" ? (
             <p className={styles.actionConfirmDetail}>
               {coEmailNotice(customerEmail)}
             </p>

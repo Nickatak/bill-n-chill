@@ -15,6 +15,7 @@ from core.models import (
     ChangeOrder,
     ChangeOrderLine,
     ChangeOrderSnapshot,
+    ChangeOrderStatusEvent,
     CostCode,
     Estimate,
     OrganizationMembership,
@@ -287,7 +288,7 @@ def _handle_co_status_transition(
     """Handle a change-order status transition with financials, audit, and email.
 
     Called when the PATCH includes a real status change or a
-    pending-approval resend.  Freezes org identity on draft departure,
+    sent resend.  Freezes org identity on draft departure,
     propagates financial deltas to the project contract value, manages
     approval metadata, records immutable snapshots, and sends email
     notifications on send/resend.
@@ -375,6 +376,15 @@ def _handle_co_status_transition(
                     applied_financial_delta=financial_delta,
                     decided_by=request.user,
                 )
+            status_note = (data.get("status_note", "") or "").strip()
+            event_note = status_note or ("Change order re-sent." if is_resend else "Change order status updated.")
+            ChangeOrderStatusEvent.record(
+                change_order=change_order,
+                from_status=previous_status,
+                to_status=next_status,
+                note=event_note,
+                changed_by=request.user,
+            )
     except ValidationError as exc:
         fields = exc.message_dict if hasattr(exc, "message_dict") else {"non_field_errors": exc.messages}
         return Response(
@@ -384,8 +394,8 @@ def _handle_co_status_transition(
 
     # Email notification (outside transaction)
     email_sent = False
-    if next_status == ChangeOrder.Status.PENDING_APPROVAL and (
-        previous_status != ChangeOrder.Status.PENDING_APPROVAL or is_resend
+    if next_status == ChangeOrder.Status.SENT and (
+        previous_status != ChangeOrder.Status.SENT or is_resend
     ):
         customer_email = (change_order.project.customer.email or "").strip()
         email_sent = send_document_sent_email(
@@ -405,11 +415,21 @@ def _handle_co_status_note(
     change_order: ChangeOrder,
     data: dict[str, Any],
 ) -> Response:
-    """Return current change-order state for note-only requests.
+    """Record a status note without changing the change-order status.
 
-    Change orders do not store timeline notes — this handler exists for
-    frontend PATCH symmetry with estimates/invoices and returns the
-    current document unchanged.
+    Creates a same-status audit event with the user's note, then returns
+    the current document unchanged.
     """
+    note_text = (data.get("status_note", "") or "").strip()
+
+    with transaction.atomic():
+        ChangeOrderStatusEvent.record(
+            change_order=change_order,
+            from_status=change_order.status,
+            to_status=change_order.status,
+            note=note_text,
+            changed_by=request.user,
+        )
+
     refreshed = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
     return Response({"data": ChangeOrderSerializer(refreshed).data, "email_sent": False})

@@ -274,13 +274,13 @@ class AttentionFeedTests(ReportingTestBase):
             revision_number=1,
             title="Needs Approval",
             amount_delta=Decimal("1500.00"),
-            status=ChangeOrder.Status.PENDING_APPROVAL,
+            status=ChangeOrder.Status.SENT,
             requested_by=self.user,
         )
         response = self.client.get("/api/v1/reports/attention-feed/", **self._auth())
         data = response.json()["data"]
         self.assertEqual(data["item_count"], 1)
-        self.assertEqual(data["items"][0]["kind"], "change_order_pending_approval")
+        self.assertEqual(data["items"][0]["kind"], "change_order_sent")
 
     def test_void_payments_appear_as_low_severity(self):
         Payment.objects.create(

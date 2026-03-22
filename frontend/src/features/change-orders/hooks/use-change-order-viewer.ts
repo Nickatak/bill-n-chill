@@ -213,12 +213,12 @@ export function useChangeOrderViewer({
       return [] as string[];
     }
     const base = [...(changeOrderAllowedTransitions[selectedViewerChangeOrder.status] ?? [])];
-    const allowResend = selectedViewerChangeOrder.status === "pending_approval";
+    const allowResend = selectedViewerChangeOrder.status === "sent";
     if (allowResend && !base.includes(selectedViewerChangeOrder.status)) {
       base.unshift(selectedViewerChangeOrder.status);
     }
     return base.filter((status) => {
-      if (status === "pending_approval") return canSendChangeOrders;
+      if (status === "sent") return canSendChangeOrders;
       if (status === "approved") return canApproveChangeOrders;
       return true;
     });

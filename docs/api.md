@@ -559,13 +559,13 @@ Current product posture:
   - Revision rule:
     - only latest revision in family is editable
   - Allowed transitions:
-    - `draft -> pending_approval | void`
-    - `pending_approval -> draft | approved | rejected | void`
-    - `approved -> void`
-    - `rejected -> draft | void`
-    - `void -> (no further transitions)`
+    - `draft -> sent | void`
+    - `sent -> approved | rejected | void`
+    - `approved -> (terminal)`
+    - `rejected -> void`
+    - `void -> (terminal)`
   - Important:
-    - direct `draft -> approved` is invalid; CO must move through `pending_approval` first.
+    - direct `draft -> approved` is invalid; CO must move through `sent` first.
   - Approval behavior:
     - transition to `approved` sets `approved_by` and `approved_at`.
   - Line-item consistency:
@@ -578,7 +578,7 @@ Current product posture:
 
 - `POST /api/v1/public/change-orders/{public_token}/decision/`
   - No auth required
-  - Applies customer decision while status is `pending_approval`.
+  - Applies customer decision while status is `sent`.
   - Decisions:
     - `approve` (`approved` alias accepted) -> `approved`
     - `reject` (`rejected` alias accepted) -> `rejected`
@@ -614,7 +614,7 @@ CO-02 extends existing CO endpoints with propagation behavior.
   - `void`
 - Not captured for non-decision/internal workflow states:
   - `draft`
-  - `pending_approval`
+  - `sent`
 - Snapshot payload stores point-in-time:
   - change-order header data
   - linked line-item rows

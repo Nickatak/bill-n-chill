@@ -306,7 +306,7 @@ def attention_feed_view(request):
     pending_change_orders = (
         ChangeOrder.objects.filter(
             project__organization_id=membership.organization_id,
-            status=ChangeOrder.Status.PENDING_APPROVAL,
+            status=ChangeOrder.Status.SENT,
         )
         .select_related("project")
         .order_by("-created_at", "-id")
@@ -314,9 +314,9 @@ def attention_feed_view(request):
     for change_order in pending_change_orders:
         items.append(
             {
-                "kind": "change_order_pending_approval",
+                "kind": "change_order_sent",
                 "severity": "medium",
-                "label": f"CO-{change_order.family_key} pending approval",
+                "label": f"CO-{change_order.family_key} awaiting approval",
                 "detail": f"{change_order.title} | amount delta {change_order.amount_delta}",
                 "project_id": change_order.project_id,
                 "project_name": change_order.project.name,

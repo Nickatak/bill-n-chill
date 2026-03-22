@@ -16,7 +16,7 @@
  * - changeOrders                 — full change-order list for the selected project
  * - projectEstimates             — approved origin estimates for the selected project
  * - originEstimateOriginalTotals — map of estimate ID to original grand total
- * - projectAuditEvents           — audit events for the selected project
+ * - projectAuditEvents           — status events for change orders (fetched per-CO, merged)
  * - costCodes                    — active cost codes for line-item dropdowns
  * - organizationDefaults         — branding and default terms for document headers
  *
@@ -29,8 +29,8 @@
  *     GETs estimates, filters to approved, enriches with approval metadata,
  *     writes into projectEstimates/originEstimateOriginalTotals state.
  *
- * - loadProjectAuditEvents(projectId)
- *     GETs audit events for a project, writes into projectAuditEvents.
+ * - loadChangeOrderStatusEvents(changeOrderId)
+ *     GETs status events for a CO, maps to AuditEventRecord shape, merges into projectAuditEvents.
  *
  * - loadCostCodes()
  *     GETs active cost codes, writes into costCodes.
@@ -40,7 +40,7 @@
  *
  * - loadProjects(callbacks)
  *     Primary bootstrap: fetches projects, selects the scoped/first project,
- *     cascades into loadProjectEstimates + loadProjectAuditEvents + loadCostCodes
+ *     cascades into loadProjectEstimates + loadCostCodes
  *     + fetchProjectChangeOrders. Uses callbacks to coordinate with form state.
  *
  * ## Effect
@@ -244,36 +244,48 @@ export function useChangeOrderProjectData({
     }
   }, [initialOriginEstimateId, authToken]);
 
-  /** Load audit events for a project. */
-  const loadProjectAuditEvents = useCallback(async (projectId: number) => {
+  /** Load status events for a single change order and merge into projectAuditEvents. */
+  const loadChangeOrderStatusEvents = useCallback(async (changeOrderId: number) => {
     try {
-      const response = await fetch(`${apiBaseUrl}/projects/${projectId}/audit-events/`, {
+      const response = await fetch(`${apiBaseUrl}/change-orders/${changeOrderId}/status-events/`, {
         headers: buildAuthHeaders(authToken),
       });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setProjectAuditEvents([]);
-        return;
-      }
-      const rows =
-        (payload.data as Array<{
-          id: number;
-          event_type: string;
-          object_type: string;
-          object_id: number;
-          from_status: string;
-          to_status: string;
-          note: string;
-          metadata_json?: Record<string, unknown> | null;
-          created_by: number;
-          created_by_email: string | null;
-          created_by_display?: string | null;
-          created_by_customer_id?: number | null;
-          created_at: string;
-        }>) ?? [];
-      setProjectAuditEvents(rows);
+      const payload = await response.json();
+      if (!response.ok || !payload.data) return;
+      const events = (payload.data as Array<{
+        id: number;
+        change_order: number;
+        from_status: string;
+        to_status: string;
+        note: string;
+        changed_by: number;
+        changed_by_email: string | null;
+        changed_by_display?: string | null;
+        changed_by_customer_id?: number | null;
+        changed_at: string;
+        action_type: string;
+      }>).map((event) => ({
+        id: event.id,
+        event_type: "change_order_updated",
+        object_type: "change_order",
+        object_id: event.change_order,
+        from_status: event.from_status,
+        to_status: event.to_status,
+        note: event.note,
+        metadata_json: { status_action: event.action_type },
+        created_by: event.changed_by,
+        created_by_email: event.changed_by_email,
+        created_by_display: event.changed_by_display,
+        created_by_customer_id: event.changed_by_customer_id,
+        created_at: event.changed_at,
+      } satisfies AuditEventRecord));
+      // Merge: replace events for this CO, keep events for other COs
+      setProjectAuditEvents((prev) => [
+        ...prev.filter((e) => e.object_id !== changeOrderId),
+        ...events,
+      ]);
     } catch {
-      setProjectAuditEvents([]);
+      // silent — events are non-critical
     }
   }, [authToken]);
 
@@ -354,9 +366,9 @@ export function useChangeOrderProjectData({
         setSelectedProjectName(nextProject.name || "");
         setSelectedProjectStatus(nextProject.status || "");
         setSelectedProjectCustomerEmail(nextProject.customer_email || "");
+        setProjectAuditEvents([]);
         await Promise.all([
           loadProjectEstimates(nextProject.id),
-          loadProjectAuditEvents(nextProject.id),
           loadCostCodes(),
         ]);
         const { rows: changeOrderRows, error } = await fetchProjectChangeOrders(nextProject.id);
@@ -388,7 +400,6 @@ export function useChangeOrderProjectData({
     fetchProjectChangeOrders,
     initialOriginEstimateId,
     loadCostCodes,
-    loadProjectAuditEvents,
     loadProjectEstimates,
     scopedProjectId,
     setFeedback,
@@ -434,7 +445,7 @@ export function useChangeOrderProjectData({
     // Helpers
     fetchProjectChangeOrders,
     loadProjectEstimates,
-    loadProjectAuditEvents,
+    loadChangeOrderStatusEvents,
     loadCostCodes,
     loadOrganizationDefaults,
     loadProjects,

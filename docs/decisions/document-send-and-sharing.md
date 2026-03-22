@@ -37,7 +37,7 @@ decision connects those pieces into a concrete UX.
 ### 1. Draft documents are not publicly accessible
 
 Public preview endpoints must reject documents that have not reached `sent`
-status (or equivalent: `pending_approval` for change orders). The public token
+status. The public token
 exists from creation (for URL stability), but the public page returns a
 not-found or not-yet-available response until the document is sent.
 

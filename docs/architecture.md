@@ -80,7 +80,7 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
 - Estimate lifecycle:
   - draft/sent/approved/rejected/void -> approved estimate sets project contract value.
 - Change-order propagation:
-  - `pending_approval -> approved|rejected` with contract value updates on approved transitions.
+  - `sent -> approved|rejected` with contract value updates on approved transitions.
 - Invoice + payment loop:
   - invoice send/status lifecycle -> inbound/outbound payment recording -> allocation updates balance/status.
 - Public customer decisions:

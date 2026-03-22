@@ -3,7 +3,7 @@
 /**
  * Public-facing change-order preview for customer decision flow.
  * Renders a read-only change-order document via a tokenized public URL and
- * provides approve/reject controls for change orders in "pending_approval" status.
+ * provides approve/reject controls for change orders in "sent" status.
  *
  * Parent: app/change-order/[publicRef]/page.tsx
  */
@@ -54,7 +54,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
   const { printTimestamp } = usePrintContext();
 
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const canDecide = changeOrder?.status === "pending_approval";
+  const canDecide = changeOrder?.status === "sent";
   const hasDecision = changeOrder?.status === "approved" || changeOrder?.status === "rejected";
   const sender = useMemo(
     () => resolvePublicSender(changeOrder?.organization_context, changeOrder),

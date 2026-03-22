@@ -4,6 +4,7 @@ from core.serializers.change_orders import (
     ChangeOrderLineInputSerializer,
     ChangeOrderLineSerializer,
     ChangeOrderSerializer,
+    ChangeOrderStatusEventSerializer,
     ChangeOrderWriteSerializer,
 )
 from core.serializers.estimates import (
@@ -92,6 +93,7 @@ __all__ = [
     "ChangeOrderSerializer",
     "ChangeOrderLineSerializer",
     "ChangeOrderLineInputSerializer",
+    "ChangeOrderStatusEventSerializer",
     "ChangeOrderWriteSerializer",
     "InvoiceLineSerializer",
     "InvoiceSerializer",

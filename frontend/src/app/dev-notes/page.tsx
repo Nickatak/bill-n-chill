@@ -670,7 +670,7 @@ function GCWorkflow() {
           <ol style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
             <li>User creates CO linked to an approved estimate (<code>origin_estimate</code> required).</li>
             <li>Adds line items (cost code + description + amount_delta + days_delta). Line totals must sum to CO amount_delta.</li>
-            <li>User sends &rarr; status to pending_approval. Org identity frozen. Email sent to customer.</li>
+            <li>User sends &rarr; status to sent. Org identity frozen. Email sent to customer.</li>
             <li>Customer opens public preview, completes OTP ceremony.</li>
             <li>Customer approves &rarr; <code>amount_delta</code> added to <code>project.contract_value_current</code>.</li>
           </ol>

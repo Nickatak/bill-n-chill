@@ -17,7 +17,7 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
 
     Business workflow:
     - Represents change governance after baseline, not a full estimate restart.
-    - Routed through draft -> pending approval -> approved/rejected/void lifecycle.
+    - Routed through draft -> sent -> approved/rejected/void lifecycle.
     - Approved amount deltas propagate to project contract value.
 
     Current policy:
@@ -27,23 +27,23 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
 
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
-        PENDING_APPROVAL = "pending_approval", "Pending Approval"
+        SENT = "sent", "Sent"
         APPROVED = "approved", "Approved"
         REJECTED = "rejected", "Rejected"
         VOID = "void", "Void"
 
     # Transition-map format:
     # {from_status: {allowed_to_status_1, allowed_to_status_2, ...}}
-    # Example: `draft -> pending_approval` is allowed because
-    # `Status.PENDING_APPROVAL` is in `ALLOWED_STATUS_TRANSITIONS[Status.DRAFT]`.
+    # Example: `draft -> sent` is allowed because
+    # `Status.SENT` is in `ALLOWED_STATUS_TRANSITIONS[Status.DRAFT]`.
     _status_label = "change-order"
 
     ALLOWED_STATUS_TRANSITIONS = {
         Status.DRAFT: {
-            Status.PENDING_APPROVAL,
+            Status.SENT,
             Status.VOID,
         },
-        Status.PENDING_APPROVAL: {
+        Status.SENT: {
             Status.APPROVED,
             Status.REJECTED,
             Status.VOID,

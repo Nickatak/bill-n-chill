@@ -5,7 +5,8 @@ from decimal import Decimal
 from django.db.models import Sum
 from rest_framework import serializers
 
-from core.models import ChangeOrder, ChangeOrderLine
+from core.models import ChangeOrder, ChangeOrderLine, ChangeOrderStatusEvent
+from core.serializers.mixins import resolve_public_actor_customer_id, resolve_public_actor_display
 
 
 class ChangeOrderLineSerializer(serializers.ModelSerializer):
@@ -139,3 +140,60 @@ class ChangeOrderWriteSerializer(serializers.Serializer):
     terms_text = serializers.CharField(max_length=10000, required=False, allow_blank=True)
     line_items = ChangeOrderLineInputSerializer(many=True, required=False)
     origin_estimate = serializers.IntegerField(required=False, allow_null=True)
+
+
+def _change_order_customer(obj: ChangeOrderStatusEvent):
+    """Navigate from a CO status event to the associated Customer."""
+    try:
+        return obj.change_order.project.customer
+    except AttributeError:
+        return None
+
+
+class ChangeOrderStatusEventSerializer(serializers.ModelSerializer):
+    """Read-only CO status event with computed action type and actor display."""
+
+    changed_by_email = serializers.CharField(source="changed_by.email", read_only=True)
+    changed_by_display = serializers.SerializerMethodField()
+    changed_by_customer_id = serializers.SerializerMethodField()
+    action_type = serializers.SerializerMethodField()
+
+    def get_action_type(self, obj: ChangeOrderStatusEvent) -> str:
+        """Classify the event as create, transition, resend, notate, or unchanged."""
+        from_status = obj.from_status or ""
+        to_status = obj.to_status or ""
+        note = (obj.note or "").strip()
+        if not from_status:
+            return "create"
+        if from_status != to_status:
+            return "transition"
+        if to_status == ChangeOrder.Status.SENT and note.lower() in {"", "change order re-sent."}:
+            return "resend"
+        if note:
+            return "notate"
+        return "unchanged"
+
+    def get_changed_by_display(self, obj: ChangeOrderStatusEvent) -> str:
+        """Return a human-readable display name for the actor who changed the status."""
+        return resolve_public_actor_display(obj, actor_field="changed_by", customer_fn=_change_order_customer)
+
+    def get_changed_by_customer_id(self, obj: ChangeOrderStatusEvent):
+        """Return the customer ID if the actor acted via a public token."""
+        return resolve_public_actor_customer_id(obj, customer_fn=_change_order_customer)
+
+    class Meta:
+        model = ChangeOrderStatusEvent
+        fields = [
+            "id",
+            "change_order",
+            "from_status",
+            "to_status",
+            "note",
+            "changed_by",
+            "changed_by_email",
+            "changed_by_display",
+            "changed_by_customer_id",
+            "changed_at",
+            "action_type",
+        ]
+        read_only_fields = fields

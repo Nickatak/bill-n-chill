@@ -586,7 +586,7 @@ class Command(BaseCommand):
         self._make_change_order(user, p_active1, "2", "Upgrade lighting fixtures",
             ChangeOrder.Status.DRAFT, Decimal("800.00"))
         self._make_change_order(user, p_active1, "3", "Add network drops",
-            ChangeOrder.Status.PENDING_APPROVAL, Decimal("1200.00"))
+            ChangeOrder.Status.SENT, Decimal("1200.00"))
         self._make_change_order(user, p_completed, "1", "Garage door upgrade",
             ChangeOrder.Status.APPROVED, Decimal("1200.00"), days_delta=1)
         self._make_change_order(user, p_completed, "2", "Cancel window relocation",
@@ -818,7 +818,7 @@ class Command(BaseCommand):
         # Change orders on active + completed projects
         co_specs = [
             (3, "1", "Upgrade master fixtures", ChangeOrder.Status.APPROVED, "7000"),
-            (3, "2", "Add mudroom entry", ChangeOrder.Status.PENDING_APPROVAL, "3500"),
+            (3, "2", "Add mudroom entry", ChangeOrder.Status.SENT, "3500"),
             (4, "1", "Conference room AV upgrade", ChangeOrder.Status.APPROVED, "7500"),
             (4, "2", "Parking lot resurfacing", ChangeOrder.Status.DRAFT, "12000"),
             (7, "1", "Server room cooling", ChangeOrder.Status.APPROVED, "3200"),

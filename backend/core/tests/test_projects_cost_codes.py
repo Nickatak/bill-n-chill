@@ -1036,7 +1036,7 @@ class ReportingPackTests(TestCase):
             project=self.project,
             family_key="21",
             title="Pending Approval CO",
-            status=ChangeOrder.Status.PENDING_APPROVAL,
+            status=ChangeOrder.Status.SENT,
             amount_delta="90.00",
             days_delta=1,
             requested_by=self.user,
@@ -1063,7 +1063,7 @@ class ReportingPackTests(TestCase):
         kinds = {item["kind"] for item in data["items"]}
         self.assertIn("overdue_invoice", kinds)
         self.assertIn("vendor_bill_due_soon", kinds)
-        self.assertIn("change_order_pending_approval", kinds)
+        self.assertIn("change_order_sent", kinds)
         self.assertIn("payment_problem", kinds)
 
     def test_quick_jump_search_returns_cross_entity_results(self):
@@ -1080,7 +1080,7 @@ class ReportingPackTests(TestCase):
             project=self.project,
             family_key="5",
             title="Kitchen Delta",
-            status=ChangeOrder.Status.PENDING_APPROVAL,
+            status=ChangeOrder.Status.SENT,
             amount_delta="250.00",
             days_delta=1,
             requested_by=self.user,

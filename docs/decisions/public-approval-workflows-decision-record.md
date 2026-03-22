@@ -46,7 +46,7 @@ Status: Accepted
 - Endpoints:
   - `GET /api/v1/public/change-orders/<token>/`
   - `POST /api/v1/public/change-orders/<token>/decision/`
-- Allowed from: `pending_approval`
+- Allowed from: `sent`
 - Decisions:
   - `approve` -> `approved` + applied financial delta to `Project.contract_value_current`
   - `reject` -> `rejected`

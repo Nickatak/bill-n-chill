@@ -80,7 +80,7 @@ This section is the canonical glossary for bill-n-chill. For model fields and li
 | Estimate Version | Revision snapshot of an estimate for one project. | `Estimate(version)` | `POST /api/v1/estimates/{id}/clone-version/` | Revisions preserve prior history. |
 | Estimate Status Event | Audit record for estimate status transitions. | `EstimateStatusEvent` | `GET /api/v1/estimates/{id}/status-events/` | Stores from/to status, actor, timestamp, note. |
 | Cost Code | Cost/billing classification used across estimate/invoice/AP flows. | `CostCode` | `GET/POST /api/v1/cost-codes/`, `PATCH /api/v1/cost-codes/{id}/` | Supports CSV import and org-scoped ownership. |
-| Change Order (CO) | Post-contract change request for scoped delta. | `ChangeOrder`, `ChangeOrderLine`, `ChangeOrderSnapshot` | `GET/POST /api/v1/projects/{id}/change-orders/`, `GET/PATCH /api/v1/change-orders/{id}/` | Lifecycle: `draft`, `pending_approval`, `approved`, `rejected`, `void`. |
+| Change Order (CO) | Post-contract change request for scoped delta. | `ChangeOrder`, `ChangeOrderLine`, `ChangeOrderSnapshot` | `GET/POST /api/v1/projects/{id}/change-orders/`, `GET/PATCH /api/v1/change-orders/{id}/` | Lifecycle: `draft`, `sent`, `approved`, `rejected`, `void`. |
 | Public Decision Link | Tokenized public customer decision flow for estimate/CO/invoice. | Public token/ref on document models | `/api/v1/public/.../{token}/decision/` | State-gated; writes audit/lifecycle context. |
 | Vendor | Payee identity for subcontractor/supplier billing workflows. | `Vendor` | `GET/POST /api/v1/vendors/`, `GET/PATCH /api/v1/vendors/{id}/` | Duplicate warning + override flow supported. |
 | Vendor Bill | AP invoice from vendor/subcontractor. | `VendorBill`, `VendorBillSnapshot` | `GET/POST /api/v1/projects/{id}/vendor-bills/`, `GET/PATCH /api/v1/vendor-bills/{id}/` | Lifecycle: `planned`, `received`, `approved`, `scheduled`, `paid`, `void`. |
@@ -387,7 +387,7 @@ Key fields:
 - `id`
 - `project_id`
 - `family_key`
-- `status` (`draft`, `pending_approval`, `approved`, `rejected`, `void`)
+- `status` (`draft`, `sent`, `approved`, `rejected`, `void`)
 - `requested_by_user_id`
 - `approved_by_user_id`
 - `amount_delta`
@@ -401,7 +401,7 @@ Immutable financial-audit snapshot for change-order decision outcomes.
 
 Current policy:
 - Captured for terminal decision states: `approved`, `rejected`, and `void`.
-- Not captured for non-terminal workflow states: `draft`, `pending_approval`.
+- Not captured for non-terminal workflow states: `draft`, `sent`.
 - Append-only audit representation used for strict decision traceability.
 - Includes `origin_estimate_version` in snapshot payload for historical replay/forensics,
   not as a primary mutable operational field.

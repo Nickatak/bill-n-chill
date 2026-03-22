@@ -5,6 +5,7 @@ from core.models.estimating import Estimate, EstimateLineItem
 from core.models.financial_auditing import (
     AccountingSyncRecord,
     ChangeOrderSnapshot,
+    ChangeOrderStatusEvent,
     CustomerRecord,
     EstimateStatusEvent,
     InvoiceStatusEvent,
@@ -50,6 +51,7 @@ __all__ = [
     "EstimateLineItem",
     "EstimateStatusEvent",
     "ChangeOrderSnapshot",
+    "ChangeOrderStatusEvent",
     "CustomerRecord",
     "ChangeOrder",
     "ChangeOrderLine",

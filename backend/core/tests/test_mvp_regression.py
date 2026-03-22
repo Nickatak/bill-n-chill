@@ -103,7 +103,7 @@ class MvpRegressionMoneyLoopTests(TestCase):
 
         to_pending = self.client.patch(
             f"/api/v1/change-orders/{co_id}/",
-            data={"status": "pending_approval"},
+            data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
