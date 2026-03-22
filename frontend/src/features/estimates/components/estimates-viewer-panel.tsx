@@ -14,7 +14,7 @@ import Link from "next/link";
 import { formatDateTimeDisplay } from "@/shared/date-format";
 import { formatDecimal } from "@/shared/money-format";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
-import { formatStatusAction, isNotatedStatusEvent } from "../helpers";
+import { formatStatusAction, isNotatedStatusEvent, isResendStatusEvent } from "../helpers";
 import type { EstimateRecord, EstimateStatusEventRecord, ProjectRecord } from "../types";
 import styles from "./estimates-console.module.css";
 
@@ -588,9 +588,11 @@ export function EstimatesViewerPanel({
                   </thead>
                   <tbody>
                     {statusEvents.map((event) => {
-                      const toStatusClass = isNotatedStatusEvent(event)
-                        ? styles.statusNotated
-                        : statusClasses[event.to_status] ?? "";
+                      const toStatusClass = isResendStatusEvent(event)
+                        ? statusClasses["sent"] ?? ""
+                        : isNotatedStatusEvent(event)
+                          ? styles.statusNotated
+                          : statusClasses[event.to_status] ?? "";
                       return (
                         <tr key={event.id}>
                           <td data-label="Action">
