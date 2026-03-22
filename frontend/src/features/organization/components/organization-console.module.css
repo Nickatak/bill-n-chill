@@ -25,24 +25,26 @@
 .tab {
   flex: 1;
   padding: var(--space-sm) var(--space-md);
-  background: none;
-  border: none;
+  background: var(--surface-secondary);
+  border: 1px solid var(--border);
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
   font-size: 0.86rem;
   font-weight: 700;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .tab:hover {
   color: var(--text-primary);
+  background: var(--surface);
 }
 
 .tabActive {
   color: var(--accent-text);
   border-bottom-color: var(--accent);
+  background: var(--surface);
 }
 
 .tabContent {
@@ -491,12 +493,7 @@
     align-items: stretch;
   }
 
-  .tabBar {
-    overflow-x: auto;
-  }
-
   .tab {
     white-space: nowrap;
-    flex: 0 0 auto;
   }
 }

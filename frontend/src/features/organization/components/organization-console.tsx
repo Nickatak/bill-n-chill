@@ -78,9 +78,9 @@ import styles from "./organization-console.module.css";
 type OrgTab = "business" | "team" | "documents" | "notifications";
 
 const TABS: Array<{ key: OrgTab; label: string }> = [
-  { key: "business", label: "My Business" },
-  { key: "team", label: "My Team" },
-  { key: "documents", label: "Document Settings" },
+  { key: "business", label: "Business" },
+  { key: "team", label: "Team" },
+  { key: "documents", label: "Docs" },
   { key: "notifications", label: "Notifications" },
 ];
 
