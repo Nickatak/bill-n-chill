@@ -307,7 +307,9 @@ export function formatStatusAction(event: EstimateStatusEventRecord): string {
 /** Check whether a status event is a notation rather than a transition. */
 export function isResendStatusEvent(event: EstimateStatusEventRecord): boolean {
   if (event.action_type === "resend") return true;
-  return event.from_status === "sent" && event.to_status === "sent";
+  if (event.action_type === "notate") return false;
+  if (event.from_status === "sent" && event.to_status === "sent" && !(event.note || "").trim()) return true;
+  return false;
 }
 
 export function isNotatedStatusEvent(event: EstimateStatusEventRecord): boolean {
