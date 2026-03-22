@@ -81,6 +81,12 @@ def public_estimate_detail_view(request, public_token):
             status=404,
         )
 
+    if estimate.status == Estimate.Status.DRAFT:
+        return Response(
+            {"error": {"code": "not_available", "message": "This estimate is not yet available.", "fields": {}}},
+            status=404,
+        )
+
     estimate_data = EstimateSerializer(estimate).data
     organization = _resolve_organization_for_public_actor(estimate.created_by)
     estimate_data["project_context"] = _serialize_public_project_context(estimate.project)

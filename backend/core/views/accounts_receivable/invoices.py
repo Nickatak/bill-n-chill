@@ -109,6 +109,12 @@ def public_invoice_detail_view(request, public_token: str):
             status=404,
         )
 
+    if invoice.status == Invoice.Status.DRAFT:
+        return Response(
+            {"error": {"code": "not_available", "message": "This invoice is not yet available.", "fields": {}}},
+            status=404,
+        )
+
     invoice_data = InvoiceSerializer(invoice).data
     organization = _resolve_organization_for_public_actor(invoice.created_by)
     invoice_data["project_context"] = _serialize_public_project_context(invoice.project)
