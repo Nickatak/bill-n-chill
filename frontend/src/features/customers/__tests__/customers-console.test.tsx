@@ -886,6 +886,66 @@ describe("CustomersConsole", () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Enter Payment link visibility by project status
+  // ---------------------------------------------------------------------------
+
+  it("shows Enter Payment link for active and on-hold projects", async () => {
+    const projects = [
+      { id: 10, name: "Active Project", status: "active", customer: 1, site_address: "123 Main" },
+      { id: 11, name: "On Hold Project", status: "on_hold", customer: 1, site_address: "456 Oak" },
+    ];
+    setupDefaultFetch({ projects });
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    // Wait for projects to load, then expand Jane Doe's accordion
+    await waitFor(() => {
+      expect(screen.getByText("2 projects")).toBeInTheDocument();
+    });
+    const janeAccordion = screen.getByText("2 projects").closest("button")!;
+    fireEvent.click(janeAccordion);
+
+    await waitFor(() => {
+      expect(screen.getByText("#10 Active Project")).toBeInTheDocument();
+      expect(screen.getByText("#11 On Hold Project")).toBeInTheDocument();
+    });
+
+    const paymentLinks = screen.getAllByText("Enter Payment");
+    expect(paymentLinks).toHaveLength(2);
+  });
+
+  it("hides Enter Payment link for prospect, cancelled, and completed projects", async () => {
+    const projects = [
+      { id: 10, name: "Prospect Project", status: "prospect", customer: 1, site_address: "111 A St" },
+      { id: 11, name: "Cancelled Project", status: "cancelled", customer: 1, site_address: "222 B St" },
+      { id: 12, name: "Completed Project", status: "completed", customer: 1, site_address: "333 C St" },
+    ];
+    setupDefaultFetch({ projects });
+    render(<CustomersConsole />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Jane Doe")).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("3 projects")).toBeInTheDocument();
+    });
+    const janeAccordion = screen.getByText("3 projects").closest("button")!;
+    fireEvent.click(janeAccordion);
+
+    await waitFor(() => {
+      expect(screen.getByText("#10 Prospect Project")).toBeInTheDocument();
+      expect(screen.getByText("#11 Cancelled Project")).toBeInTheDocument();
+      expect(screen.getByText("#12 Completed Project")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("Enter Payment")).not.toBeInTheDocument();
+  });
+
   it("shows filter-mismatch message when all customers are filtered out", async () => {
     const allArchived = [
       {
