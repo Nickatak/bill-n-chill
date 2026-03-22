@@ -93,7 +93,7 @@ function actionConfirmationMessage(
   }
   if (statusValue === "approved") return `Mark ${docLabel} as approved.`;
   if (statusValue === "rejected") return `Mark ${docLabel} as rejected.`;
-  if (statusValue === "void") return `Void ${docLabel}. This cannot be undone.`;
+  if (statusValue === "void") return `Void ${docLabel}.`;
   return `Transition ${docLabel} to ${optionLabel.toLowerCase()}.`;
 }
 
