@@ -21,6 +21,13 @@ an MVP stand-in for quick developer/QA access. It has two problems:
    lifecycle — if a customer can see a draft, the draft → sent transition is
    meaningless.
 
+A third problem existed in the status management UX: the "select next status
+from dropdown → click Update" pattern is a developer's mental model, not a
+user's. Picking "sent" from a dropdown and clicking "Update" doesn't communicate
+what's about to happen (email fires, document becomes public, etc.). Users think
+in actions ("send this to my customer"), not state transitions ("change status
+field to sent").
+
 The PWA decision (`pwa-mobile-strategy.md`) already established that Web Share
 API is the delivery mechanism and that programmatic SMS is rejected. This
 decision connects those pieces into a concrete UX.
@@ -37,10 +44,61 @@ not-found or not-yet-available response until the document is sent.
 **Rationale:** The lifecycle exists to enforce a deliberate gate. If drafts are
 viewable, "sent" has no meaning.
 
-### 2. Share button is the primary send surface
+### 2. Action buttons replace the status dropdown
 
-Each document console gets a "Send" action button (label TBD — "Send",
-"Send to Customer", etc.) that does two things atomically:
+The "select next status → update" dropdown is replaced with explicit action
+buttons. Each button describes what it does in plain language. The available
+buttons are determined by the document's current status.
+
+**Estimates:**
+
+| Current status | Available actions |
+|----------------|-------------------|
+| Draft          | **Send to Customer**, Void |
+| Sent           | **Re-send**, Mark Approved, Mark Rejected, Void |
+| Approved       | *(locked — no actions)* |
+| Rejected       | Void |
+| Void           | *(terminal)* |
+
+**Invoices:**
+
+| Current status   | Available actions |
+|------------------|-------------------|
+| Draft            | **Send to Customer**, Void |
+| Sent             | **Re-send**, Void |
+| Partially Paid   | Void |
+| Paid             | *(terminal)* |
+| Void             | *(terminal)* |
+
+**Change Orders:**
+
+| Current status     | Available actions |
+|--------------------|-------------------|
+| Draft              | **Send for Approval**, Void |
+| Pending Approval   | **Re-send**, Mark Accepted, Mark Rejected, Void |
+| Accepted           | *(locked — no actions)* |
+| Rejected           | Void |
+| Void               | *(terminal)* |
+
+**Rationale:** "Send to Customer" tells the user exactly what will happen.
+"Void" tells them exactly what will happen. A dropdown with status codes
+tells them nothing.
+
+### 3. Action buttons live in the expansion panel
+
+Action buttons are placed in the document expansion area (where status controls
+already live), not in the document card header. The card stays clean — just
+identity info (number, customer, amount, status badge). When a document is
+selected and the detail panel expands, the contextual actions appear alongside
+the document detail.
+
+This removes all action links from the card surface: no "Customer View," no
+inline status controls, no send links. Select a document → see its detail →
+take action.
+
+### 4. "Send to Customer" is the primary send surface
+
+The "Send to Customer" button does two things atomically:
 
 1. **Transitions the document to sent** (draft → sent), firing all existing
    lifecycle side effects (audit event, identity freeze, auto-email via Mailgun).
@@ -55,82 +113,62 @@ Each document console gets a "Send" action button (label TBD — "Send",
 The user clicks one button and the document is both marked as sent and delivered
 to the customer through whatever channel they choose.
 
-### 3. Re-send uses the same surface
+### 5. Re-send uses the same surface
 
-For documents already in `sent` status, the same button is available but labeled
-differently ("Re-send", "Share Again", etc.). It:
+For documents already in `sent` status, the "Re-send" button:
 
 - Records a re-send audit event (infrastructure already exists)
 - Opens the share mechanism again
 - Does **not** change the document status (already sent)
 
-### 4. Manual status dropdown remains
-
-The existing status transition dropdown is not removed. It serves as an explicit
-control for power users who want to manage status independently — e.g., marking
-something as sent without triggering the share sheet, or transitioning to other
-statuses (void, etc.).
-
-The share button and the status dropdown are two surfaces for the same backend
-transition. The backend doesn't care which surface initiated it.
-
-### 5. Auto-email fires on any sent transition
+### 6. Auto-email fires on any sent transition
 
 The Mailgun notification email fires whenever a document transitions to sent,
-regardless of which surface triggered it (share button or status dropdown). This
-means the customer may receive both an email and a text/share — that's
-intentional. The email is the system's automatic notification; the share is the
-user's personal outreach.
+regardless of which button triggered it. The customer may receive both an email
+and a text/share — that's intentional. The email is the system's automatic
+notification; the share is the user's personal outreach.
 
-### 6. Action feedback: before and after
+### 7. Action feedback: before and after
 
 Users need to know what the system will do (before) and what it did (after).
-The two send surfaces have different transparency needs:
 
-**Share button** — the button label ("Send to Customer") and the native share
-sheet already communicate that you're sending something. No pre-action
-confirmation needed. After the transition completes, a toast confirms what
-happened:
+**Send / Re-send buttons** — the button label communicates intent clearly.
+After the transition completes, a toast confirms what happened:
 
 - *"Sent. Email notification delivered to jane@example.com."*
 - *"Sent. No email on file — share the link directly."*
 
-**Status dropdown → sent** — this path is less obvious. Picking "sent" from a
-dropdown doesn't visually communicate that an email is about to fire. This
-surface needs both:
+**Other action buttons** (Void, Mark Approved, etc.) — these are
+straightforward status changes. Post-action toast confirms the outcome:
 
-- **Pre-action:** Before the transition executes, show what will happen:
-  *"This will email jane@example.com."* or *"No email on file — the customer
-  won't be notified automatically."* (The no-email warning partially exists
-  today; the has-email notice is new.)
-- **Post-action:** Same toast as the share button, confirming the outcome.
+- *"Estimate voided."*
+- *"Marked as approved."*
 
-This ensures that regardless of which path the user takes, they always know
-what the system did on their behalf. No silent side effects.
+Every action gives the user clear feedback about what the system did on their
+behalf. No silent side effects.
 
-### 7. "Customer View" link is removed
+### 8. "Customer View" link is removed
 
-The current new-tab link to the public preview is replaced by the share button.
-Internal users who want to preview the public page can use print preview or a
-dedicated preview mode (future work), but the public URL is not surfaced as a
-direct link in the internal UI.
+The current new-tab link to the public preview is removed entirely. Internal
+users who want to preview the public page can use print preview or a dedicated
+preview mode (future work). The public URL is not surfaced as a direct link in
+the internal UI — it's delivered to the customer via the share mechanism.
 
 ## Multiple paths, consistent outcome
 
 The backend lifecycle is strict: one state machine, one set of audit events, one
-set of side effects. The frontend offers multiple paths to the same outcome
-because users operate in different contexts:
+set of side effects. The frontend offers clear action buttons that map directly
+to backend transitions:
 
-| Context | Path | What happens | Feedback |
-|---------|------|-------------|----------|
-| Mobile, on job site | Share button → Messages | draft → sent + SMS to customer + auto-email | Post-toast: "Sent. Email delivered to..." |
-| Desktop, composing | Share button → clipboard | draft → sent + link copied + auto-email | Post-toast: "Sent. Link copied. Email delivered to..." |
-| Desktop, power user | Status dropdown → sent | draft → sent + auto-email (no share sheet) | Pre-warning: "This will email..." / Post-toast: "Sent. Email delivered to..." |
-| Re-send (any device) | Share button on sent doc | re-send event + share sheet (no status change) | Post-toast: "Re-sent. Email delivered to..." |
+| Context | Action | What happens | Feedback |
+|---------|--------|-------------|----------|
+| Mobile, on job site | Send to Customer → Messages | draft → sent + SMS to customer + auto-email | Toast: "Sent. Email delivered to..." |
+| Desktop, composing | Send to Customer → clipboard | draft → sent + link copied + auto-email | Toast: "Sent. Link copied. Email delivered to..." |
+| Re-send (any device) | Re-send → share sheet | re-send event + share (no status change) | Toast: "Re-sent. Email delivered to..." |
+| Void (any device) | Void | status → void | Toast: "Voided." |
 
-All four paths produce the same backend state. The difference is only in how the
-link reaches the customer. Every path gives the user clear post-action feedback
-about what the system did.
+All paths go through the same backend transitions. The action buttons just make
+each transition's meaning and side effects explicit.
 
 ## Desktop behavior — open question
 
@@ -147,8 +185,10 @@ This is deferred — clipboard + toast is sufficient for MVP.
 
 - **Public preview endpoints** (estimate, invoice, change order): Add status
   guard rejecting drafts.
-- **Document consoles** (3 consoles): Add share/send button, wire to status
-  transition + Web Share API.
+- **Document consoles** (3 consoles): Replace status dropdown with contextual
+  action buttons in the expansion panel. Add share mechanism (Web Share API /
+  clipboard) to the send/re-send buttons.
+- **Toast system**: New shared component for post-action feedback messages.
 - **"Customer View" link**: Remove from all document consoles.
 - **Backend**: No changes needed — the status transition, audit events, and
   email sending already exist. The frontend just needs to call them.
