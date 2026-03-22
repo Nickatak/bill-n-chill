@@ -155,7 +155,10 @@ function EstimateActionPanel({
     // Trigger share mechanism for send/re-send actions
     if (pendingAction === "sent" && updated.public_ref) {
       const publicUrl = `${window.location.origin}/estimate/${updated.public_ref}`;
-      const shareText = `${customerName ? customerName + " — " : ""}Estimate #${updated.id}: ${publicUrl}`;
+      const senderName = (updated.sender_name || "").trim();
+      const greeting = customerName ? `Hi ${customerName} — ` : "";
+      const from = senderName ? ` from ${senderName}` : "";
+      const shareText = `${greeting}here's your estimate${from}:\n${publicUrl}`;
 
       if (typeof navigator.share === "function") {
         try {
