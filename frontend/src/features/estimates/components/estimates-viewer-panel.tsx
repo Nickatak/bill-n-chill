@@ -162,7 +162,7 @@ function EstimateActionPanel({
 
       if (typeof navigator.share === "function") {
         try {
-          await navigator.share({ title: `Estimate #${updated.id}`, text: shareText, url: publicUrl });
+          await navigator.share({ title: `Estimate #${updated.id}`, text: shareText });
         } catch {
           // User cancelled share sheet — not an error
         }
