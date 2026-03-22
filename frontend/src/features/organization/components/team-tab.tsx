@@ -21,6 +21,7 @@ import type {
   OrganizationRolePolicy,
 } from "../types";
 import styles from "./organization-console.module.css";
+import animStyles from "@/shared/styles/animations.module.css";
 
 type MembershipDraft = {
   role: string;
@@ -357,7 +358,7 @@ export function TeamTab({
                 type="submit"
                 disabled={isCreatingInvite || !inviteEmailDraft.trim()}
               >
-                {isCreatingInvite ? "Creating\u2026" : "Create Invite"}
+                {isCreatingInvite ? <span className={animStyles.sendingDots}>Creating</span> : "Create Invite"}
               </button>
             </div>
           </form>

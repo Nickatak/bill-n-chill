@@ -12,6 +12,7 @@ import {
   type SessionRole,
 } from "../client-session";
 import styles from "./home-auth-console.module.css";
+import animStyles from "@/shared/styles/animations.module.css";
 
 type RegisterResponse = {
   data?: {
@@ -371,7 +372,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
               onClick={handleResendVerification}
             >
               {isResending
-                ? "Sending..."
+                ? <span className={animStyles.sendingDots}>Sending</span>
                 : resendCooldown > 0
                   ? `Wait ${resendCooldown}s`
                   : "Didn\u2019t get it? Resend"}

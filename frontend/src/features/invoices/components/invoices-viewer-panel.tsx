@@ -27,6 +27,7 @@ import type {
   ProjectRecord,
 } from "../types";
 import styles from "./invoices-console.module.css";
+import animStyles from "@/shared/styles/animations.module.css";
 
 // ---------------------------------------------------------------------------
 // Pure display helpers (CSS-dependent — kept local)
@@ -162,6 +163,7 @@ export type InvoicesViewerPanelProps = {
   setStatusNote: (note: string) => void;
   viewerActionMessage: string;
   viewerActionTone: string;
+  isUpdatingStatus: boolean;
   onUpdateStatus: () => void;
   onAddStatusNote: () => void;
 
@@ -212,6 +214,7 @@ export function InvoicesViewerPanel({
   setStatusNote,
   viewerActionMessage,
   viewerActionTone,
+  isUpdatingStatus,
   onUpdateStatus,
   onAddStatusNote,
   selectedInvoiceStatusEvents,
@@ -542,9 +545,11 @@ export function InvoicesViewerPanel({
                                     type="button"
                                     className={`${styles.invoiceViewerActionButton} ${styles.invoiceViewerActionButtonPrimary}`}
                                     onClick={(e) => { e.stopPropagation(); onUpdateStatus(); }}
-                                    disabled={!selectedStatus}
+                                    disabled={!selectedStatus || isUpdatingStatus}
                                   >
-                                    Update Status
+                                    {isUpdatingStatus && selectedStatus === "sent"
+                                      ? <span className={animStyles.sendingDots}>Sending</span>
+                                      : "Update Status"}
                                   </button>
                                 ) : null}
                                 <button

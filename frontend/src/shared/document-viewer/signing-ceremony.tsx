@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./signing-ceremony.module.css";
+import animStyles from "@/shared/styles/animations.module.css";
 
 import { defaultApiBaseUrl, normalizeApiBaseUrl } from "@/shared/api/base";
 
@@ -80,6 +81,7 @@ export function SigningCeremony({
 
   // UI state.
   const [loading, setLoading] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [cooldown, setCooldown] = useState(0);
@@ -110,6 +112,7 @@ export function SigningCeremony({
   /** Request an OTP code via the backend. */
   async function requestOtp() {
     setLoading(true);
+    setSendingOtp(true);
     setErrorMessage("");
     setMessage("");
 
@@ -138,6 +141,7 @@ export function SigningCeremony({
       setErrorMessage("Could not reach the server.");
     } finally {
       setLoading(false);
+      setSendingOtp(false);
     }
   }
 
@@ -240,7 +244,7 @@ export function SigningCeremony({
             onClick={() => void requestOtp()}
             disabled={isDisabled}
           >
-            Send Verification Code
+            {loading ? <span className={animStyles.sendingDots}>Sending</span> : "Send Verification Code"}
           </button>
         </div>
       </div>
@@ -288,7 +292,7 @@ export function SigningCeremony({
             onClick={() => void requestOtp()}
             disabled={isDisabled || cooldown > 0}
           >
-            Resend code
+            {sendingOtp ? <span className={animStyles.sendingDots}>Sending</span> : "Resend code"}
           </button>
           {cooldown > 0 ? (
             <span className={styles.cooldownLabel}>({cooldown}s)</span>

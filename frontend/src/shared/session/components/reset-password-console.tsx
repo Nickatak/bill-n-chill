@@ -10,6 +10,7 @@ import {
   type SessionRole,
 } from "../client-session";
 import styles from "./home-auth-console.module.css";
+import animStyles from "@/shared/styles/animations.module.css";
 
 import { defaultApiBaseUrl } from "@/shared/api/base";
 
@@ -144,7 +145,7 @@ function ForgotForm() {
           <div className={styles.formHintRow}>
             <div className={styles.buttonRow}>
               <button className={styles.button} type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Sending..." : "Send reset link"}
+                {isSubmitting ? <span className={animStyles.sendingDots}>Sending</span> : "Send reset link"}
               </button>
             </div>
             <div className={styles.formHintStack}>

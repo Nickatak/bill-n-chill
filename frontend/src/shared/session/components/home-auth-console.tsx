@@ -11,6 +11,7 @@ import {
   type SessionRole,
 } from "../client-session";
 import styles from "./home-auth-console.module.css";
+import animStyles from "@/shared/styles/animations.module.css";
 
 type LoginResponse = {
   data?: {
@@ -228,7 +229,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
                   disabled={isResending}
                   onClick={handleResendVerification}
                 >
-                  {isResending ? "Sending..." : "Resend verification email"}
+                  {isResending ? <span className={animStyles.sendingDots}>Sending</span> : "Resend verification email"}
                 </button>
               )}
             </div>

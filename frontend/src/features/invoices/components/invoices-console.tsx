@@ -224,6 +224,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
 
   const [viewerActionMessage, setViewerActionMessage] = useState("");
   const [viewerActionTone, setViewerActionTone] = useState<"success" | "error">("success");
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showAllEvents, setShowAllEvents] = useState(false);
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
@@ -656,6 +657,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       return;
     }
 
+    setIsUpdatingStatus(true);
     setNeutralStatus("Updating invoice status...");
     try {
       const trimmedNote = statusNote.trim();
@@ -700,6 +702,8 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       setErrorStatus(msg);
       setViewerActionMessage(msg);
       setViewerActionTone("error");
+    } finally {
+      setIsUpdatingStatus(false);
     }
   }
 
@@ -877,6 +881,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
             setStatusNote={setStatusNote}
             viewerActionMessage={viewerActionMessage}
             viewerActionTone={viewerActionTone}
+            isUpdatingStatus={isUpdatingStatus}
             onUpdateStatus={handleUpdateInvoiceStatus}
             onAddStatusNote={handleAddInvoiceStatusNote}
             selectedInvoiceStatusEvents={invoiceData.selectedInvoiceStatusEvents}
