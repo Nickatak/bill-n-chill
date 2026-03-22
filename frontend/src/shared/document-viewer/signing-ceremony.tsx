@@ -76,7 +76,6 @@ export function SigningCeremony({
 
   // Ceremony state.
   const [signerName, setSignerName] = useState("");
-  const [signerNote, setSignerNote] = useState("");
   const [consentChecked, setConsentChecked] = useState(false);
 
   // UI state.
@@ -198,7 +197,7 @@ export function SigningCeremony({
         session_token: sessionToken,
         signer_name: signerName.trim(),
         consent_accepted: true,
-        note: signerNote.trim(),
+        note: "",
       });
     } catch {
       setErrorMessage("Could not submit decision.");
@@ -324,17 +323,6 @@ export function SigningCeremony({
           value={signerName}
           onChange={(e) => setSignerName(e.target.value)}
           placeholder="Type your full name"
-          disabled={isDisabled}
-        />
-      </label>
-
-      <label className={styles.field}>
-        Note (optional)
-        <textarea
-          rows={2}
-          value={signerNote}
-          onChange={(e) => setSignerNote(e.target.value)}
-          placeholder="Optional note"
           disabled={isDisabled}
         />
       </label>
