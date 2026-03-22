@@ -310,12 +310,6 @@
 }
 
 
-.lifecycleFieldLabel {
-  font-size: var(--font-base);
-  color: var(--text-secondary);
-}
-
-
 .statusToneDraft {
   background: var(--status-blue-bg);
   color: var(--status-blue-text);
@@ -421,17 +415,67 @@
     grid-template-columns: 1fr;
   }
 
-  .invoiceViewerActionRow {
-    display: grid;
-    grid-template-columns: 1fr;
+  .actionButtons {
+    flex-direction: column;
   }
 
-  .invoiceViewerActionButton {
+  .invoiceActionButton {
+    min-height: 44px;
     width: 100%;
+    text-align: center;
   }
 
-  .invoiceQuickStatusPills {
-    gap: 4px;
+  .lifecycleActions {
+    flex-direction: column;
+  }
+
+  /* ── Status events table: stacked cards on mobile ── */
+  .statusEventsTable {
+    min-width: 0;
+  }
+
+  .statusEventsTable thead {
+    display: none;
+  }
+
+  .statusEventsTable tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-secondary);
+    margin-bottom: 6px;
+  }
+
+  .statusEventsTable tbody tr:nth-child(even) {
+    background: var(--surface-secondary);
+  }
+
+  .statusEventsTable tbody td {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 4px 0;
+    border-top: 0;
+    font-size: 0.82rem;
+  }
+
+  .statusEventsTable tbody td::before {
+    content: attr(data-label);
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-tertiary, var(--text-secondary));
+    opacity: 0.7;
+  }
+
+  .statusEventsTableWrap {
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
   }
 }
 
@@ -485,112 +529,153 @@
   gap: var(--space-sm);
 }
 
-/* Quick status pills */
+/* ── Action buttons ────────────────────────────────────────────── */
 
-.invoiceQuickStatusPills {
+.actionButtons {
   display: flex;
+  gap: 10px;
   flex-wrap: wrap;
-  gap: 6px;
+  min-width: 0;
 }
 
-.invoiceQuickStatusButton {
-  appearance: none;
-  -webkit-appearance: none;
-  border: 1px solid var(--border-accent);
-  border-radius: var(--radius-pill);
-  padding: 5px 12px;
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease;
+.actionButtons > * {
+  flex: 1 1 0;
+  min-width: 0;
   text-align: center;
-  white-space: nowrap;
 }
 
-.invoiceQuickStatusButtonInactive {
-  background: var(--surface);
-  border-color: var(--border);
-  color: var(--text-secondary);
-}
-
-.invoiceQuickStatusButtonActive {
-  box-shadow: none;
-}
-
-/* Action buttons */
-
-.invoiceViewerActionSuccess {
-  margin: 0;
-  font-size: var(--font-sm);
-  font-weight: 600;
-  color: var(--tone-success-text);
-}
-
-.invoiceViewerActionError {
-  margin: 0;
-  font-size: var(--font-sm);
-  font-weight: 600;
-  color: var(--tone-error-text);
-}
-
-.invoiceViewerActionRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  margin-top: 2px;
-}
-
-.invoiceViewerActionButton {
-  border: 1px solid var(--border);
+.invoiceActionButton {
+  flex: 0 0 auto;
+  border: 1px solid var(--border-accent);
   border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--accent-text);
   padding: 8px 12px;
   font-size: var(--font-sm);
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
   cursor: pointer;
-  transition: filter 120ms ease, transform 120ms ease;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
 }
 
-.invoiceViewerActionButton:disabled {
-  opacity: 0.58;
+.invoiceActionButton:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-border);
+  box-shadow: 0 8px 14px color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+
+.invoiceActionButton:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
 }
 
-.invoiceViewerActionButtonPrimary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--text-on-accent);
+.actionButtonSent {
+  background: var(--status-amber-solid);
+  border-color: var(--status-amber-border);
+  color: var(--status-amber-solid-text);
 }
 
-.invoiceViewerActionButtonSecondary {
-  background: var(--border);
-  border-color: var(--border);
-  color: var(--status-gray-text);
+.actionButtonSent:hover {
+  border-color: var(--status-amber-solid-text);
 }
 
-.invoiceViewerActionButton:not(:disabled):hover,
-.invoiceViewerActionButton:not(:disabled):focus-visible {
-  filter: brightness(1.03);
-  transform: translateY(-1px);
-  outline: none;
+.actionButtonPartial {
+  background: var(--status-violet-solid, var(--status-violet-bg));
+  border-color: var(--status-violet-border);
+  color: var(--status-violet-solid-text, var(--status-violet-text));
 }
 
-/* Viewer field (label + textarea) */
+.actionButtonPartial:hover {
+  border-color: var(--status-violet-solid-text, var(--status-violet-text));
+}
 
-.invoiceViewerField {
+.actionButtonPaid {
+  background: var(--status-green-solid);
+  border-color: var(--status-green-solid);
+  color: var(--status-green-solid-text);
+}
+
+.actionButtonPaid:hover {
+  border-color: var(--status-green-solid-text);
+}
+
+.actionButtonVoid {
+  background: var(--status-gray-solid);
+  border-color: var(--status-gray-border);
+  color: var(--status-gray-solid-text);
+}
+
+.actionButtonVoid:hover {
+  border-color: var(--status-gray-solid-text);
+}
+
+.actionButtonActive {
+  border-color: transparent !important;
+  outline: 3px solid var(--accent);
+}
+
+/* ── Action confirm panel ──────────────────────────────────────── */
+
+.actionConfirmPanel {
   display: grid;
-  gap: 4px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  gap: 10px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--accent-lighter);
+}
+
+.actionConfirmMessage {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: var(--font-base);
+}
+
+.actionConfirmDetail {
+  margin: 0;
+  font-size: var(--font-sm);
   color: var(--text-secondary);
 }
 
-.invoiceViewerField textarea {
+.actionConfirmActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.sendingDots::after {
+  content: "";
+  animation: invoiceDots 1.2s steps(4, end) infinite;
+}
+
+@keyframes invoiceDots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}
+
+/* ── Lifecycle field / actions ─────────────────────────────────── */
+
+.lifecycleField {
+  display: grid;
+  gap: 4px;
+}
+
+.lifecycleFieldLabel {
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.statusNote {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-sm) 10px;
@@ -600,73 +685,83 @@
   font-family: inherit;
   min-height: 48px;
   resize: vertical;
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: normal;
 }
 
-/* Event list */
+.lifecycleActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 
-.invoiceViewerEventList {
-  list-style: none;
+.actionSuccess {
   margin: 0;
-  padding: var(--space-sm);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  display: grid;
-  gap: var(--space-sm);
-}
-
-.invoiceViewerEventItem {
-  display: grid;
-  gap: 2px;
-  padding-bottom: var(--space-sm);
-  border-bottom: 1px solid var(--border);
-}
-
-.invoiceViewerEventItem:last-child {
-  padding-bottom: 0;
-  border-bottom: 0;
-}
-
-.invoiceViewerEventAction {
-  width: fit-content;
-  border-radius: var(--radius-pill);
-  padding: 2px 8px;
-  font-size: 0.68rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  font-weight: 700;
-}
-
-.invoiceViewerEventMeta {
-  font-size: 0.76rem;
-  color: var(--text-secondary);
-}
-
-.invoiceViewerEventNote {
-  font-size: 0.76rem;
-  color: var(--text-secondary);
-}
-
-/* Show all toggle */
-
-.invoiceShowAllToggle {
-  appearance: none;
-  -webkit-appearance: none;
-  border: 0;
-  background: transparent;
-  padding: 2px 0;
-  font-size: 0.76rem;
+  font-size: var(--font-sm);
   font-weight: 600;
-  color: var(--accent);
-  cursor: pointer;
-  text-align: left;
+  color: var(--tone-success-text);
 }
 
-.invoiceShowAllToggle:hover {
-  text-decoration: underline;
+.actionError {
+  margin: 0;
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--tone-error-text);
+}
+
+/* ── Status events table ───────────────────────────────────────── */
+
+.statusEvents {
+  display: grid;
+  gap: 6px;
+}
+
+.statusEvents h4 {
+  margin: 0 0 6px;
+  color: var(--text-primary);
+}
+
+.statusEventsTableWrap {
+  composes: tableWrap from '../../../shared/styles/table.module.css';
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+.statusEventsTable {
+  composes: table from '../../../shared/styles/table.module.css';
+  min-width: 480px;
+}
+
+.statusEventsTable thead th {
+  text-align: left;
+  padding: 9px 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
+}
+
+.statusEventsTable tbody td {
+  padding: 9px 10px;
+  border-top: 1px solid var(--table-border);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  vertical-align: top;
+}
+
+.statusEventsTable tbody tr:nth-child(even) {
+  background: var(--table-row-alt);
+}
+
+.invoiceEventBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .invoiceViewerMetaRow {
@@ -786,16 +881,10 @@
   .panel,
   .workspaceToolbar,
   .workspaceToolbarActions,
-  .invoiceQuickStatusPills,
-  .invoiceViewerActionRow,
-  .invoiceViewerEventList,
-  .invoiceShowAllToggle,
   .statusFilters,
   .invoiceSearchInput,
   .toolbarPrimaryButton,
-  .toolbarSecondaryButton,
-  .invoiceViewerActionSuccess,
-  .invoiceViewerActionError {
+  .toolbarSecondaryButton {
     display: none !important;
   }
 

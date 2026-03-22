@@ -9,6 +9,7 @@
  * Parent: InvoicesConsole
  */
 
+import { useState } from "react";
 import Link from "next/link";
 import { formatDateDisplay, formatDateTimeDisplay } from "@/shared/date-format";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
@@ -16,7 +17,6 @@ import { PaginationControls } from "@/shared/components/pagination-controls";
 import {
   invoiceNextActionHint,
   invoiceStatusEventActionLabel,
-  publicInvoiceHref,
 } from "../helpers";
 import { ReadOnlyLineTable, readOnlyLineTableStyles as roTableStyles } from "@/shared/document-viewer/read-only-line-table";
 import type {
@@ -27,7 +27,6 @@ import type {
   ProjectRecord,
 } from "../types";
 import styles from "./invoices-console.module.css";
-import animStyles from "@/shared/styles/animations.module.css";
 
 // ---------------------------------------------------------------------------
 // Pure display helpers (CSS-dependent — kept local)
@@ -63,15 +62,258 @@ function invoiceCardStatusClass(status: string): string {
   return "";
 }
 
-/** Map a status event to its visual tone class for the history timeline. */
-function invoiceStatusEventToneClass(event: InvoiceStatusEventRecord): string {
-  if (event.action_type === "resend" || (event.from_status === "sent" && event.to_status === "sent")) {
-    return styles.statusToneSent;
-  }
-  if (event.action_type === "notate" || (event.from_status === event.to_status && (event.note || "").trim())) {
-    return styles.statusToneNotate;
-  }
+/** Map a status event to its badge class for the status events table. */
+function invoiceEventBadgeClass(event: InvoiceStatusEventRecord): string {
+  if (event.action_type === "notate") return styles.statusToneNotate;
+  if (event.action_type === "resend") return styles.statusToneSent;
+  if (event.action_type === "create") return styles.statusToneDraft;
+  if (event.from_status === event.to_status && (event.note || "").trim()) return styles.statusToneNotate;
+  if (event.from_status === "sent" && event.to_status === "sent") return styles.statusToneSent;
   return invoiceStatusToneClass(event.to_status);
+}
+
+// ---------------------------------------------------------------------------
+// Action button helpers
+// ---------------------------------------------------------------------------
+
+function invoiceActionButtonColorClass(status: string): string {
+  switch (status) {
+    case "sent": return styles.actionButtonSent;
+    case "partially_paid": return styles.actionButtonPartial;
+    case "paid": return styles.actionButtonPaid;
+    case "void": return styles.actionButtonVoid;
+    default: return "";
+  }
+}
+
+function invoiceActionLabel(statusValue: string, currentStatus?: string): string {
+  if (statusValue === "sent") return currentStatus === "sent" ? "Re-send" : "Send to Customer";
+  if (statusValue === "partially_paid") return "Mark Partially Paid";
+  if (statusValue === "paid") return "Mark Paid";
+  if (statusValue === "void") return "Void Invoice";
+  return statusValue;
+}
+
+function invoiceConfirmationMessage(
+  statusValue: string,
+  invoice: InvoiceRecord,
+  customerName: string,
+  currentStatus?: string,
+): string {
+  const label = `invoice ${invoice.invoice_number}`;
+  const isResend = statusValue === "sent" && currentStatus === "sent";
+  if (statusValue === "sent") return `${isResend ? "Re-send" : "Send"} ${label} to ${customerName || "customer"}.`;
+  if (statusValue === "partially_paid") return `Mark ${label} as partially paid.`;
+  if (statusValue === "paid") return `Mark ${label} as paid.`;
+  if (statusValue === "void") return `Void ${label}.`;
+  return `Transition ${label} to ${statusValue}.`;
+}
+
+function invoiceEmailNotice(customerEmail: string): string {
+  if (customerEmail) return `Email notification will be sent to ${customerEmail}.`;
+  return "No email on file — customer won't be notified automatically.";
+}
+
+/** Action confirmation panel for invoices — owns its own expanded/collapsed state. */
+function InvoiceActionPanel({
+  selectedInvoice,
+  nextStatusOptions,
+  selectedProject,
+  selectedStatus,
+  setSelectedStatus,
+  statusNote,
+  setStatusNote,
+  statusLabel,
+  viewerActionMessage,
+  viewerActionTone,
+  onUpdateStatus,
+  onAddStatusNote,
+  canMutateInvoices,
+}: {
+  selectedInvoice: InvoiceRecord;
+  nextStatusOptions: string[];
+  selectedProject: ProjectRecord | null;
+  selectedStatus: string;
+  setSelectedStatus: (status: string) => void;
+  statusNote: string;
+  setStatusNote: (note: string) => void;
+  statusLabel: (status: string) => string;
+  viewerActionMessage: string;
+  viewerActionTone: string;
+  onUpdateStatus: () => Promise<InvoiceRecord | null>;
+  onAddStatusNote: () => void;
+  canMutateInvoices: boolean;
+}) {
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [shareMessage, setShareMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const customerName = selectedProject?.customer_display_name || "";
+  const customerEmail = (selectedProject?.customer_email || "").trim();
+
+  function handleActionClick(statusValue: string) {
+    setShareMessage("");
+    if (pendingAction === statusValue) {
+      setPendingAction(null);
+      setSelectedStatus("");
+      return;
+    }
+    setPendingAction(statusValue);
+    setSelectedStatus(statusValue);
+  }
+
+  async function handleConfirm() {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const updated = await onUpdateStatus();
+      if (!updated) return;
+      setPendingAction(null);
+
+      if (pendingAction === "sent" && updated.public_ref) {
+        const publicUrl = `${window.location.origin}/invoice/${updated.public_ref}`;
+        const senderName = (updated.sender_name || "").trim();
+        const greeting = customerName ? `Hi ${customerName} — ` : "";
+        const from = senderName ? ` from ${senderName}` : "";
+        const shareText = `${greeting}here's your invoice${from}:\n${publicUrl}`;
+
+        if (typeof navigator.share === "function") {
+          try {
+            await navigator.share({ title: `Invoice ${updated.invoice_number}`, text: shareText });
+          } catch { /* cancelled */ }
+        } else {
+          try {
+            await navigator.clipboard.writeText(publicUrl);
+            setShareMessage("Link copied to clipboard.");
+          } catch { /* clipboard unavailable */ }
+        }
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleCancel() {
+    setPendingAction(null);
+    setSelectedStatus("");
+    setStatusNote("");
+  }
+
+  const pendingLabel = pendingAction
+    ? invoiceActionLabel(pendingAction, selectedInvoice.status)
+    : "";
+
+  return (
+    <div className={styles.invoiceViewerSectionContent} onClick={(e) => e.stopPropagation()}>
+      {nextStatusOptions.length > 0 && canMutateInvoices ? (
+        <div className={styles.actionButtons}>
+          {nextStatusOptions.map((status) => {
+            const label = invoiceActionLabel(status, selectedInvoice.status);
+            const isActive = pendingAction === status;
+            return (
+              <button
+                key={status}
+                type="button"
+                className={`${styles.invoiceActionButton} ${invoiceActionButtonColorClass(status)} ${
+                  isActive ? styles.actionButtonActive : ""
+                }`}
+                onClick={() => handleActionClick(status)}
+                aria-pressed={isActive}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {!canMutateInvoices ? (
+        <p className={styles.inlineHint}>Status actions are read-only for your role.</p>
+      ) : nextStatusOptions.length === 0 ? (
+        <p className={styles.inlineHint}>{invoiceNextActionHint(selectedInvoice.status)}</p>
+      ) : null}
+
+      {pendingAction ? (
+        <div className={styles.actionConfirmPanel}>
+          <p className={styles.actionConfirmMessage}>
+            {invoiceConfirmationMessage(
+              pendingAction,
+              selectedInvoice,
+              customerName,
+              selectedInvoice.status,
+            )}
+          </p>
+          <label className={styles.lifecycleField}>
+            <span className={styles.lifecycleFieldLabel}>Note (optional)</span>
+            <textarea
+              className={styles.statusNote}
+              value={statusNote}
+              onChange={(e) => setStatusNote(e.target.value)}
+              placeholder="Optional note for this action"
+              rows={2}
+            />
+          </label>
+          {pendingAction === "sent" ? (
+            <p className={styles.actionConfirmDetail}>
+              {invoiceEmailNotice(customerEmail)}
+            </p>
+          ) : null}
+          <div className={styles.actionConfirmActions}>
+            <button
+              type="button"
+              className={styles.invoiceActionButton}
+              onClick={handleCancel}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={`${styles.invoiceActionButton} ${invoiceActionButtonColorClass(pendingAction)}`}
+              onClick={handleConfirm}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? <span className={styles.sendingDots}>Sending</span> : `Confirm ${pendingLabel}`}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!pendingAction && canMutateInvoices ? (
+        <label className={styles.lifecycleField}>
+          <span className={styles.lifecycleFieldLabel}>Status note</span>
+          <textarea
+            className={styles.statusNote}
+            value={statusNote}
+            onChange={(e) => setStatusNote(e.target.value)}
+            placeholder="Add note for this invoice"
+            rows={2}
+          />
+        </label>
+      ) : null}
+
+      {viewerActionMessage && viewerActionTone === "success" ? (
+        <p className={styles.actionSuccess}>{viewerActionMessage}</p>
+      ) : null}
+      {viewerActionMessage && viewerActionTone === "error" ? (
+        <p className={styles.actionError}>{viewerActionMessage}</p>
+      ) : null}
+      {shareMessage ? (
+        <p className={styles.actionSuccess}>{shareMessage}</p>
+      ) : null}
+
+      {!pendingAction && canMutateInvoices ? (
+        <div className={styles.lifecycleActions}>
+          <button
+            type="button"
+            className={styles.invoiceActionButton}
+            onClick={onAddStatusNote}
+            disabled={!statusNote.trim()}
+          >
+            Add Invoice Status Note
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -163,15 +405,12 @@ export type InvoicesViewerPanelProps = {
   setStatusNote: (note: string) => void;
   viewerActionMessage: string;
   viewerActionTone: string;
-  isUpdatingStatus: boolean;
-  onUpdateStatus: () => void;
+  onUpdateStatus: () => Promise<InvoiceRecord | null>;
   onAddStatusNote: () => void;
 
   // History
   selectedInvoiceStatusEvents: InvoiceStatusEventRecord[];
   statusEventsLoading: boolean;
-  showAllEvents: boolean;
-  setShowAllEvents: React.Dispatch<React.SetStateAction<boolean>>;
 
   // Contract breakdown
   contractBreakdown: ContractBreakdown | null;
@@ -214,13 +453,10 @@ export function InvoicesViewerPanel({
   setStatusNote,
   viewerActionMessage,
   viewerActionTone,
-  isUpdatingStatus,
   onUpdateStatus,
   onAddStatusNote,
   selectedInvoiceStatusEvents,
   statusEventsLoading,
-  showAllEvents,
-  setShowAllEvents,
   contractBreakdown,
   isContractBreakdownOpen,
   setIsContractBreakdownOpen,
@@ -465,163 +701,69 @@ export function InvoicesViewerPanel({
                   <span><span className={styles.invoiceMetaLabel}>Issued</span> {formatDateDisplay(invoice.issue_date)}</span>
                   <span><span className={styles.invoiceMetaLabel}>Due</span> {formatDateDisplay(invoice.due_date)}</span>
                 </div>
-                {invoice.public_ref ? (
-                  <div className={styles.invoiceLinkBar}>
-                    <a
-                      href={publicInvoiceHref(invoice.public_ref)}
-                      className={styles.invoiceLinkBarLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(event) => event.stopPropagation()}
-                      onKeyDown={(event) => event.stopPropagation()}
-                    >
-                      Customer View →
-                    </a>
-                  </div>
-                ) : null}
-
                 {isSelected && selectedInvoice ? (
                   <div className={styles.invoiceExpandedSections}>
-                    {/* Status & Actions */}
-                    <div className={styles.invoiceViewerSection}>
-                      <h4 className={styles.invoiceViewerSectionHeading}>Status &amp; Actions</h4>
-                        <div className={styles.invoiceViewerSectionContent}>
-                          <p className={styles.inlineHint}>{invoiceNextActionHint(selectedInvoice.status)}</p>
-                          {canMutateInvoices ? (
-                            <>
-                              {nextStatusOptions.length > 0 ? (
-                                <>
-                                  <span className={styles.lifecycleFieldLabel}>Next status</span>
-                                  <div className={styles.invoiceQuickStatusPills}>
-                                    {nextStatusOptions.map((status) => {
-                                      const isActive = selectedStatus === status;
-                                      return (
-                                        <button
-                                          key={status}
-                                          type="button"
-                                          className={`${styles.invoiceQuickStatusButton} ${
-                                            isActive
-                                              ? `${styles.invoiceQuickStatusButtonActive} ${invoiceStatusToneClass(status)}`
-                                              : styles.invoiceQuickStatusButtonInactive
-                                          }`}
-                                          onClick={(e) => { e.stopPropagation(); setSelectedStatus(status); }}
-                                          aria-pressed={isActive}
-                                        >
-                                          {selectedInvoice.status === "sent" && status === "sent"
-                                            ? "Re-send"
-                                            : statusLabel(status)}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                  {selectedStatus === "sent" && !selectedProject?.customer_email?.trim() ? (
-                                    <p className={styles.invoiceViewerActionError}>WARNING: This customer has no email on file and will not receive an automated email.</p>
-                                  ) : null}
-                                </>
-                              ) : (
-                                <p className={styles.inlineHint}>No next statuses available.</p>
-                              )}
-                              <label className={styles.invoiceViewerField} onClick={(e) => e.stopPropagation()}>
-                                Status note
-                                <textarea
-                                  value={statusNote}
-                                  onChange={(e) => setStatusNote(e.target.value)}
-                                  placeholder="Optional note for this status action or history-only note."
-                                  rows={2}
-                                />
-                              </label>
-                              {viewerActionMessage ? (
-                                <p
-                                  className={viewerActionTone === "error" ? styles.invoiceViewerActionError : styles.invoiceViewerActionSuccess}
-                                  role="status"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {viewerActionMessage}
-                                </p>
-                              ) : null}
-                              <div className={styles.invoiceViewerActionRow}>
-                                {nextStatusOptions.length > 0 ? (
-                                  <button
-                                    type="button"
-                                    className={`${styles.invoiceViewerActionButton} ${styles.invoiceViewerActionButtonPrimary}`}
-                                    onClick={(e) => { e.stopPropagation(); onUpdateStatus(); }}
-                                    disabled={!selectedStatus || isUpdatingStatus}
-                                  >
-                                    {isUpdatingStatus && selectedStatus === "sent"
-                                      ? <span className={animStyles.sendingDots}>Sending</span>
-                                      : "Update Status"}
-                                  </button>
-                                ) : null}
-                                <button
-                                  type="button"
-                                  className={`${styles.invoiceViewerActionButton} ${styles.invoiceViewerActionButtonSecondary}`}
-                                  onClick={(e) => { e.stopPropagation(); onAddStatusNote(); }}
-                                  disabled={!statusNote.trim()}
-                                >
-                                  Add Status Note
-                                </button>
-                              </div>
-                            </>
-                          ) : (
-                            <p className={styles.inlineHint}>Status actions are read-only for your role.</p>
-                          )}
-                        </div>
-                    </div>
+                    <InvoiceActionPanel
+                      selectedInvoice={selectedInvoice}
+                      nextStatusOptions={nextStatusOptions}
+                      selectedProject={selectedProject}
+                      selectedStatus={selectedStatus}
+                      setSelectedStatus={setSelectedStatus}
+                      statusNote={statusNote}
+                      setStatusNote={setStatusNote}
+                      statusLabel={statusLabel}
+                      viewerActionMessage={viewerActionMessage}
+                      viewerActionTone={viewerActionTone}
+                      onUpdateStatus={onUpdateStatus}
+                      onAddStatusNote={onAddStatusNote}
+                      canMutateInvoices={canMutateInvoices}
+                    />
 
-                    {/* History */}
-                    <div className={styles.invoiceViewerSection}>
-                      <h4 className={styles.invoiceViewerSectionHeading}>History ({selectedInvoiceStatusEvents.length})</h4>
-                        <div className={styles.invoiceViewerSectionContent}>
-                          {selectedInvoiceStatusEvents.length > 0 ? (
-                            <>
-                              <ul className={styles.invoiceViewerEventList}>
-                                {(showAllEvents
-                                  ? selectedInvoiceStatusEvents
-                                  : selectedInvoiceStatusEvents.slice(0, 4)
-                                ).map((event) => (
-                                  <li key={event.id} className={styles.invoiceViewerEventItem}>
-                                    <span className={`${styles.invoiceViewerEventAction} ${invoiceStatusEventToneClass(event)}`}>
+                    {selectedInvoiceStatusEvents.length > 0 ? (
+                      <div className={styles.statusEvents}>
+                        <h4>Status Events</h4>
+                        <div className={styles.statusEventsTableWrap}>
+                          <table className={styles.statusEventsTable}>
+                            <thead>
+                              <tr>
+                                <th>Action</th>
+                                <th>Occurred</th>
+                                <th>Note</th>
+                                <th>Who</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedInvoiceStatusEvents.map((event) => (
+                                <tr key={event.id}>
+                                  <td data-label="Action">
+                                    <span className={`${styles.invoiceEventBadge} ${invoiceEventBadgeClass(event)}`}>
                                       {invoiceStatusEventActionLabel(event, statusLabel)}
                                     </span>
-                                    <span className={styles.invoiceViewerEventMeta}>
-                                      {formatDateTimeDisplay(event.changed_at, "--")} by{" "}
-                                      {event.changed_by_customer_id ? (
-                                        <Link
-                                          href={`/customers?customer=${event.changed_by_customer_id}`}
-                                          className={styles.statusActorLink}
-                                          onClick={(e) => e.stopPropagation()}
-                                        >
-                                          {event.changed_by_display || `Customer #${event.changed_by_customer_id}`}
-                                        </Link>
-                                      ) : (
-                                        event.changed_by_display || event.changed_by_email || `User #${event.changed_by}`
-                                      )}
-                                    </span>
-                                    {event.note ? (
-                                      <span className={styles.invoiceViewerEventNote}>{event.note}</span>
-                                    ) : null}
-                                  </li>
-                                ))}
-                              </ul>
-                              {selectedInvoiceStatusEvents.length > 4 ? (
-                                <button
-                                  type="button"
-                                  className={styles.invoiceShowAllToggle}
-                                  onClick={(e) => { e.stopPropagation(); setShowAllEvents((v) => !v); }}
-                                >
-                                  {showAllEvents
-                                    ? "Show less"
-                                    : `Show all ${selectedInvoiceStatusEvents.length} events`}
-                                </button>
-                              ) : null}
-                            </>
-                          ) : (
-                            <p className={styles.inlineHint}>
-                              {statusEventsLoading ? "Loading status history..." : "No status history yet."}
-                            </p>
-                          )}
+                                  </td>
+                                  <td data-label="Occurred">{formatDateTimeDisplay(event.changed_at, "--")}</td>
+                                  <td data-label="Note">{event.note || "—"}</td>
+                                  <td data-label="Who">
+                                    {event.changed_by_customer_id ? (
+                                      <Link
+                                        href={`/customers?customer=${event.changed_by_customer_id}`}
+                                        className={styles.statusActorLink}
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {event.changed_by_display || `Customer #${event.changed_by_customer_id}`}
+                                      </Link>
+                                    ) : (
+                                      event.changed_by_display || event.changed_by_email || "Unknown user"
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
-                    </div>
+                      </div>
+                    ) : statusEventsLoading ? (
+                      <p className={styles.inlineHint}>Loading status history...</p>
+                    ) : null}
 
                     {/* Line Items */}
                     <div className={styles.invoiceViewerSection}>

@@ -224,8 +224,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
 
   const [viewerActionMessage, setViewerActionMessage] = useState("");
   const [viewerActionTone, setViewerActionTone] = useState<"success" | "error">("success");
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-  const [showAllEvents, setShowAllEvents] = useState(false);
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [selectedInvoiceId, setSelectedInvoiceId] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("draft");
@@ -530,7 +528,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   function handleSelectInvoice(invoice: InvoiceRecord) {
     setSelectedInvoiceId(String(invoice.id));
     setSelectedStatus("");
-    setShowAllEvents(false);
     setViewerActionMessage("");
     formFields.loadInvoiceIntoWorkspace(invoice);
   }
@@ -645,19 +642,18 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
   }
 
   /** Transition the selected invoice to a new status, with optional status note. */
-  async function handleUpdateInvoiceStatus() {
+  async function handleUpdateInvoiceStatus(): Promise<InvoiceRecord | null> {
     if (!canMutateInvoices) {
       setErrorStatus(`Role ${role} is read-only for invoice mutations.`);
-      return;
+      return null;
     }
 
     const invoiceId = Number(selectedInvoiceId);
     if (!invoiceId) {
       setErrorStatus("Select an invoice first.");
-      return;
+      return null;
     }
 
-    setIsUpdatingStatus(true);
     setNeutralStatus("Updating invoice status...");
     try {
       const trimmedNote = statusNote.trim();
@@ -681,8 +677,11 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       const payload: ApiResponse = await response.json();
 
       if (!response.ok) {
-        setErrorStatus(readInvoiceApiError(payload, "Status update failed."));
-        return;
+        const msg = readInvoiceApiError(payload, "Status update failed.");
+        setErrorStatus(msg);
+        setViewerActionMessage(msg);
+        setViewerActionTone("error");
+        return null;
       }
 
       const updated = payload.data as InvoiceRecord;
@@ -697,13 +696,13 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       setSuccessStatus(msg);
       setViewerActionMessage(msg);
       setViewerActionTone("success");
+      return updated;
     } catch {
       const msg = "Could not reach invoice status endpoint.";
       setErrorStatus(msg);
       setViewerActionMessage(msg);
       setViewerActionTone("error");
-    } finally {
-      setIsUpdatingStatus(false);
+      return null;
     }
   }
 
@@ -881,13 +880,10 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
             setStatusNote={setStatusNote}
             viewerActionMessage={viewerActionMessage}
             viewerActionTone={viewerActionTone}
-            isUpdatingStatus={isUpdatingStatus}
             onUpdateStatus={handleUpdateInvoiceStatus}
             onAddStatusNote={handleAddInvoiceStatusNote}
             selectedInvoiceStatusEvents={invoiceData.selectedInvoiceStatusEvents}
             statusEventsLoading={invoiceData.statusEventsLoading}
-            showAllEvents={showAllEvents}
-            setShowAllEvents={setShowAllEvents}
             contractBreakdown={invoiceData.contractBreakdown}
             isContractBreakdownOpen={isContractBreakdownOpen}
             setIsContractBreakdownOpen={setIsContractBreakdownOpen}
