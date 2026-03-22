@@ -547,11 +547,18 @@ export function ChangeOrdersConsole({
         await projectData.loadProjectAuditEvents(projectId);
       }
       const emailNote = form.quickStatus === "pending_approval" && payload.email_sent === false ? " No email sent — customer has no email on file." : "";
-      if (isResend) {
-        projectData.setFeedback(`Re-sent ${coLabel(updated)} for approval. History updated.${emailNote}`, "success");
-      } else {
-        projectData.setFeedback(`Updated ${coLabel(updated)} to ${statusLabel(updated.status, changeOrderStatusLabels)}. History updated.${emailNote}`, "success");
-      }
+      const actionFeedback: Record<string, string> = {
+        pending_approval: isResend
+          ? `Re-sent ${coLabel(updated)} for approval.${emailNote}`
+          : `Sent ${coLabel(updated)} for approval.${emailNote}`,
+        approved: `Marked ${coLabel(updated)} as accepted.`,
+        rejected: `Marked ${coLabel(updated)} as rejected.`,
+        void: `Voided ${coLabel(updated)}.`,
+      };
+      projectData.setFeedback(
+        actionFeedback[updated.status] ?? `Updated ${coLabel(updated)}. History updated.`,
+        "success",
+      );
       form.setQuickStatus("");
       form.setQuickStatusNote("");
       return updated;

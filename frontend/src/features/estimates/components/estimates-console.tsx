@@ -1106,7 +1106,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setStatusNote("");
       await loadStatusEvents({ estimateId: updated.id, quiet: true });
       const emailNote = updated.status === "sent" && payload.email_sent === false ? " No email sent — customer has no email on file." : "";
-      setActionMessage(`Updated estimate #${updated.id} to ${updated.status.replace(/_/g, " ")}. History updated.${emailNote}`);
+      const actionFeedback: Record<string, string> = {
+        sent: `Sent estimate #${updated.id}.${emailNote}`,
+        approved: `Marked estimate #${updated.id} as approved.`,
+        rejected: `Marked estimate #${updated.id} as rejected.`,
+        void: `Voided estimate #${updated.id}.`,
+      };
+      setActionMessage(actionFeedback[updated.status] ?? `Updated estimate #${updated.id}.${emailNote}`);
       setActionTone("success");
       return updated;
     } catch {
