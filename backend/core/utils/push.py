@@ -50,7 +50,7 @@ def send_push_to_user(user_id: int, payload: dict) -> int:
     """
     private_key = _get_vapid_private_key()
     if not private_key:
-        logger.warning("VAPID_PRIVATE_KEY not configured — skipping push notification.")
+        logger.debug("VAPID_PRIVATE_KEY not configured — skipping push notification.")
         return 0
 
     subscriptions = list(
