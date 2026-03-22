@@ -282,7 +282,7 @@ export function CustomersList({
                                       #{project.id} {project.name}
                                     </span>
                                   </Link>
-                                  {project.status !== "cancelled" && project.status !== "completed" ? (
+                                  {project.status !== "cancelled" && project.status !== "completed" && project.status !== "prospect" ? (
                                     <Link
                                       href={`/projects?project=${project.id}`}
                                       className={styles.projectQuickLink}
