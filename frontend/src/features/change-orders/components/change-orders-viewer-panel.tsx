@@ -45,17 +45,29 @@ function statusEventActionClass(event: AuditEventRecord): string {
   const toStatus = event.to_status || "";
   const fromStatus = event.from_status || "";
   const statusAction = String(event.metadata_json?.status_action || "").toLowerCase();
-  if (statusAction === "notate") return styles.statusEventNeutral;
-  if (statusAction === "resend") return styles.statusEventSent;
-  if (!fromStatus && toStatus === "draft") return styles.statusEventCreated;
-  if (fromStatus === toStatus && (event.note || "").trim()) return styles.statusEventNeutral;
-  if (fromStatus === "sent" && toStatus === "sent") return styles.statusEventSent;
-  if (fromStatus === "draft" && toStatus === "sent") return styles.statusEventSent;
-  if (toStatus === "approved") return styles.statusEventApproved;
-  if (toStatus === "rejected") return styles.statusEventRejected;
-  if (toStatus === "void") return styles.statusEventVoid;
-  if (toStatus === "draft" && fromStatus) return styles.statusEventReturnedDraft;
-  return styles.statusEventNeutral;
+  if (statusAction === "notate") return styles.coStatusEventNotated;
+  if (statusAction === "resend") return styles.coStatusSent;
+  if (!fromStatus && toStatus === "draft") return styles.coStatusDraft;
+  if (fromStatus === toStatus && (event.note || "").trim()) return styles.coStatusEventNotated;
+  if (fromStatus === "sent" && toStatus === "sent") return styles.coStatusSent;
+  if (fromStatus === "draft" && toStatus === "sent") return styles.coStatusSent;
+  if (toStatus === "approved") return styles.coStatusApproved;
+  if (toStatus === "rejected") return styles.coStatusRejected;
+  if (toStatus === "void") return styles.coStatusVoid;
+  if (toStatus === "draft" && fromStatus) return styles.coStatusDraft;
+  return styles.coStatusEventNotated;
+}
+
+const coStatusClasses: Record<string, string> = {
+  draft: styles.coStatusDraft,
+  sent: styles.coStatusSent,
+  approved: styles.coStatusApproved,
+  rejected: styles.coStatusRejected,
+  void: styles.coStatusVoid,
+};
+
+function coStatusClass(status: string): string {
+  return coStatusClasses[status] ?? "";
 }
 
 function viewerHistoryStatusClass(status: string): string {
@@ -359,8 +371,6 @@ export type ChangeOrdersViewerPanelProps = {
 
   // Selected CO detail
   selectedViewerChangeOrder: ChangeOrderRecord | null;
-  selectedViewerWorkingTotals: { preApproval: string; postApproval: string };
-  approvedCOsForSelectedEstimate: ChangeOrderRecord[];
 
   // Status & actions
   canMutateChangeOrders: boolean;
@@ -376,20 +386,8 @@ export type ChangeOrdersViewerPanelProps = {
   actionMessage: string;
   actionTone: string;
 
-  // Collapsible sections
-  isStatusSectionOpen: boolean;
-  setIsStatusSectionOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  isHistorySectionOpen: boolean;
-  setIsHistorySectionOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  isLineItemsSectionOpen: boolean;
-  setIsLineItemsSectionOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  isOriginLineItemsSectionOpen: boolean;
-  setIsOriginLineItemsSectionOpen: React.Dispatch<React.SetStateAction<boolean>>;
-
   // History
   selectedChangeOrderStatusEvents: AuditEventRecord[];
-  showAllEvents: boolean;
-  setShowAllEvents: React.Dispatch<React.SetStateAction<boolean>>;
 
 };
 
@@ -421,8 +419,6 @@ export function ChangeOrdersViewerPanel({
   projectAuditEvents,
   changeOrderStatusLabels,
   selectedViewerChangeOrder,
-  selectedViewerWorkingTotals,
-  approvedCOsForSelectedEstimate,
   canMutateChangeOrders,
   quickStatusOptions,
   quickStatus,
@@ -433,17 +429,7 @@ export function ChangeOrdersViewerPanel({
   onAddChangeOrderStatusNote,
   actionMessage,
   actionTone,
-  isStatusSectionOpen,
-  setIsStatusSectionOpen,
-  isHistorySectionOpen,
-  setIsHistorySectionOpen,
-  isLineItemsSectionOpen,
-  setIsLineItemsSectionOpen,
-  isOriginLineItemsSectionOpen,
-  setIsOriginLineItemsSectionOpen,
   selectedChangeOrderStatusEvents,
-  showAllEvents,
-  setShowAllEvents,
 }: ChangeOrdersViewerPanelProps) {
   return (
     <section className={styles.viewer}>
@@ -525,7 +511,7 @@ export function ChangeOrdersViewerPanel({
               {viewerChangeOrders.length > 0 ? (
                 <>
                   <h4 className={styles.viewerSectionHeading}>Change Orders</h4>
-                  <div className={`${styles.viewerRail} ${styles.viewerHistoryRail}`}>
+                  <div className={styles.coCardList}>
                     {paginatedChangeOrders.map((changeOrder) => {
                       const active = String(changeOrder.id) === selectedChangeOrderId;
                       const lastStatusEvent = lastStatusEventForChangeOrder(changeOrder.id, projectAuditEvents);
@@ -534,35 +520,26 @@ export function ChangeOrdersViewerPanel({
                           key={changeOrder.id}
                           role="button"
                           tabIndex={0}
-                          className={`${styles.viewerRailItem} ${styles.viewerHistoryItem} ${viewerHistoryStatusClass(changeOrder.status)} ${
-                            active ? `${styles.viewerRailItemActive} ${styles.viewerHistoryItemActive}` : ""
-                          }`}
+                          className={`${styles.coCard} ${active ? styles.coCardActive : ""}`}
                           onClick={() => onSelectChangeOrder(changeOrder)}
                           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelectChangeOrder(changeOrder); } }}
                         >
-                          <span className={styles.viewerRailTitle}>
-                            <span className={styles.viewerRailTitleText}>
+                          <span className={styles.coCardTitleRow}>
+                            <span className={styles.coCardTitle}>
                               {changeOrder.title || "Untitled"} · {coLabel(changeOrder)}
                             </span>
-                            <span className={styles.viewerHistoryStatusText}>{statusLabel(changeOrder.status, changeOrderStatusLabels)}</span>
-                          </span>
-                          <span
-                            className={`${styles.viewerHistoryMetaText} ${styles.viewerHistoryLineDelta} ${
-                              ["approved", "accepted"].includes(changeOrder.status)
-                                ? styles.viewerHistoryLineDeltaApproved
-                                : ""
-                            }`}
-                          >
-                            Line delta: ${changeOrder.line_total_delta}
-                          </span>
-                          {lastStatusEvent ? (
-                            <span className={styles.viewerHistoryMetaText}>
-                              Last action: {statusEventActionLabel(lastStatusEvent, changeOrderStatusLabels)} on{" "}
-                              {formatEventDateTime(lastStatusEvent.created_at)} by {eventActorLabel(lastStatusEvent)}
+                            <span className={`${styles.coCardStatusBadge} ${coStatusClass(changeOrder.status)}`}>
+                              {statusLabel(changeOrder.status, changeOrderStatusLabels)}
                             </span>
-                          ) : (
-                            <span className={styles.viewerHistoryMetaText}>No status events yet.</span>
-                          )}
+                          </span>
+                          <span className={styles.coCardMeta}>
+                            ${changeOrder.line_total_delta} · {coLabel(changeOrder)}
+                          </span>
+                          <span className={styles.coCardDate}>
+                            {lastStatusEvent
+                              ? `Last action: ${formatEventDateTime(lastStatusEvent.created_at)}`
+                              : `Created: ${formatEventDateTime(changeOrder.created_at)}`}
+                          </span>
                         </div>
                       );
                     })}
@@ -570,145 +547,57 @@ export function ChangeOrdersViewerPanel({
                   <PaginationControls page={coPage} totalPages={coTotalPages} totalCount={coTotalCount} onPageChange={setCoPage} />
                   {selectedViewerChangeOrder ? (
                     <>
-                      {/* Status & Actions */}
-                      <div className={styles.viewerSection}>
-                        <button
-                          type="button"
-                          className={styles.viewerSectionToggle}
-                          onClick={() => setIsStatusSectionOpen((v) => !v)}
-                          aria-expanded={isStatusSectionOpen}
-                        >
-                          <h4>Status &amp; Actions</h4>
-                          <span className={styles.viewerSectionArrow}>▼</span>
-                        </button>
-                        {isStatusSectionOpen ? (
-                          <ChangeOrderActionPanel
-                            selectedViewerChangeOrder={selectedViewerChangeOrder}
-                            quickStatusOptions={quickStatusOptions}
-                            selectedProjectCustomerEmail={selectedProjectCustomerEmail}
-                            selectedProjectName={selectedProjectName}
-                            quickStatus={quickStatus}
-                            setQuickStatus={setQuickStatus}
-                            quickStatusNote={quickStatusNote}
-                            setQuickStatusNote={setQuickStatusNote}
-                            actionMessage={actionMessage}
-                            actionTone={actionTone}
-                            onQuickUpdateStatus={onQuickUpdateStatus}
-                            onAddChangeOrderStatusNote={onAddChangeOrderStatusNote}
-                            canMutateChangeOrders={canMutateChangeOrders}
-                            changeOrderStatusLabels={changeOrderStatusLabels}
-                          />
-                        ) : null}
-                      </div>
+                      <ChangeOrderActionPanel
+                        selectedViewerChangeOrder={selectedViewerChangeOrder}
+                        quickStatusOptions={quickStatusOptions}
+                        selectedProjectCustomerEmail={selectedProjectCustomerEmail}
+                        selectedProjectName={selectedProjectName}
+                        quickStatus={quickStatus}
+                        setQuickStatus={setQuickStatus}
+                        quickStatusNote={quickStatusNote}
+                        setQuickStatusNote={setQuickStatusNote}
+                        actionMessage={actionMessage}
+                        actionTone={actionTone}
+                        onQuickUpdateStatus={onQuickUpdateStatus}
+                        onAddChangeOrderStatusNote={onAddChangeOrderStatusNote}
+                        canMutateChangeOrders={canMutateChangeOrders}
+                        changeOrderStatusLabels={changeOrderStatusLabels}
+                      />
 
-                      {/* History section */}
-                      <div className={styles.viewerSection}>
-                        <button
-                          type="button"
-                          className={styles.viewerSectionToggle}
-                          onClick={() => setIsHistorySectionOpen((v) => !v)}
-                          aria-expanded={isHistorySectionOpen}
-                        >
-                          <h4>History ({selectedChangeOrderStatusEvents.length})</h4>
-                          <span className={styles.viewerSectionArrow}>▼</span>
-                        </button>
-                        {isHistorySectionOpen ? (
-                          <div className={styles.viewerSectionContent}>
-                            {selectedChangeOrderStatusEvents.length > 0 ? (
-                              <>
-                                <ul className={styles.viewerEventList}>
-                                  {(showAllEvents
-                                    ? selectedChangeOrderStatusEvents
-                                    : selectedChangeOrderStatusEvents.slice(0, 4)
-                                  ).map((event) => (
-                                    <li key={event.id} className={styles.viewerEventItem}>
-                                      <span className={`${styles.viewerEventAction} ${statusEventActionClass(event)}`}>
-                                        {statusEventActionLabel(event, changeOrderStatusLabels)}
-                                      </span>
-                                      <span className={styles.viewerEventMeta}>
-                                        {formatEventDateTime(event.created_at)} by {renderEventActor(event)}
-                                      </span>
-                                      {event.note ? (
-                                        <span className={styles.viewerEventNote}>{event.note}</span>
-                                      ) : null}
-                                    </li>
-                                  ))}
-                                </ul>
-                                {selectedChangeOrderStatusEvents.length > 4 ? (
-                                  <button
-                                    type="button"
-                                    className={styles.showAllToggle}
-                                    onClick={() => setShowAllEvents((v) => !v)}
-                                  >
-                                    {showAllEvents
-                                      ? "Show less"
-                                      : `Show all ${selectedChangeOrderStatusEvents.length} events`}
-                                  </button>
-                                ) : null}
-                              </>
-                            ) : (
-                              <p className={styles.viewerHint}>No status events recorded yet.</p>
-                            )}
+                      {selectedChangeOrderStatusEvents.length > 0 ? (
+                        <div className={styles.statusEvents}>
+                          <h4>Status Events</h4>
+                          <div className={styles.statusEventsTableWrap}>
+                            <table className={styles.statusEventsTable}>
+                              <thead>
+                                <tr>
+                                  <th>Action</th>
+                                  <th>Occurred</th>
+                                  <th>Note</th>
+                                  <th>Who</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {selectedChangeOrderStatusEvents.map((event) => {
+                                  const actionClass = statusEventActionClass(event);
+                                  return (
+                                    <tr key={event.id}>
+                                      <td data-label="Action">
+                                        <span className={`${styles.coEventBadge} ${actionClass}`}>
+                                          {statusEventActionLabel(event, changeOrderStatusLabels)}
+                                        </span>
+                                      </td>
+                                      <td data-label="Occurred">{formatEventDateTime(event.created_at)}</td>
+                                      <td data-label="Note">{event.note || "—"}</td>
+                                      <td data-label="Who">{renderEventActor(event)}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
                           </div>
-                        ) : null}
-                      </div>
-
-                      {/* Line Items section */}
-                      <div className={styles.viewerSection}>
-                        <button
-                          type="button"
-                          className={styles.viewerSectionToggle}
-                          onClick={() => setIsLineItemsSectionOpen((v) => !v)}
-                          aria-expanded={isLineItemsSectionOpen}
-                        >
-                          <h4>Line Items ({selectedViewerChangeOrder.line_items.length})</h4>
-                          <span className={styles.viewerSectionArrow}>▼</span>
-                        </button>
-                        {isLineItemsSectionOpen ? (
-                          <div className={styles.viewerSectionContent}>
-                            {selectedViewerChangeOrder.line_items.length > 0 ? (
-                                <div className={styles.lineTableWrap}>
-                                  <table className={styles.lineTable}>
-                                    <thead>
-                                      <tr>
-                                        <th>Cost code</th>
-                                        <th>Description</th>
-                                        <th>Adjustment reason</th>
-                                        <th>CO line delta ($)</th>
-                                        <th>Days delta</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {selectedViewerChangeOrder.line_items.map((line) => (
-                                        <tr key={line.id}>
-                                          <td data-label="Cost code">{line.cost_code_code || "—"}</td>
-                                          <td data-label="Description">{line.description || "—"}</td>
-                                          <td data-label="Reason">{line.adjustment_reason || "—"}</td>
-                                          <td data-label="CO delta ($)">${line.amount_delta}</td>
-                                          <td data-label="Days delta">{line.days_delta}</td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                            ) : (
-                              <p className={styles.viewerHint}>No line items yet on this change order.</p>
-                            )}
-                            <div className={styles.viewerMetaRow}>
-                              <span className={styles.viewerMetaLabel}>Line delta total</span>
-                              <strong>${selectedViewerChangeOrder.line_total_delta}</strong>
-                            </div>
-                            <div className={styles.viewerMetaRow}>
-                              <span className={styles.viewerMetaLabel}>Pre-approval total</span>
-                              <strong>${selectedViewerWorkingTotals.preApproval}</strong>
-                            </div>
-                            <div className={styles.viewerMetaRow}>
-                              <span className={styles.viewerMetaLabel}>Post-approval total</span>
-                              <strong>${selectedViewerWorkingTotals.postApproval}</strong>
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
+                        </div>
+                      ) : null}
                     </>
                   ) : null}
                 </>

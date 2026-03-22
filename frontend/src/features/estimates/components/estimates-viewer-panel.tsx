@@ -522,21 +522,6 @@ export function EstimatesViewerPanel({
                               Last action: {formatEstimateLastActionDate(latest)}
                             </span>
                           </div>
-                          {quickActionKind === "change_order" && selectedProjectId ? (
-                            <div className={styles.familyLinkBar}>
-                              {quickActionKind === "change_order" && selectedProjectId ? (
-                                <Link
-                                  href={`/projects/${selectedProjectId}/change-orders?origin_estimate=${latest.id}`}
-                                  className={styles.familyPublicLink}
-                                  aria-label={`${quickActionTitle} (estimate #${latest.id})`}
-                                  title={quickActionTitle}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  View Change Orders →
-                                </Link>
-                              ) : null}
-                            </div>
-                          ) : null}
                         </div>
                         {isViewingHistory || quickActionKind === "revision" ? (
                           <div className={styles.familyFooter}>

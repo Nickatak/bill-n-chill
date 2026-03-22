@@ -163,9 +163,6 @@ export function ChangeOrdersConsole({
 
   // UI section toggles (thin — kept in console)
   const [isViewerExpanded, setIsViewerExpanded] = useState(true);
-  const [isStatusSectionOpen, setIsStatusSectionOpen] = useState(true);
-  const [isHistorySectionOpen, setIsHistorySectionOpen] = useState(false);
-  const [isLineItemsSectionOpen, setIsLineItemsSectionOpen] = useState(true);
   const [isOriginLineItemsSectionOpen, setIsOriginLineItemsSectionOpen] = useState(false);
 
   // -------------------------------------------------------------------------
@@ -672,7 +669,7 @@ export function ChangeOrdersConsole({
   // -------------------------------------------------------------------------
 
   return (
-    <section>
+    <section className={styles.console}>
       {projectData.actionMessage && projectData.actionTone !== "success" ? (
         <p
           className={
@@ -714,8 +711,6 @@ export function ChangeOrdersConsole({
         projectAuditEvents={projectData.projectAuditEvents}
         changeOrderStatusLabels={changeOrderStatusLabels}
         selectedViewerChangeOrder={viewer.selectedViewerChangeOrder}
-        selectedViewerWorkingTotals={viewer.selectedViewerWorkingTotals}
-        approvedCOsForSelectedEstimate={viewer.approvedCOsForSelectedEstimate}
         canMutateChangeOrders={viewer.canMutateChangeOrders}
         quickStatusOptions={viewer.quickStatusOptions}
         quickStatus={form.quickStatus}
@@ -726,17 +721,7 @@ export function ChangeOrdersConsole({
         onAddChangeOrderStatusNote={handleAddChangeOrderStatusNote}
         actionMessage={projectData.actionMessage}
         actionTone={projectData.actionTone}
-        isStatusSectionOpen={isStatusSectionOpen}
-        setIsStatusSectionOpen={setIsStatusSectionOpen}
-        isHistorySectionOpen={isHistorySectionOpen}
-        setIsHistorySectionOpen={setIsHistorySectionOpen}
-        isLineItemsSectionOpen={isLineItemsSectionOpen}
-        setIsLineItemsSectionOpen={setIsLineItemsSectionOpen}
-        isOriginLineItemsSectionOpen={isOriginLineItemsSectionOpen}
-        setIsOriginLineItemsSectionOpen={setIsOriginLineItemsSectionOpen}
         selectedChangeOrderStatusEvents={viewer.selectedChangeOrderStatusEvents}
-        showAllEvents={form.showAllEvents}
-        setShowAllEvents={form.setShowAllEvents}
       />
 
 

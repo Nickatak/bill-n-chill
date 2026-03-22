@@ -1,3 +1,9 @@
+.console {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
 .primaryCreateButton {
   composes: toolbarPrimaryButton from "../../../shared/document-creator/creator-foundation.module.css";
 }
@@ -68,6 +74,8 @@
   border-radius: 14px;
   padding: 14px;
   background: var(--surface-secondary);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .viewerHeader h3 {
@@ -224,6 +232,8 @@
   background: var(--surface);
   padding: var(--space-md);
   display: grid;
+  min-width: 0;
+  overflow: hidden;
   gap: 9px;
   align-content: start;
 }
@@ -274,11 +284,171 @@
 
 .viewerHistoryStatusText {
   margin-left: auto;
-  font-size: var(--font-xs);
-  letter-spacing: 0.1em;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-weight: 700;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+.coStatusDraft { composes: draft from '../../../shared/styles/status.module.css'; }
+.coStatusSent { composes: sent from '../../../shared/styles/status.module.css'; }
+.coStatusApproved { composes: approved from '../../../shared/styles/status.module.css'; }
+.coStatusRejected { composes: rejected from '../../../shared/styles/status.module.css'; }
+.coStatusVoid { composes: archived from '../../../shared/styles/status.module.css'; }
+
+.coStatusEventNotated {
+  composes: badge from '../../../shared/styles/status.module.css';
+  background: var(--tone-neutral-bg);
+  color: var(--text-secondary);
+}
+
+/* --- CO card list (mirrors estimate familyGroup/familyMain pattern) --- */
+
+.coCardList {
+  display: grid;
+  gap: 8px;
+}
+
+.coCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--surface);
+  min-width: 0;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.coCard:hover {
+  border-color: var(--accent-border);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+.coCardActive {
+  border-color: var(--accent);
+  background: var(--accent-lighter);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.coCardTitleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.coCardTitle {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coCardStatusBadge {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+
+.coCardMeta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
+  display: block;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coCardDate {
+  display: block;
+  margin-top: auto;
+  font-size: 0.8rem;
   color: var(--status-gray-text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Status events table (mirrors estimates pattern) --- */
+
+.statusEvents h4 {
+  margin: 0 0 6px;
+  color: var(--text-primary);
+}
+
+.statusEventsTableWrap {
+  composes: tableWrap from '../../../shared/styles/table.module.css';
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+.statusEventsTable {
+  composes: table from '../../../shared/styles/table.module.css';
+  min-width: 680px;
+}
+
+.statusEventsTable thead th {
+  text-align: left;
+  padding: 9px 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
+}
+
+.statusEventsTable tbody td {
+  padding: 9px 10px;
+  border-top: 1px solid var(--table-border);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  vertical-align: top;
+}
+
+.statusEventsTable tbody tr:nth-child(even) {
+  background: var(--table-row-alt);
+}
+
+.coEventBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.eventActorLink {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.eventActorLink:hover,
+.eventActorLink:focus-visible {
+  text-decoration: underline;
 }
 
 .viewerHistoryMetaText {
@@ -424,6 +594,13 @@
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  min-width: 0;
+}
+
+.actionButtons > * {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
 }
 
 .actionButtonSent {
@@ -692,6 +869,8 @@
 .viewerSectionContent {
   display: grid;
   gap: var(--space-sm);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .showAllToggle {
@@ -799,6 +978,10 @@
     word-break: break-word;
   }
 
+  .actionButtons {
+    flex-direction: column;
+  }
+
   /* ── Status pills / actions: touch targets ── */
   .quickStatusButton {
     min-height: 44px;
@@ -861,6 +1044,55 @@
   }
 
   .lineTableWrap {
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  /* ── Status events table: stacked cards on mobile ── */
+  .statusEventsTable {
+    min-width: 0;
+  }
+
+  .statusEventsTable thead {
+    display: none;
+  }
+
+  .statusEventsTable tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-secondary);
+    margin-bottom: 6px;
+  }
+
+  .statusEventsTable tbody tr:nth-child(even) {
+    background: var(--surface-secondary);
+  }
+
+  .statusEventsTable tbody td {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 4px 0;
+    border-top: 0;
+    font-size: 0.82rem;
+  }
+
+  .statusEventsTable tbody td::before {
+    content: attr(data-label);
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-tertiary, var(--text-secondary));
+    opacity: 0.7;
+  }
+
+  .statusEventsTableWrap {
     border: 0;
     border-radius: 0;
     overflow: visible;
