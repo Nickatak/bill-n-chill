@@ -193,11 +193,6 @@ function EstimateActionPanel({
               customerEmail,
             )}
           </p>
-          {(pendingAction === "sent") ? (
-            <p className={styles.actionConfirmDetail}>
-              {emailNotice(customerEmail)}
-            </p>
-          ) : null}
           <label className={styles.lifecycleField}>
             <span className={styles.lifecycleFieldLabel}>Note (optional)</span>
             <textarea
@@ -208,6 +203,11 @@ function EstimateActionPanel({
               rows={2}
             />
           </label>
+          {(pendingAction === "sent") ? (
+            <p className={styles.actionConfirmDetail}>
+              {emailNotice(customerEmail)}
+            </p>
+          ) : null}
           <div className={styles.actionConfirmActions}>
             <button
               type="button"
