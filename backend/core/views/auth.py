@@ -3,7 +3,7 @@
 import logging
 
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError, connection, transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -41,8 +41,12 @@ logger = logging.getLogger(__name__)
 def health_view(_request):
     """Health probe endpoint used by infra and local readiness checks.
 
+    Verifies database connectivity with a lightweight query before
+    reporting healthy.
+
     Flow:
-        1. Return static OK payload.
+        1. Execute a trivial DB query to confirm connectivity.
+        2. Return OK if reachable, 503 if not.
 
     URL: ``GET /api/v1/health/``
 
@@ -51,7 +55,19 @@ def health_view(_request):
     Success 200::
 
         { "data": { "status": "ok" } }
+
+    Error 503::
+
+        { "error": { "code": "service_unavailable", "message": "Database unreachable." } }
     """
+    try:
+        connection.ensure_connection()
+    except Exception:
+        logger.error("Health check failed: database unreachable")
+        return Response(
+            {"error": {"code": "service_unavailable", "message": "Database unreachable."}},
+            status=503,
+        )
     return Response({"data": {"status": "ok"}})
 
 
