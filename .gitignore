@@ -46,8 +46,9 @@ HUMAN_MEMORY.md
 work/*
 saas_plans/
 
-# Misc OS / logs
+# Misc OS / logs / backups
 logs/
+backups/
 .DS_Store
 Thumbs.db
 *.pem
