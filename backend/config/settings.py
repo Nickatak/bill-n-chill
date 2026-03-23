@@ -224,6 +224,16 @@ ANYMAIL = {
 # Frontend URL for building verification links in emails.
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
+# Sentry error monitoring — only active when SENTRY_DSN is set (prod).
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+if SENTRY_DSN:
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        traces_sample_rate=0,
+        environment="production" if not DEBUG else "development",
+    )
+
 # Logging
 _default_log_dir = Path("/var/log/bnc") if not DEBUG else BASE_DIR.parent / "logs"
 LOG_DIR = Path(os.getenv("LOG_DIR", str(_default_log_dir)))
