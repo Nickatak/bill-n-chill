@@ -237,7 +237,11 @@ if SENTRY_DSN:
 # Logging
 _default_log_dir = Path("/var/log/bnc") if not DEBUG else BASE_DIR.parent / "logs"
 LOG_DIR = Path(os.getenv("LOG_DIR", str(_default_log_dir)))
-LOG_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+except PermissionError:
+    LOG_DIR = BASE_DIR.parent / "logs"
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 LOGGING = {
     "version": 1,
