@@ -189,16 +189,16 @@ describe("OrganizationConsole", () => {
 
   // -- Tab rendering --
 
-  it("renders three tabs and defaults to My Business", async () => {
+  it("renders three tabs and defaults to Business", async () => {
     setupDefaultFetch();
     render(<OrganizationConsole />);
     await waitFor(() => expect(screen.getByText("Company Name")).toBeTruthy());
-    expect(screen.getByText("My Business")).toBeTruthy();
-    expect(screen.getByText("My Team")).toBeTruthy();
-    expect(screen.getByText("Document Settings")).toBeTruthy();
+    expect(screen.getByText("Business")).toBeTruthy();
+    expect(screen.getByText("Team")).toBeTruthy();
+    expect(screen.getByText("Docs")).toBeTruthy();
   });
 
-  it("switches to My Team tab and renders membership table", async () => {
+  it("switches to Team tab and renders membership table", async () => {
     const members = [
       makeMembership(),
       makeMembership({ id: 2, user: 2, user_email: "pm@test.com", user_full_name: "PM User", role: "pm", is_current_user: false }),
@@ -207,17 +207,17 @@ describe("OrganizationConsole", () => {
     render(<OrganizationConsole />);
     await waitFor(() => expect(screen.getByText("Company Name")).toBeTruthy());
 
-    fireEvent.click(screen.getByText("My Team"));
+    fireEvent.click(screen.getByText("Team"));
     expect(screen.getByText("Test Owner")).toBeTruthy();
     expect(screen.getByText("PM User")).toBeTruthy();
   });
 
-  it("switches to Document Settings tab and renders estimate fields by default", async () => {
+  it("switches to Docs tab and renders estimate fields by default", async () => {
     setupDefaultFetch();
     render(<OrganizationConsole />);
     await waitFor(() => expect(screen.getByText("Company Name")).toBeTruthy());
 
-    fireEvent.click(screen.getByText("Document Settings"));
+    fireEvent.click(screen.getByText("Docs"));
     expect(screen.getByText("Estimate Valid Days")).toBeTruthy();
   });
 
@@ -386,7 +386,7 @@ describe("OrganizationConsole > Team Tab", () => {
     setupDefaultFetch(overrides);
     render(<OrganizationConsole />);
     return waitFor(() => expect(screen.getByText("Company Name")).toBeTruthy()).then(() => {
-      fireEvent.click(screen.getByText("My Team"));
+      fireEvent.click(screen.getByText("Team"));
     });
   }
 
@@ -600,7 +600,7 @@ describe("OrganizationConsole > Team Tab", () => {
 // DocumentSettingsTab (rendered via OrganizationConsole, documents tab)
 // ---------------------------------------------------------------------------
 
-describe("OrganizationConsole > Document Settings", () => {
+describe("OrganizationConsole > Docs", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     localStorage.clear();
@@ -614,7 +614,7 @@ describe("OrganizationConsole > Document Settings", () => {
     setupDefaultFetch(overrides);
     render(<OrganizationConsole />);
     await waitFor(() => expect(screen.getByText("Company Name")).toBeTruthy());
-    fireEvent.click(screen.getByText("Document Settings"));
+    fireEvent.click(screen.getByText("Docs"));
   }
 
   it("renders estimate doc type sub-tab by default", async () => {
