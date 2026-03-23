@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import datetime
+import logging
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 from django.db import transaction
 from django.db.models import QuerySet
@@ -453,6 +456,7 @@ def _handle_vb_status_transition(
                 acted_by=request.user,
                 status_note=status_note,
             )
+            logger.info("Vendor bill status transition: id=%s %s (%s → %s) by %s", vendor_bill.id, vendor_bill.bill_number or "(no number)", previous_status, next_status, request.user.email)
 
     vendor_bill = _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()
     return Response(

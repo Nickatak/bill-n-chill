@@ -13,6 +13,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - ./media:/app/backend/media
+      - ./logs:/var/log/bnc
     command: >-
       sh -c "pip install --no-cache-dir -r requirements.txt &&
       python manage.py migrate &&

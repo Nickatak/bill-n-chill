@@ -1,7 +1,11 @@
 """Domain-specific helpers for estimate views."""
 
+import logging
+
 from decimal import Decimal
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
@@ -149,6 +153,7 @@ def _archive_estimate_family(
             note=note,
             changed_by=user,
         )
+        logger.info("Estimate archived: id=%s title='%s' v%s (%s → archived)", candidate.id, candidate.title, candidate.version, previous_status)
 
 
 def _next_estimate_family_version(*, project: Project, title: str) -> int:
@@ -445,6 +450,7 @@ def _handle_estimate_status_transition(
             note=event_note,
             changed_by=request.user,
         )
+        logger.info("Estimate status transition: id=%s title='%s' v%s (%s → %s) by %s", estimate.id, estimate.title, estimate.version, previous_status, next_status, request.user.email)
 
         if next_status in (Estimate.Status.SENT, Estimate.Status.APPROVED):
             _promote_prospect_to_active(estimate.project)

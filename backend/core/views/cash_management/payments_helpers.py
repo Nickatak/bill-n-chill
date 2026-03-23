@@ -1,7 +1,11 @@
 """Domain-specific helpers for payment views."""
 
+import logging
+
 from decimal import Decimal
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from django.contrib.auth import get_user_model
 from django.db.models import Model, QuerySet, Sum
@@ -90,6 +94,7 @@ def _set_invoice_balance_from_payments(invoice: Invoice, *, changed_by: "User") 
             note=note,
             changed_by=changed_by,
         )
+        logger.info("Invoice balance-driven status change: id=%s %s (%s → %s) balance=$%s", invoice.id, invoice.invoice_number, previous_status, invoice.status, invoice.balance_due)
 
 
 def _set_vendor_bill_balance_from_payments(vendor_bill: VendorBill) -> None:

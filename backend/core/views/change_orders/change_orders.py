@@ -1,6 +1,10 @@
 """Change-order creation, revision, and lifecycle endpoints."""
 
+import logging
+
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -261,6 +265,8 @@ def public_change_order_decision_view(request, public_token):
             ip_address=client_ip,
             user_agent=client_ua,
         )
+
+    logger.info("Change order public decision: id=%s CO-%s v%s decision=%s delta=$%s from=%s", change_order.id, change_order.family_key, change_order.revision_number, decision, financial_delta, client_ip)
 
     # Fire push notification to document owner (best-effort, non-blocking).
     customer_name = change_order.project.customer.display_name

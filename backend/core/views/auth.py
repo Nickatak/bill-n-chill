@@ -1,5 +1,7 @@
 """Authentication and registration views with invite-flow support."""
 
+import logging
+
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -28,6 +30,7 @@ from core.views.auth_helpers import (
 )
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 # ── views ──
@@ -93,6 +96,7 @@ def login_view(request):
 
     membership = _ensure_org_membership(user)
 
+    logger.info("User logged in: %s", user.email)
     return Response({"data": _build_auth_response_payload(user, membership)})
 
 
@@ -196,6 +200,7 @@ def register_view(request):
 
         # Reload with select_related for response
         membership = OrganizationMembership.objects.select_related("organization").get(id=membership.id)
+        logger.info("User registered via invite (Flow B): %s, org=%s", user.email, invite.organization_id)
         return Response({"data": _build_auth_response_payload(user, membership)}, status=201)
 
     # Flow A: standard registration (no invite).
@@ -219,6 +224,7 @@ def register_view(request):
         return Response(_CHECK_EMAIL, status=200)
 
     send_verification_email(user, token_obj)  # Outside atomic — mail failure doesn't roll back user.
+    logger.info("User registered (Flow A): %s", email)
     return Response(_CHECK_EMAIL, status=200)
 
 
@@ -499,6 +505,7 @@ def accept_invite_view(request):
 
     # Reload for response
     membership = OrganizationMembership.objects.select_related("organization").get(id=membership.id)
+    logger.info("Invite accepted (Flow C): %s, org=%s", user.email, invite.organization_id)
     return Response({"data": _build_auth_response_payload(user, membership)})
 
 
@@ -553,6 +560,7 @@ def verify_email_view(request):
         user.save(update_fields=["is_active"])
 
     membership = _ensure_org_membership(user)
+    logger.info("Email verified: %s", user.email)
     return Response({"data": _build_auth_response_payload(user, membership)})
 
 
@@ -753,6 +761,7 @@ def reset_password_view(request):
         user.save(update_fields=["password"])
 
     membership = _ensure_org_membership(user)
+    logger.info("Password reset completed: %s", user.email)
     return Response({"data": _build_auth_response_payload(user, membership)})
 
 
@@ -832,6 +841,7 @@ def impersonate_start_view(request):
         "real_email": request.user.email,
     }
 
+    logger.info("Impersonation started: %s → %s", request.user.email, target_user.email)
     return Response({"data": payload})
 
 

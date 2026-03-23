@@ -47,6 +47,7 @@ work/*
 saas_plans/
 
 # Misc OS / logs
+logs/
 .DS_Store
 Thumbs.db
 *.pem

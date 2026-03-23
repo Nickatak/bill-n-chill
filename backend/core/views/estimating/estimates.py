@@ -1,7 +1,11 @@
 """Estimate authoring and public sharing endpoints."""
 
+import logging
+
 from datetime import timedelta
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 from django.conf import settings
 from django.db import transaction
@@ -217,6 +221,8 @@ def public_estimate_decision_view(request, public_token):
             note=str(request.data.get("note", "") or "").strip(),
             access_session=ceremony_session,
         )
+
+    logger.info("Estimate public decision: id=%s title='%s' v%s decision=%s from=%s", estimate.id, estimate.title, estimate.version, decision, client_ip)
 
     # Fire push notification to document owner (best-effort, non-blocking).
     customer_name = estimate.project.customer.display_name

@@ -1,5 +1,9 @@
 """Accounts receivable invoice endpoints and state transitions."""
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -280,6 +284,8 @@ def public_invoice_decision_view(request, public_token: str):
             note=str(request.data.get("note", "") or "").strip(),
             access_session=ceremony_session,
         )
+
+    logger.info("Invoice public decision: id=%s %s decision=%s from=%s", invoice.id, invoice.invoice_number, decision_type, client_ip)
 
     # Fire push notification to document owner (best-effort, non-blocking).
     customer_name = invoice.project.customer.display_name

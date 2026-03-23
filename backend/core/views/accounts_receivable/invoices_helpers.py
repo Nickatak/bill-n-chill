@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import logging
+
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
@@ -470,6 +474,7 @@ def _handle_invoice_status_transition(
             note=event_note,
             changed_by=request.user,
         )
+        logger.info("Invoice status transition: id=%s %s (%s → %s) by %s", invoice.id, invoice.invoice_number, previous_status, next_status, request.user.email)
 
         if next_status == Invoice.Status.SENT:
             _promote_prospect_to_active(invoice.project)

@@ -44,6 +44,7 @@ def send_verification_email(user, token_obj):
         sent_by_user=user,
         metadata={"verification_token_id": token_obj.id, "user_id": user.id},
     )
+    logger.info("Verification email sent to %s", user.email)
 
 
 def send_password_reset_email(user, token_obj, *, is_security_alert=False):
@@ -94,6 +95,7 @@ def send_password_reset_email(user, token_obj, *, is_security_alert=False):
             "is_security_alert": is_security_alert,
         },
     )
+    logger.info("Password reset email sent to %s (security_alert=%s)", user.email, is_security_alert)
 
 
 def send_otp_email(recipient_email, code, document_type_label, document_title):
@@ -112,7 +114,7 @@ def send_otp_email(recipient_email, code, document_type_label, document_title):
     )
 
     if settings.DEBUG:
-        print(f"[OTP] Code {code} for {recipient_email} ({document_type_label}: {document_title})")
+        logger.debug("OTP code %s for %s (%s: %s)", code, recipient_email, document_type_label, document_title)
 
     send_mail(
         subject=subject,
@@ -129,6 +131,7 @@ def send_otp_email(recipient_email, code, document_type_label, document_title):
         body_text=body,
         metadata={"document_type_label": document_type_label, "document_title": document_title},
     )
+    logger.info("OTP email sent to %s for %s: %s", recipient_email, document_type_label, document_title)
 
 
 def send_document_sent_email(*, document_type, document_title, public_url, recipient_email, sender_user):
@@ -186,5 +189,6 @@ def send_document_sent_email(*, document_type, document_title, public_url, recip
             "public_url": public_url,
         },
     )
+    logger.info("Document sent email delivered: %s '%s' to %s", document_type, document_title, recipient_email)
 
     return True

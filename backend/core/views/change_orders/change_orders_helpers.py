@@ -1,7 +1,11 @@
 """Domain-specific helpers for change-order views."""
 
+import logging
+
 from decimal import Decimal
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -385,6 +389,7 @@ def _handle_co_status_transition(
                 note=event_note,
                 changed_by=request.user,
             )
+            logger.info("Change order status transition: id=%s CO-%s v%s (%s → %s) delta=$%s by %s", change_order.id, change_order.family_key, change_order.revision_number, previous_status, next_status, financial_delta, request.user.email)
     except ValidationError as exc:
         fields = exc.message_dict if hasattr(exc, "message_dict") else {"non_field_errors": exc.messages}
         return Response(

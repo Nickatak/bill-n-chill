@@ -1,5 +1,9 @@
 """Cash-management payment endpoints."""
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
@@ -182,6 +186,7 @@ def org_payments_view(request):
             if target and payment.status == Payment.Status.SETTLED:
                 _recalculate_target_balance(target, payment.target_type, request.user)
 
+        logger.info("Payment created: id=%s $%s %s/%s target=%s by %s", payment.id, payment.amount, payment.direction, payment.method, payment.target_type, request.user.email)
         return Response({"data": PaymentSerializer(payment).data}, status=201)
 
 
@@ -294,6 +299,7 @@ def project_payments_view(request, project_id):
             if target and payment.status == Payment.Status.SETTLED:
                 _recalculate_target_balance(target, payment.target_type, request.user)
 
+        logger.info("Payment created (project): id=%s $%s %s/%s project=%s by %s", payment.id, payment.amount, payment.direction, payment.method, project_id, request.user.email)
         return Response({"data": PaymentSerializer(payment).data}, status=201)
 
 
@@ -423,4 +429,6 @@ def payment_detail_view(request, payment_id):
                 )
 
         payment.refresh_from_db()
+        if status_changed:
+            logger.info("Payment status changed: id=%s $%s (%s → %s) by %s", payment.id, payment.amount, previous_status, payment.status, request.user.email)
         return Response({"data": PaymentSerializer(payment).data})

@@ -1,6 +1,10 @@
 """Shared customer-intake endpoints."""
 
+import logging
+
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
@@ -567,6 +571,7 @@ def quick_add_customer_intake_view(request):
                     recorded_by=request.user,
                     note="Customer created from intake quick add.",
                 )
+                logger.info("Customer created: id=%s name='%s' by %s", customer.id, customer.display_name, request.user.email)
 
             created_record = LeadContactRecord.record(
                 snapshot_json=build_intake_snapshot(payload=payload),
