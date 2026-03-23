@@ -6,6 +6,7 @@
 	local-run-frontend local-run-backend local-check-db \
 	local-makemigrations local-superuser \
 	local-test local-test-backend local-test-frontend local-clean local-kill-ports \
+	lint install-hooks backup \
 	docker-up docker-down docker-logs db-migrate \
 	db-seed db-reset db-reset-hard db-grant-test-db-perms \
 	docker-prod-up docker-prod-down docker-prod-logs \
@@ -55,10 +56,18 @@ help:
 	@echo ""
 	@echo "Local Utilities"
 	@echo "  make env-init               Switch environment to local (.env.local)"
+	@echo "  make lint                   Run frontend ESLint (fast check)"
+	@echo "  make install-hooks          Install git pre-commit hook"
+	@echo "  make backup                 Run DB backup (add --local-only to skip B2)"
 	@echo "  make local-makemigrations   Create Django migration files"
 	@echo "  make local-superuser        Create Django admin user"
 	@echo "  make local-clean            Clear local build/cache artifacts"
 	@echo "  make local-kill-ports       Manual rescue for ports 3000-3005/8000"
+	@echo ""
+	@echo "Shell Access"
+	@echo "  make docker-shell-backend   Shell into dev backend container"
+	@echo "  make docker-shell-frontend  Shell into dev frontend container"
+	@echo "  make docker-shell-db        MySQL shell into dev DB container"
 
 # ============================================================================
 # LOCAL (HOST PROCESSES)
@@ -119,6 +128,16 @@ local-clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	@echo "Clean complete."
+
+lint:
+	npm run lint --prefix frontend
+
+install-hooks:
+	ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
+	@echo "Installed pre-commit hook."
+
+backup:
+	./scripts/backup-db.sh $(ARGS)
 
 local-kill-ports:
 	@echo "Stopping listeners on ports: $(LOCAL_KILL_PORTS)"
@@ -212,5 +231,8 @@ docker-shell-backend:
 
 docker-shell-frontend:
 	$(DEV_COMPOSE) exec frontend sh
+
+docker-shell-db:
+	$(DEV_COMPOSE) exec $(DB_SERVICE) mysql -u$${MYSQL_USER:-bnc} -p$${MYSQL_PASSWORD:-bnc_password} $${MYSQL_DATABASE:-bill_n_chill}
 
 .DEFAULT_GOAL := help

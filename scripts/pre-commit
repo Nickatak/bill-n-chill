@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Git pre-commit hook — runs fast lint checks before allowing a commit.
+# Install: make install-hooks
+
+set -euo pipefail
+
+echo "pre-commit: running frontend lint..."
+npm run lint --prefix frontend
+
+echo "pre-commit: passed."

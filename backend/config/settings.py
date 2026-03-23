@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 import pymysql
 
@@ -54,6 +55,17 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+    # Fail fast if dangerous defaults slipped into production.
+    _prod_checks = []
+    if SECRET_KEY == "django-insecure-dev-only-change-me":
+        _prod_checks.append("DJANGO_SECRET_KEY is still the insecure default")
+    if ALLOWED_HOSTS == ["localhost", "127.0.0.1"]:
+        _prod_checks.append("DJANGO_ALLOWED_HOSTS is still the dev default")
+    if _prod_checks:
+        raise ImproperlyConfigured(
+            "Production startup blocked:\n  - " + "\n  - ".join(_prod_checks)
+        )
 
 
 # Application definition

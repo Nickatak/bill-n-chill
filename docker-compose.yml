@@ -37,6 +37,12 @@ services:
       - ./backend:/app/backend
       - media_data:/app/backend/media
       - ./logs:/var/log/bnc
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     command: >-
       sh -c "pip install --no-cache-dir -r requirements.txt &&
       python manage.py migrate &&
