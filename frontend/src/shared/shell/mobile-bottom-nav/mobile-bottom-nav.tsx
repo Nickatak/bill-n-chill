@@ -66,14 +66,8 @@ export function MobileBottomNav() {
 
       {moreOpen ? (
         <div className={styles.moreMenu}>
-          {organization ? (
-            <div className={styles.moreHeader}>
-              <span className={styles.orgLabel}>{organization.displayName}</span>
-            </div>
-          ) : null}
-
           <div className={styles.moreSection}>
-            {businessMenuRoutes.map((route) => (
+            {businessMenuRoutes.filter((r) => r.section !== "Support").map((route) => (
               <Link
                 key={route.href}
                 href={route.href}
@@ -83,6 +77,28 @@ export function MobileBottomNav() {
                 {route.label}
               </Link>
             ))}
+          </div>
+
+          <div className={styles.moreDivider} />
+
+          <div className={styles.moreSection}>
+            {businessMenuRoutes.filter((r) => r.section === "Support").map((route) => (
+              <Link
+                key={route.href}
+                href={route.href}
+                className={`${styles.moreLink} ${isRouteActive(pathname, route) ? styles.moreLinkActive : ""}`}
+                onClick={() => setMoreOpen(false)}
+              >
+                {route.label}
+              </Link>
+            ))}
+            <a
+              href="mailto:nicholasmtakemori@gmail.com"
+              className={styles.moreLink}
+              onClick={() => setMoreOpen(false)}
+            >
+              Contact Support
+            </a>
           </div>
 
           <div className={styles.moreDivider} />

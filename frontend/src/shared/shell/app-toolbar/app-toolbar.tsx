@@ -115,6 +115,14 @@ export function AppToolbar() {
                 </Fragment>
               );
             })}
+            <a
+              href="mailto:nicholasmtakemori@gmail.com"
+              className={styles.menuItem}
+              role="menuitem"
+              onClick={closeMenus}
+            >
+              Contact Support
+            </a>
           </div>
         </details>
       ) : null}
