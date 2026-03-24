@@ -20,7 +20,6 @@
  * ├─────────────────────────────────────────────────┤
  * │ EstimatesWorkspacePanel                          │
  * │   ├── Workspace header (context badge)           │
- * │   ├── Duplicate dialog                           │
  * │   ├── Family collision prompt                    │
  * │   └── Estimate composer (sheet form)             │
  * └─────────────────────────────────────────────────┘
@@ -43,11 +42,10 @@
  * - clearSelectedEstimateState() — Resets selection + form to blank draft
  * - startNewEstimate()         — Clears selection and flashes composer
  * - handleCreateEstimate()     — Create or save-draft form submission
- * - handleDuplicateEstimate()  — Clone as standalone with custom title
+ * - handleDuplicateAsNew()     — Pre-fill create form from selected estimate
  * - handleUpdateEstimateStatus() — Apply status transition
  * - handleAddEstimateStatusNote() — Append note without transition
- * - cloneEstimateRevision()    — Clone as new version in family
- * - handleFamilyCardQuickAction() — Route CO/revision quick actions
+ * - handleFamilyCardQuickAction() — Route CO/duplicate quick actions
  * - handleSortLineItems()      — Column sort with toggle direction
  *
  * ## Effects
@@ -302,7 +300,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   // -------------------------------------------------------------------------
 
   const [openFamilyHistory, setOpenFamilyHistory] = useState<Set<string>>(() => new Set());
-  const duplicateDialogRef = useRef<HTMLDialogElement | null>(null);
   const [isViewerExpanded, setIsViewerExpanded] = useState(true);
   const { ref: estimateComposerRef, flash: flashCreator } = useCreatorFlash();
   const { setPrintable } = usePrintable();
@@ -427,7 +424,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       return "View change orders for this estimate";
     }
     if (kind === "revision") {
-      return "Duplicate this estimate as a new revision";
+      return "Duplicate as new";
     }
     return "";
   }
@@ -436,40 +433,18 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   // Data loading & form hydration
   // -------------------------------------------------------------------------
 
-  /** Clone an existing estimate as a new revision in its family. */
-  async function cloneEstimateRevision(sourceEstimate: EstimateRecord) {
-    const sourceWasSent = sourceEstimate.status === "sent";
-    setActionMessage("Cloning estimate version...");
-    try {
-      const response = await fetch(`${apiBaseUrl}/estimates/${sourceEstimate.id}/clone-version/`, {
-        method: "POST",
-        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
-        body: JSON.stringify({}),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setActionMessage(readEstimateApiError(payload, "Clone failed."));
-        return;
-      }
-      const cloned = payload.data as EstimateRecord;
-      setEstimates((current) => {
-        const updated = current.map((estimate) =>
-          sourceWasSent && estimate.id === sourceEstimate.id
-            ? { ...estimate, status: "rejected" }
-            : estimate,
-        );
-        return [cloned, ...updated];
-      });
-      handleSelectEstimate(cloned);
-      setStatusEvents([]);
-      setActionMessage("");
-    } catch {
-      setActionMessage("Could not reach clone endpoint.");
-    }
+  /** Pre-fill the create form from an existing estimate (duplicate-as-new). */
+  function handleDuplicateAsNew(sourceEstimate: EstimateRecord) {
+    formFields.populateCreateFromEstimate(sourceEstimate);
+    setSelectedEstimateId("");
+    selectedEstimateIdRef.current = "";
+    setActionMessage(`Copied "${sourceEstimate.title}" into create form.`);
+    setActionTone("success");
+    flashCreator();
   }
 
-  /** Route the quick-action click for a family card to CO navigation or revision clone. */
-  async function handleFamilyCardQuickAction(sourceEstimate: EstimateRecord) {
+  /** Route the quick-action click for a family card to CO navigation or duplicate. */
+  function handleFamilyCardQuickAction(sourceEstimate: EstimateRecord) {
     const actionKind = quickActionKindForStatus(sourceEstimate.status);
     if (!actionKind) {
       return;
@@ -482,7 +457,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       router.push(`/projects/${selectedProjectId}/change-orders?origin_estimate=${sourceEstimate.id}`);
       return;
     }
-    await cloneEstimateRevision(sourceEstimate);
+    handleDuplicateAsNew(sourceEstimate);
   }
 
   const lineTotals = useMemo(() => lineItems.map(computeLineTotal), [lineItems]);
@@ -518,7 +493,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     formFields.setFamilyCollisionPrompt(null);
     formFields.setConfirmedFamilyTitleKey("");
     loadEstimateIntoForm(estimate);
-    formFields.setDuplicateTitle(`${estimate.title || "Estimate"} Copy`);
+    formFields.setTitleLocked(false);
   }, [loadEstimateIntoForm]);
 
   // Keep the ref in sync so async callbacks always see the latest selection.
@@ -539,7 +514,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setStatusNote("");
     setStatusEvents([]);
     formFields.resetFormFields();
-    duplicateDialogRef.current?.close();
   }, [formFields.resetFormFields]);
 
   /** Reset the composer to a blank draft. */
@@ -912,7 +886,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       return;
     }
     if (isReadOnly) {
-      setFormErrorMessage("This estimate is read-only. Clone or add a new draft to edit.");
+      setFormErrorMessage("This estimate is read-only. Duplicate as new or start a fresh draft to edit.");
       return;
     }
     const projectId = Number(selectedProjectId);
@@ -997,6 +971,16 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       );
       return;
     }
+    // When title is locked (duplicate-as-new), skip the family collision prompt —
+    // the user explicitly chose to create a new version in this family.
+    if (existingFamily && formFields.titleLocked) {
+      await submitNewEstimateWithTitle({
+        projectId,
+        title: trimmedTitle,
+        allowExistingTitleFamily: true,
+      });
+      return;
+    }
     if (existingFamily && formFields.confirmedFamilyTitleKey !== normalizedTitle) {
       if (promptMatchesCurrentTitle) {
         await submitNewEstimateWithTitle({
@@ -1026,50 +1010,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     });
   }
 
-  /** Duplicate the selected estimate as a new standalone estimate with a custom title. */
-  async function handleDuplicateEstimate() {
-    const estimateId = Number(selectedEstimateId);
-    if (!estimateId) {
-      setActionMessage("Select an existing estimate version before duplicating.");
+  /** Duplicate the currently selected estimate into the create form. */
+  function handleDuplicateSelectedEstimate() {
+    if (!selectedEstimate) {
+      setActionMessage("Select an estimate first.");
       return;
     }
-    if (!formFields.duplicateTitle.trim()) {
-      setActionMessage("Duplicate title is required.");
-      return;
-    }
-
-    setActionMessage("");
-    try {
-      const response = await fetch(`${apiBaseUrl}/estimates/${estimateId}/duplicate/`, {
-        method: "POST",
-        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
-        body: JSON.stringify({
-          title: formFields.duplicateTitle.trim(),
-        }),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setActionMessage(readEstimateApiError(payload, "Duplicate failed."));
-        return;
-      }
-      const duplicated = payload.data as EstimateRecord;
-      if (String(duplicated.project) === selectedProjectId) {
-        setEstimates((current) => [duplicated, ...current]);
-      }
-      if (String(duplicated.project) !== selectedProjectId) {
-        setSelectedProjectId(String(duplicated.project));
-      }
-      handleSelectEstimate(duplicated);
-      const duplicatedFamilyTitle = (duplicated.title || "").trim() || "Untitled";
-      setOpenFamilyHistory(new Set<string>([duplicatedFamilyTitle]));
-      duplicateDialogRef.current?.close();
-      setStatusEvents([]);
-      setActionMessage(`Duplicated as ${duplicated.title || "Untitled"} v${duplicated.version}.`);
-      setActionTone("success");
-      flashCreator();
-    } catch {
-      setActionMessage("Could not reach duplicate endpoint.");
-    }
+    handleDuplicateAsNew(selectedEstimate);
   }
 
   /** Apply a status transition to the selected estimate. Returns the updated record on success, null on failure. */
@@ -1255,16 +1202,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         workspaceBadgeLabel={workspaceBadgeLabel}
         selectedEstimate={selectedEstimate}
         onStartNew={startNewEstimate}
-        onOpenDuplicate={() => {
-          formFields.setDuplicateTitle(`${selectedEstimate?.title || "Estimate"} Copy`);
-          duplicateDialogRef.current?.showModal();
-        }}
+        onDuplicateAsNew={handleDuplicateSelectedEstimate}
         actionMessage={actionMessage}
         actionTone={actionTone}
-        duplicateDialogRef={duplicateDialogRef}
-        duplicateTitle={formFields.duplicateTitle}
-        onDuplicateTitleChange={formFields.setDuplicateTitle}
-        onConfirmDuplicate={handleDuplicateEstimate}
+        titleLocked={formFields.titleLocked}
         selectedProject={selectedProject}
         familyCollisionPrompt={formFields.familyCollisionPrompt}
         estimateTitle={formFields.estimateTitle}

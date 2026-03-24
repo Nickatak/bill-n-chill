@@ -53,6 +53,7 @@ type EstimateSheetProps = {
   isSubmitting: boolean;
   isEditingDraft: boolean;
   readOnly: boolean;
+  titleLocked?: boolean;
   formErrorMessage?: string;
   formSuccessMessage?: string;
   lineValidation?: LineValidationResult;
@@ -121,6 +122,7 @@ export function EstimateSheet({
   isSubmitting,
   isEditingDraft,
   readOnly,
+  titleLocked = false,
   formErrorMessage = "",
   formSuccessMessage = "",
   lineValidation,
@@ -144,7 +146,7 @@ export function EstimateSheet({
   const customerName = (project?.customer_display_name || "Customer name").trim();
   const rawBillingAddress = (project?.customer_billing_address || "").trim();
   const isExistingEstimate = Boolean(estimateId);
-  const titleReadOnly = readOnly || isExistingEstimate;
+  const titleReadOnly = readOnly || isExistingEstimate || titleLocked;
   const mailingLines = rawBillingAddress
     ? rawBillingAddress
         .split(/\r?\n/)

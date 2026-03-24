@@ -3,7 +3,7 @@
  *
  * Owns the editable fields that populate the estimate draft composer:
  * title, dates, tax, terms, line sort, family collision prompts, and
- * duplicate title. Provides hydrate/reset callbacks so the console can
+ * title lock state. Provides hydrate/reset callbacks so the console can
  * load an existing estimate into the form or clear it for a new draft.
  *
  * Consumer: EstimatesConsole (composed alongside useLineItems and data loading).
@@ -19,7 +19,7 @@
  * - lineSortDirection       — "asc" | "desc"
  * - familyCollisionPrompt   — prompt data when title matches an existing family
  * - confirmedFamilyTitleKey — normalized title key user confirmed for family add
- * - duplicateTitle          — pre-filled title for the duplicate dialog
+ * - titleLocked             — true when form was populated via duplicate (title read-only)
  * - isSubmitting            — form submission in-flight guard
  *
  * ## Functions
@@ -27,6 +27,10 @@
  * - hydrateFromEstimate(estimate)
  *     Populates all form fields from an EstimateRecord. Used when
  *     selecting an existing estimate in the viewer panel.
+ *
+ * - populateCreateFromEstimate(estimate)
+ *     Pre-fills the create form from an existing estimate for "Duplicate
+ *     as New". Title is locked so the new estimate joins the same family.
  *
  * - resetFormFields()
  *     Clears all form fields to blank-draft defaults, respecting
@@ -84,7 +88,7 @@ type UseEstimateFormFieldsOptions = {
 
 /**
  * Manage estimate composer form fields: title, dates, tax, terms, sort,
- * collision prompts, and duplicate title.
+ * collision prompts, and title lock state.
  *
  * @param options - Organization defaults and line-item setters from useLineItems.
  * @returns Form field state, setters, hydrate/reset callbacks, and the submit guard ref.
@@ -109,7 +113,7 @@ export function useEstimateFormFields({
   const [familyCollisionPrompt, setFamilyCollisionPrompt] =
     useState<EstimateFamilyCollisionPrompt | null>(null);
   const [confirmedFamilyTitleKey, setConfirmedFamilyTitleKey] = useState("");
-  const [duplicateTitle, setDuplicateTitle] = useState("");
+  const [titleLocked, setTitleLocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitGuard = useRef(false);
 
@@ -131,6 +135,23 @@ export function useEstimateFormFields({
     }
   }, [organizationDefaults?.estimate_terms_and_conditions, setLineItems, setNextLineId]);
 
+  /** Pre-fill the create form from an existing estimate (duplicate-as-new). Title is locked. */
+  const populateCreateFromEstimate = useCallback((estimate: EstimateRecord) => {
+    const estimateTerms = (estimate.terms_text || "").trim();
+    setEstimateTitle(estimate.title || "Untitled");
+    setTitleLocked(true);
+    setTermsText(estimateTerms || organizationDefaults?.estimate_terms_and_conditions || "");
+    setTaxPercent(String(estimate.tax_percent ?? "0"));
+    setValidThrough(estimate.valid_through ?? "");
+    const mapped = mapEstimateLineItemsToInputs(estimate.line_items ?? []);
+    setLineItems(mapped);
+    setNextLineId(mapped.length + 1);
+    const nextEstimateDate = todayDateInput();
+    setEstimateDate(nextEstimateDate);
+    setFamilyCollisionPrompt(null);
+    setConfirmedFamilyTitleKey("");
+  }, [organizationDefaults?.estimate_terms_and_conditions, setLineItems, setNextLineId]);
+
   /** Reset all form fields to blank-draft defaults. */
   const resetFormFields = useCallback(() => {
     const nextEstimateDate = todayDateInput();
@@ -139,6 +160,7 @@ export function useEstimateFormFields({
       resolveEstimateValidationDeltaDays(organizationDefaults),
     );
     setEstimateTitle("");
+    setTitleLocked(false);
     setFamilyCollisionPrompt(null);
     setConfirmedFamilyTitleKey("");
     setTermsText(organizationDefaults?.estimate_terms_and_conditions || "");
@@ -194,7 +216,7 @@ export function useEstimateFormFields({
     lineSortDirection,
     familyCollisionPrompt,
     confirmedFamilyTitleKey,
-    duplicateTitle,
+    titleLocked,
     isSubmitting,
     submitGuard,
 
@@ -208,11 +230,12 @@ export function useEstimateFormFields({
     setLineSortDirection,
     setFamilyCollisionPrompt,
     setConfirmedFamilyTitleKey,
-    setDuplicateTitle,
+    setTitleLocked,
     setIsSubmitting,
 
     // Helpers
     hydrateFromEstimate,
+    populateCreateFromEstimate,
     resetFormFields,
     handleEstimateTitleChange,
   };

@@ -8,7 +8,6 @@ from core.serializers.change_orders import (
     ChangeOrderWriteSerializer,
 )
 from core.serializers.estimates import (
-    EstimateDuplicateSerializer,
     EstimateLineItemInputSerializer,
     EstimateLineItemSerializer,
     EstimateSerializer,
@@ -86,7 +85,6 @@ __all__ = [
     "EstimateLineItemSerializer",
     "EstimateSerializer",
     "EstimateStatusEventSerializer",
-    "EstimateDuplicateSerializer",
     "EstimateLineItemInputSerializer",
     "EstimateWriteSerializer",
     "ChangeOrderSerializer",

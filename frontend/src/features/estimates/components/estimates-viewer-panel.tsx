@@ -344,7 +344,7 @@ export type EstimatesViewerPanelProps = {
   openFamilyHistory: Set<string>;
   handleSelectFamilyLatest: (title: string, latest: EstimateRecord) => void;
   handleSelectEstimate: (estimate: EstimateRecord) => void;
-  handleFamilyCardQuickAction: (estimate: EstimateRecord) => Promise<void>;
+  handleFamilyCardQuickAction: (estimate: EstimateRecord) => void;
   selectedProjectId: string;
 
   // Display callbacks (depend on parent-derived data)

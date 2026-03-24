@@ -18,9 +18,7 @@ from core.views import (
     customer_detail_view,
     customer_project_create_view,
     customers_list_view,
-    estimate_clone_version_view,
     estimate_contract_view,
-    estimate_duplicate_view,
     estimate_detail_view,
     estimate_status_events_view,
     public_estimate_decision_view,
@@ -273,16 +271,6 @@ urlpatterns = [
         "estimates/<int:estimate_id>/status-events/",
         estimate_status_events_view,
         name="estimate-status-events",
-    ),
-    path(
-        "estimates/<int:estimate_id>/clone-version/",
-        estimate_clone_version_view,
-        name="estimate-clone-version",
-    ),
-    path(
-        "estimates/<int:estimate_id>/duplicate/",
-        estimate_duplicate_view,
-        name="estimate-duplicate",
     ),
     path(
         "change-orders/<int:change_order_id>/",

@@ -1,6 +1,6 @@
 /**
- * Workspace panel for the estimates console — toolbar, duplicate dialog,
- * family-collision prompt, document creator (EstimateSheet), and decision stamp.
+ * Workspace panel for the estimates console — toolbar, family-collision
+ * prompt, document creator (EstimateSheet), and decision stamp.
  *
  * Pure presentational component: all state and handlers live in the parent
  * EstimatesConsole and are passed down as props.
@@ -45,17 +45,14 @@ export type EstimatesWorkspacePanelProps = {
 
   // Toolbar actions
   onStartNew: () => void;
-  onOpenDuplicate: () => void;
+  onDuplicateAsNew: () => void;
 
   // Action feedback
   actionMessage: string;
   actionTone: string;
 
-  // Duplicate dialog
-  duplicateDialogRef: RefObject<HTMLDialogElement | null>;
-  duplicateTitle: string;
-  onDuplicateTitleChange: (value: string) => void;
-  onConfirmDuplicate: () => void;
+  // Title lock (from duplicate-as-new)
+  titleLocked: boolean;
   selectedProject: ProjectRecord | null;
 
   // Family collision prompt
@@ -115,13 +112,10 @@ export function EstimatesWorkspacePanel({
   workspaceBadgeLabel,
   selectedEstimate,
   onStartNew,
-  onOpenDuplicate,
+  onDuplicateAsNew,
   actionMessage,
   actionTone,
-  duplicateDialogRef,
-  duplicateTitle,
-  onDuplicateTitleChange,
-  onConfirmDuplicate,
+  titleLocked,
   selectedProject,
   familyCollisionPrompt,
   estimateTitle,
@@ -176,7 +170,7 @@ export function EstimatesWorkspacePanel({
               </span>
             </div>
             <p className={styles.workspaceToolbarHint}>
-              Create New Estimate opens a fresh draft workspace. Duplicate creates a new draft from the selected estimate.
+              Create New Estimate opens a fresh draft workspace. Duplicate copies the selected estimate into the create form.
             </p>
           </div>
           <div className={`${styles.lifecycleActions} ${styles.composerPrepActions} ${styles.workspaceToolbarActions}`}>
@@ -187,41 +181,17 @@ export function EstimatesWorkspacePanel({
               <button
                 type="button"
                 className={styles.toolbarSecondaryButton}
-                onClick={onOpenDuplicate}
+                onClick={onDuplicateAsNew}
               >
-                Duplicate as New Estimate
+                Duplicate as New
               </button>
             ) : null}
           </div>
         </div>
-        {actionMessage && actionTone === "success" && /^Duplicated\b/i.test(actionMessage) ? (
+        {actionMessage && actionTone === "success" && /^Copied\b/i.test(actionMessage) ? (
           <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
         ) : null}
         {actionMessage && actionTone !== "success" ? <p className={`${styles.actionError} ${styles.composerPrepMessage}`}>{actionMessage}</p> : null}
-        <dialog ref={duplicateDialogRef} className={styles.duplicateDialog}>
-          <p className={styles.inlineHint}>
-            Duplicating in project{" "}
-            {selectedProject
-              ? `#${selectedProject.id} - ${selectedProject.name} (${selectedProject.customer_display_name})`
-              : "current selection"}.
-          </p>
-          <label className={styles.lifecycleField}>
-            New estimate title
-            <input
-              value={duplicateTitle}
-              onChange={(event) => onDuplicateTitleChange(event.target.value)}
-              placeholder="Estimate title"
-            />
-          </label>
-          <div className={styles.lifecycleActions}>
-            <button type="button" className={creatorStyles.primaryButton} onClick={onConfirmDuplicate}>
-              Confirm Duplicate
-            </button>
-            <button type="button" className={creatorStyles.secondaryButton} onClick={() => duplicateDialogRef.current?.close()}>
-              Cancel
-            </button>
-          </div>
-        </dialog>
         {familyCollisionPrompt ? (
           <div className={`${styles.duplicatePanel} ${styles.composerPrepPanel}`}>
             <p className={styles.inlineHint}>
@@ -279,6 +249,7 @@ export function EstimatesWorkspacePanel({
           isSubmitting={isSubmitting}
           isEditingDraft={isEditingDraft}
           readOnly={readOnly}
+          titleLocked={titleLocked}
           formErrorMessage={formErrorMessage}
           formSuccessMessage={formSuccessMessage}
           lineValidation={lineValidation}

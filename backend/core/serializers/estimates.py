@@ -171,16 +171,3 @@ class EstimateWriteSerializer(serializers.Serializer):
                 "Archived status is system-controlled and cannot be set directly."
             )
         return value
-
-
-class EstimateDuplicateSerializer(serializers.Serializer):
-    """Write serializer for duplicating an estimate to the same or different project."""
-
-    project_id = serializers.IntegerField(required=False)
-    title = serializers.CharField(max_length=255, required=True, allow_blank=False)
-
-    def validate_title(self, value: str) -> str:
-        trimmed = value.strip()
-        if not trimmed:
-            raise serializers.ValidationError("Title cannot be blank.")
-        return trimmed

@@ -11,8 +11,6 @@ Manage estimate authoring, revision flow, status lifecycle, and customer-facing 
 1. `Estimate`
    - create estimate version (`POST /projects/{id}/estimates/`)
    - update estimate fields/status (`PATCH /estimates/{id}/`)
-   - clone version (`POST /estimates/{id}/clone-version/`)
-   - duplicate as new draft (`POST /estimates/{id}/duplicate/`)
 2. `PublicEstimateDecision`
    - approve/reject actions through public preview workflow (`GET /public/estimates/{public_token}/` + decision mutation path in preview flow)
 
@@ -45,11 +43,7 @@ Manage estimate authoring, revision flow, status lifecycle, and customer-facing 
    creates estimate version.
 5. `PATCH /estimates/{id}/`:
    updates selected estimate fields and status.
-6. `POST /estimates/{id}/clone-version/`:
-   clones selected estimate into next revision.
-7. `POST /estimates/{id}/duplicate/`:
-   duplicates selected estimate as new draft lineage.
-8. `GET /estimates/{id}/status-events/`:
+6. `GET /estimates/{id}/status-events/`:
    loads status-history events for selected estimate.
 10. `GET /public/estimates/{public_token}/`:
    hydrates customer-facing public estimate preview.
