@@ -19,7 +19,7 @@ class VendorBillSnapshot(ImmutableModelMixin):
 
     Current policy:
     - Append-only (`create` only). Existing rows are immutable.
-    - Captured statuses: `received`, `approved`, `disputed`, `closed`, `void`.
+    - Captured statuses: `open`, `disputed`, `closed`, `void`.
     - Lifecycle control: `system-managed`.
     - Visibility: `internal-facing`.
     """
@@ -27,8 +27,7 @@ class VendorBillSnapshot(ImmutableModelMixin):
     _immutable_label = "Vendor-bill snapshots"
 
     class CaptureStatus(models.TextChoices):
-        RECEIVED = "received", "Received"
-        APPROVED = "approved", "Approved"
+        OPEN = "open", "Open"
         DISPUTED = "disputed", "Disputed"
         CLOSED = "closed", "Closed"
         VOID = "void", "Void"

@@ -17,7 +17,7 @@
  * - formPaymentDate     — date input (defaults to today)
  * - formReferenceNumber — optional reference / check number
  * - formNotes           — optional notes textarea
- * - targetId            — required target document id (invoice/bill/receipt)
+ * - targetId            — required target document id (invoice/bill)
  *
  * ## Functions
  *

@@ -28,10 +28,6 @@ vi.mock("../components/bills-tab", () => ({
   BillsTab: () => <div data-testid="bills-tab">BillsTab</div>,
 }));
 
-vi.mock("../components/receipts-tab", () => ({
-  ReceiptsTab: () => <div data-testid="receipts-tab">ReceiptsTab</div>,
-}));
-
 import { AccountingConsole } from "../components/accounting-console";
 
 // ---------------------------------------------------------------------------
@@ -48,7 +44,6 @@ describe("AccountingConsole", () => {
 
     expect(screen.getByTestId("invoices-tab")).toBeInTheDocument();
     expect(screen.queryByTestId("bills-tab")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("receipts-tab")).not.toBeInTheDocument();
   });
 
   it("switches to bills tab on click", () => {
@@ -58,17 +53,6 @@ describe("AccountingConsole", () => {
 
     expect(screen.queryByTestId("invoices-tab")).not.toBeInTheDocument();
     expect(screen.getByTestId("bills-tab")).toBeInTheDocument();
-    expect(screen.queryByTestId("receipts-tab")).not.toBeInTheDocument();
-  });
-
-  it("switches to receipts tab on click", () => {
-    render(<AccountingConsole />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Receipts" }));
-
-    expect(screen.queryByTestId("invoices-tab")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("bills-tab")).not.toBeInTheDocument();
-    expect(screen.getByTestId("receipts-tab")).toBeInTheDocument();
   });
 
   it("shows auth notice when no token", async () => {

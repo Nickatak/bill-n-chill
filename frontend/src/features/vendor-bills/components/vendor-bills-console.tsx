@@ -117,23 +117,20 @@ import styles from "./vendor-bills-console.module.css";
 // ---------------------------------------------------------------------------
 
 const VENDOR_BILL_STATUSES_FALLBACK: string[] = [
-  "received",
+  "open",
   "disputed",
-  "approved",
   "closed",
   "void",
 ];
 const VENDOR_BILL_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
-  received: ["disputed", "approved", "void"],
-  disputed: ["approved", "void"],
-  approved: ["closed", "void"],
+  open: ["disputed", "closed", "void"],
+  disputed: ["open", "void"],
   closed: [],
   void: [],
 };
 const VENDOR_BILL_STATUS_LABELS_FALLBACK: Record<string, string> = {
-  received: "Received",
+  open: "Open",
   disputed: "Disputed",
-  approved: "Approved",
   closed: "Closed",
   void: "Void",
 };
@@ -204,7 +201,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const activeVendors = vendors.filter((vendor) => vendor.is_active);
   const canMutateVendorBills = canDo(capabilities, "vendor_bills", "create");
-  const canApproveVendorBills = canDo(capabilities, "vendor_bills", "approve");
   const isEditingMode = Boolean(selectedVendorBillId);
 
   // -------------------------------------------------------------------------
@@ -265,7 +261,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const isProjectCancelled = selectedProject?.status === "cancelled";
   const selectedVendorBill =
     vendorBills.find((vendorBill) => String(vendorBill.id) === selectedVendorBillId) ?? null;
-  const workspaceIsLockedByStatus = selectedVendorBill ? selectedVendorBill.status !== "received" : false;
+  const workspaceIsLockedByStatus = selectedVendorBill ? selectedVendorBill.status !== "open" : false;
   const workspaceIsLocked = !canMutateVendorBills || isProjectCancelled || workspaceIsLockedByStatus;
   const workspaceBadgeLabel = !selectedVendorBill
     ? "CREATING"
@@ -273,22 +269,18 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       ? "READ-ONLY"
       : "EDITING";
   const workspaceBadgeClass = !selectedVendorBill
-    ? styles.tableStatusReceived
+    ? styles.tableStatusOpen
     : workspaceIsLocked
       ? styles[`tableStatus${selectedVendorBill.status[0].toUpperCase()}${selectedVendorBill.status.slice(1)}`] ?? ""
-      : styles.tableStatusReceived;
+      : styles.tableStatusOpen;
   const workspaceContext = selectedVendorBill
     ? `#${selectedVendorBill.id} — ${selectedVendorBill.bill_number || "Untitled"}`
     : "New vendor bill";
   const vendorOptions = vendors;
   const selectedVendor = vendorOptions.find((v) => String(v.id) === formVendorId) ?? null;
-  const quickStatusOptions = (selectedVendorBill
+  const quickStatusOptions = selectedVendorBill
     ? allowedStatusTransitions[selectedVendorBill.status] ?? []
-    : []
-  ).filter((status: string) => {
-    if (status === "approved") return canApproveVendorBills;
-    return true;
-  });
+    : [];
 
   // Workspace visibility + flash animation
   const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(true);
@@ -463,7 +455,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
               <div className={styles.detailGrid}>
                 <div>
                   <p className={styles.detailLabel}>Vendor</p>
-                  <p className={styles.detailValue}>{vendorBill.vendor_name}</p>
+                  <p className={styles.detailValue}>{vendorBill.vendor_name || vendorBill.store_name || "Expense"}</p>
                 </div>
                 <div>
                   <p className={styles.detailLabel}>Bill #</p>
@@ -1103,7 +1095,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                   >
                     <div className={styles.billCardTop}>
                       <div className={styles.billCardIdentity}>
-                        <span className={styles.billCardVendor}>{vendorBill.vendor_name}</span>
+                        <span className={styles.billCardVendor}>{vendorBill.vendor_name || vendorBill.store_name || "Expense"}</span>
                         <span className={styles.billCardMeta}>
                           #{vendorBill.id} {vendorBill.bill_number}
                           {vendorBill.due_date ? ` · Due ${formatDateDisplay(vendorBill.due_date)}` : ""}
@@ -1158,7 +1150,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                         <td>
                           <strong>#{vendorBill.id}</strong> {vendorBill.bill_number}
                         </td>
-                        <td>{vendorBill.vendor_name}</td>
+                        <td>{vendorBill.vendor_name || vendorBill.store_name || "Expense"}</td>
                         <td>
                           <span className={`${styles.tableStatusBadge} ${statusBadgeClass(vendorBill.status)}`}>
                             {statusDisplayLabel(vendorBill.status)}
@@ -1571,7 +1563,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
               <p><strong>Duplicate candidates:</strong></p>
               {duplicateCandidates.map((candidate) => (
                 <p key={candidate.id}>
-                  #{candidate.id} {candidate.vendor_name} / {candidate.bill_number} (
+                  #{candidate.id} {candidate.vendor_name || candidate.store_name || "Expense"} / {candidate.bill_number} (
                   {statusDisplayLabel(candidate.status)})
                 </p>
               ))}

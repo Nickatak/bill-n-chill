@@ -186,14 +186,6 @@ class MvpRegressionMoneyLoopTests(TestCase):
         self.assertEqual(vendor_bill_create.status_code, 201)
         vendor_bill_id = vendor_bill_create.json()["data"]["id"]
 
-        to_approved = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "approved"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(to_approved.status_code, 200)
-
         outbound_payment = self.client.post(
             f"/api/v1/projects/{self.project.id}/payments/",
             data={
@@ -231,5 +223,5 @@ class MvpRegressionMoneyLoopTests(TestCase):
         vendor_bill = VendorBill.objects.get(id=vendor_bill_id)
         self.assertEqual(invoice.status, Invoice.Status.PAID)
         self.assertEqual(str(invoice.balance_due), "0.00")
-        self.assertEqual(vendor_bill.status, VendorBill.Status.APPROVED)
+        self.assertEqual(vendor_bill.status, VendorBill.Status.OPEN)
         self.assertEqual(str(vendor_bill.balance_due), "0.00")

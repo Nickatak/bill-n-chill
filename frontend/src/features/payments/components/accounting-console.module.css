@@ -120,18 +120,11 @@
 
 /* ── Status badges ────────────────────────────────── */
 
-.statusReceived {
+.statusOpen {
   composes: badge from "../../../shared/styles/status.module.css";
   background: var(--status-blue-bg);
   border-color: var(--status-blue-border);
   color: var(--status-blue-text);
-}
-
-.statusApproved {
-  composes: badge from "../../../shared/styles/status.module.css";
-  background: var(--status-green-bg);
-  border-color: var(--status-green-border);
-  color: var(--status-green-text);
 }
 
 .statusDisputed {

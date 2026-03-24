@@ -4,25 +4,25 @@
  * Tabbed quick-entry panel for the projects page.
  *
  * Offers two tabs — "Customer Payment" (inbound payment recorder) and
- * "Expense Receipt" (standalone receipt form) — so users can record
- * cash-in or expense receipts without leaving the project hub.
+ * "Log Expense" (quick expense form) — so users can record cash-in or
+ * expenses without leaving the project hub.
  *
  * Parent: ProjectsConsole
  */
 
 import { useState } from "react";
 import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
-import { QuickReceipt } from "@/features/vendor-bills/components/quick-receipt";
+import { QuickExpense } from "@/features/vendor-bills/components/quick-expense";
 import styles from "./quick-entry-tabs.module.css";
 
-type QuickEntryTab = "payment" | "receipt";
+type QuickEntryTab = "payment" | "expense";
 
 type QuickEntryTabsProps = {
   projectId: number;
   authToken: string;
   allocationTargets: AllocationTarget[];
   onPaymentsChanged?: () => void;
-  onReceiptCreated?: () => void;
+  onExpenseCreated?: () => void;
 };
 
 export function QuickEntryTabs({
@@ -30,7 +30,7 @@ export function QuickEntryTabs({
   authToken,
   allocationTargets,
   onPaymentsChanged,
-  onReceiptCreated,
+  onExpenseCreated,
 }: QuickEntryTabsProps) {
   const [activeTab, setActiveTab] = useState<QuickEntryTab>("payment");
 
@@ -47,11 +47,11 @@ export function QuickEntryTabs({
         </button>
         <button
           type="button"
-          className={`${styles.tab} ${activeTab === "receipt" ? styles.tabActive : styles.tabInactive}`}
-          aria-pressed={activeTab === "receipt"}
-          onClick={() => setActiveTab("receipt")}
+          className={`${styles.tab} ${activeTab === "expense" ? styles.tabActive : styles.tabInactive}`}
+          aria-pressed={activeTab === "expense"}
+          onClick={() => setActiveTab("expense")}
         >
-          Expense Receipt
+          Log Expense
         </button>
       </div>
       <div className={styles.tabContent}>
@@ -66,10 +66,10 @@ export function QuickEntryTabs({
             onPaymentsChanged={onPaymentsChanged}
           />
         ) : (
-          <QuickReceipt
+          <QuickExpense
             projectId={projectId}
             authToken={authToken}
-            onReceiptCreated={onReceiptCreated}
+            onExpenseCreated={onExpenseCreated}
           />
         )}
       </div>

@@ -57,7 +57,8 @@ class VendorBillSerializer(serializers.ModelSerializer):
     """Read-only vendor bill with nested line items, vendor/project names, and derived payment status."""
 
     project_name = serializers.CharField(source="project.name", read_only=True)
-    vendor_name = serializers.CharField(source="vendor.name", read_only=True)
+    vendor_name = serializers.SerializerMethodField()
+    store_name = serializers.SerializerMethodField()
     line_items = VendorBillLineSerializer(many=True, read_only=True)
     allocations = VendorBillPaymentSerializer(
         source="target_payments", many=True, read_only=True,
@@ -72,6 +73,8 @@ class VendorBillSerializer(serializers.ModelSerializer):
             "project_name",
             "vendor",
             "vendor_name",
+            "store",
+            "store_name",
             "bill_number",
             "status",
             "payment_status",
@@ -99,6 +102,14 @@ class VendorBillSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_vendor_name(self, obj) -> str:
+        """Return vendor name, falling back to empty string for expenses."""
+        return obj.vendor.name if obj.vendor_id else ""
+
+    def get_store_name(self, obj) -> str:
+        """Return store name, falling back to empty string."""
+        return obj.store.name if obj.store_id else ""
 
     def get_payment_status(self, obj) -> str:
         """Derive payment status from payment coverage."""

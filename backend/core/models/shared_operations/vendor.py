@@ -12,9 +12,8 @@ class Vendor(models.Model):
     Business workflow:
     - Represents a business relationship: subcontractors, trades, suppliers
       who send you invoices. Symmetrical to Customer on the AR side.
-    - NOT for retail purchases (Home Depot, Lowe's) — those are receipts
-      with a free-text store name. See ``Receipt`` model and
-      ``docs/decisions/receipt-vendor-separation.md``.
+    - NOT for retail purchases (Home Depot, Lowe's) — those use quick
+      expenses (VendorBill with null vendor and store_name field).
     - Maintained internally by the contractor/user.
     - Duplicate warnings are handled at application level by name/email.
     - Duplicate matches are warning-level and allow explicit user override when needed

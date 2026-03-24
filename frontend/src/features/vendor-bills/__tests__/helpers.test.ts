@@ -34,13 +34,13 @@ describe("createEmptyVendorBillLineRow", () => {
 
 describe("defaultBillStatusFilters", () => {
   it("excludes terminal statuses (closed, void)", () => {
-    const statuses = ["received", "approved", "disputed", "closed", "void"];
+    const statuses = ["open", "disputed", "closed", "void"];
     const result = defaultBillStatusFilters(statuses);
-    expect(result).toEqual(["received", "approved", "disputed"]);
+    expect(result).toEqual(["open", "disputed"]);
   });
 
   it("returns all statuses when none are terminal", () => {
-    const statuses = ["received", "approved"];
+    const statuses = ["open", "disputed"];
     expect(defaultBillStatusFilters(statuses)).toEqual(statuses);
   });
 
@@ -54,7 +54,7 @@ describe("defaultBillStatusFilters", () => {
   });
 
   it("handles single non-terminal status", () => {
-    expect(defaultBillStatusFilters(["received"])).toEqual(["received"]);
+    expect(defaultBillStatusFilters(["open"])).toEqual(["open"]);
   });
 
   it("handles single terminal status", () => {

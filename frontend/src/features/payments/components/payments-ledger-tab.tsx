@@ -69,7 +69,6 @@ const METHOD_OPTIONS = Object.entries(METHOD_LABELS);
 const ALLOCATION_TARGET_LABELS: Record<string, string> = {
   invoice: "Invoice",
   vendor_bill: "Vendor Bill",
-  receipt: "Receipt",
 };
 
 function formatMoney(val: string): string {

@@ -103,7 +103,7 @@ class PortfolioSnapshotTests(ReportingTestBase):
             bill_number="VB-001",
             issue_date=today - timedelta(days=30),
             due_date=today - timedelta(days=1),
-            status=VendorBill.Status.RECEIVED,
+            status=VendorBill.Status.OPEN,
             created_by=self.user,
         )
         response = self.client.get("/api/v1/reports/portfolio/", **self._auth())
@@ -257,7 +257,7 @@ class AttentionFeedTests(ReportingTestBase):
             bill_number="VB-SOON",
             issue_date=today - timedelta(days=10),
             due_date=today + timedelta(days=3),
-            status=VendorBill.Status.RECEIVED,
+            status=VendorBill.Status.OPEN,
             created_by=self.user,
         )
         response = self.client.get("/api/v1/reports/attention-feed/", **self._auth())

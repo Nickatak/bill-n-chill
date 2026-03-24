@@ -12,12 +12,12 @@ User = get_user_model()
 class Payment(StatusTransitionMixin, models.Model):
     """Recorded money movement at the organization level (AR inbound or AP outbound).
 
-    Each payment targets exactly one document: an invoice (inbound), vendor bill
-    (outbound), or receipt (outbound).  The payment amount is the full amount
-    applied to that document — there is no separate allocation layer.
+    Each payment targets exactly one document: an invoice (inbound) or vendor
+    bill (outbound).  The payment amount is the full amount applied to that
+    document — there is no separate allocation layer.
 
     Business workflow:
-    - `direction` determines valid target type (inbound → invoice, outbound → vendor bill or receipt).
+    - `direction` determines valid target type (inbound → invoice, outbound → vendor bill).
     - `organization` is the owning org (required).
     - `customer` identifies the sender (required for inbound, null for outbound).
     - `project` is optional context.
@@ -50,7 +50,6 @@ class Payment(StatusTransitionMixin, models.Model):
     class TargetType(models.TextChoices):
         INVOICE = "invoice", "Invoice"
         VENDOR_BILL = "vendor_bill", "Vendor Bill"
-        RECEIPT = "receipt", "Receipt"
 
     _status_label = "payment"
 
@@ -113,14 +112,6 @@ class Payment(StatusTransitionMixin, models.Model):
         null=True,
         blank=True,
     )
-    receipt = models.ForeignKey(
-        "Receipt",
-        on_delete=models.PROTECT,
-        related_name="target_payments",
-        null=True,
-        blank=True,
-    )
-
     created_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -135,7 +126,7 @@ class Payment(StatusTransitionMixin, models.Model):
     @property
     def target_id(self) -> int | None:
         """Return the ID of the linked target document."""
-        return self.invoice_id or self.vendor_bill_id or self.receipt_id
+        return self.invoice_id or self.vendor_bill_id
 
     def clean(self):
         """Validate status transitions and target consistency."""
@@ -146,7 +137,6 @@ class Payment(StatusTransitionMixin, models.Model):
         fk_count = sum([
             self.invoice_id is not None,
             self.vendor_bill_id is not None,
-            self.receipt_id is not None,
         ])
         if self.target_type and fk_count != 1:
             errors["target_type"] = "Exactly one target FK must be set."
@@ -155,8 +145,6 @@ class Payment(StatusTransitionMixin, models.Model):
             errors["invoice"] = "Invoice FK required for target_type 'invoice'."
         if self.target_type == self.TargetType.VENDOR_BILL and not self.vendor_bill_id:
             errors["vendor_bill"] = "Vendor bill FK required for target_type 'vendor_bill'."
-        if self.target_type == self.TargetType.RECEIPT and not self.receipt_id:
-            errors["receipt"] = "Receipt FK required for target_type 'receipt'."
 
         if errors:
             raise ValidationError(errors)

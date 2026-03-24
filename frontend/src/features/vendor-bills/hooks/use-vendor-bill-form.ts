@@ -89,7 +89,7 @@ export function useVendorBillForm({
   const [lineItems, setLineItems] = useState<VendorBillLineFormRow[]>([
     createEmptyVendorBillLineRow(),
   ]);
-  const [status, setStatus] = useState<string>("received");
+  const [status, setStatus] = useState<string>("open");
 
   // --- State (shared) ---
 

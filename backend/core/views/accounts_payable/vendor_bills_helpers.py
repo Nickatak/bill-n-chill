@@ -20,8 +20,7 @@ from core.views.helpers import _resolve_cost_codes_for_user
 
 # Statuses that require issue_date and due_date.
 DATE_REQUIRED_STATUSES = {
-    VendorBill.Status.RECEIVED,
-    VendorBill.Status.APPROVED,
+    VendorBill.Status.OPEN,
 }
 
 
@@ -179,7 +178,7 @@ def _prefetch_vendor_bill_qs(queryset: QuerySet) -> QuerySet:
     - prefetch_related: batches separate queries for reverse-FK line items,
       their cost codes, and target payments, mapping results back in Python.
     """
-    return queryset.select_related("project", "vendor").prefetch_related(
+    return queryset.select_related("project", "vendor", "store").prefetch_related(
         "line_items", "line_items__cost_code",
         "target_payments",
     )
@@ -241,8 +240,7 @@ def _validate_vb_line_items_present(line_items: list | None) -> dict | None:
 
 # Statuses that trigger snapshot capture on transition.
 SNAPSHOT_CAPTURE_STATUSES = {
-    VendorBill.Status.RECEIVED,
-    VendorBill.Status.APPROVED,
+    VendorBill.Status.OPEN,
     VendorBill.Status.DISPUTED,
     VendorBill.Status.CLOSED,
     VendorBill.Status.VOID,

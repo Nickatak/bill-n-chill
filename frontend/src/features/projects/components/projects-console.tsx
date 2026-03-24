@@ -62,7 +62,7 @@ import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./projects-console.module.css";
 import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
-import { QuickReceipt } from "@/features/vendor-bills/components/quick-receipt";
+import { QuickExpense } from "@/features/vendor-bills/components/quick-expense";
 import { ProjectListViewer } from "@/shared/project-list-viewer";
 import { DepositPanel } from "./deposit-panel";
 import { ApiResponse, ApprovedEstimate, ProjectFinancialSummary, ProjectRecord } from "../types";
@@ -104,8 +104,7 @@ export function ProjectsConsole() {
     accepted: number;
   } | null>(null);
   const [billStatusCounts, setBillStatusCounts] = useState<{
-    received: number;
-    approved: number;
+    open: number;
     disputed: number;
   } | null>(null);
   const [invoiceStatusCounts, setInvoiceStatusCounts] = useState<{
@@ -115,7 +114,7 @@ export function ProjectsConsole() {
   } | null>(null);
   const [acceptedEstimateTotal, setAcceptedEstimateTotal] = useState("--");
   const [invoiceAllocationTargets, setInvoiceAllocationTargets] = useState<AllocationTarget[]>([]);
-  const [toolbarPanel, setToolbarPanel] = useState<"deposit" | "payment" | "receipt" | null>(null);
+  const [toolbarPanel, setToolbarPanel] = useState<"deposit" | "payment" | "expense" | null>(null);
   const [approvedEstimates, setApprovedEstimates] = useState<ApprovedEstimate[]>([]);
   const [linkedEstimateIds, setLinkedEstimateIds] = useState<Set<number>>(new Set());
   /** After a deposit invoice is created, holds the new invoice for payment pivot. */
@@ -369,19 +368,16 @@ export function ProjectsConsole() {
         return;
       }
       const rows = (payload.data as Array<{ status?: string }>) ?? [];
-      let received = 0;
-      let approved = 0;
+      let open = 0;
       let disputed = 0;
       for (const bill of rows) {
-        if (bill.status === "received") {
-          received += 1;
-        } else if (bill.status === "approved") {
-          approved += 1;
+        if (bill.status === "open") {
+          open += 1;
         } else if (bill.status === "disputed") {
           disputed += 1;
         }
       }
-      setBillStatusCounts({ received, approved, disputed });
+      setBillStatusCounts({ open, disputed });
     } catch {
       setBillStatusCounts(null);
     }
@@ -800,13 +796,10 @@ export function ProjectsConsole() {
                   <span className={styles.pipelineLabel}>Bills</span>
                   <span className={styles.pipelineCounts}>
                     <span className={`${styles.estimateCountPill} ${styles.billCountReceived}`}>
-                      R{billStatusCounts ? billStatusCounts.received : "--"}
+                      O{billStatusCounts ? billStatusCounts.open : "--"}
                     </span>
                     <span className={`${styles.estimateCountPill} ${styles.billCountDisputed}`}>
                       D{billStatusCounts ? billStatusCounts.disputed : "--"}
-                    </span>
-                    <span className={`${styles.estimateCountPill} ${styles.estimateCountApproved}`}>
-                      A{billStatusCounts ? billStatusCounts.approved : "--"}
                     </span>
                   </span>
                 </Link>
@@ -835,10 +828,10 @@ export function ProjectsConsole() {
                 </button>
                 <button
                   type="button"
-                  className={`${styles.toolbarAction} ${toolbarPanel === "receipt" ? styles.toolbarActionActive : ""}`}
-                  onClick={() => setToolbarPanel(toolbarPanel === "receipt" ? null : "receipt")}
+                  className={`${styles.toolbarAction} ${toolbarPanel === "expense" ? styles.toolbarActionActive : ""}`}
+                  onClick={() => setToolbarPanel(toolbarPanel === "expense" ? null : "expense")}
                 >
-                  Log Receipt
+                  Log Expense
                 </button>
               </div>
 
@@ -892,10 +885,13 @@ export function ProjectsConsole() {
                     void loadInvoiceAllocationTargets(selectedProject.id);
                   }}
                 />
-              ) : toolbarPanel === "receipt" ? (
-                <QuickReceipt
+              ) : toolbarPanel === "expense" ? (
+                <QuickExpense
                   projectId={selectedProject.id}
                   authToken={authToken ?? ""}
+                  onExpenseCreated={() => {
+                    void loadFinancialSummary();
+                  }}
                 />
               ) : (
                 <p className={styles.toolbarPanelPrompt}>

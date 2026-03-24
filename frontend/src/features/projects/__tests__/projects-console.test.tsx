@@ -628,9 +628,8 @@ describe("ProjectsConsole", () => {
   it("displays bill and invoice status count badges", async () => {
     setupDefaultFetch({
       vendorBills: [
-        { status: "received" },
-        { status: "received" },
-        { status: "approved" },
+        { status: "open" },
+        { status: "open" },
         { status: "disputed" },
       ],
       invoices: [
@@ -642,14 +641,13 @@ describe("ProjectsConsole", () => {
     });
     render(<ProjectsConsole />);
 
-    // Bill badges: R{received} D{disputed} A{approved}
+    // Bill badges: O{open} D{disputed}
     await waitFor(() => {
       const billsLink = screen.getByRole("link", { name: /Bills/ });
-      expect(within(billsLink).getByText("R2")).toBeInTheDocument();
+      expect(within(billsLink).getByText("O2")).toBeInTheDocument();
     });
     const billsLink = screen.getByRole("link", { name: /Bills/ });
     expect(within(billsLink).getByText("D1")).toBeInTheDocument();
-    expect(within(billsLink).getByText("A1")).toBeInTheDocument();
 
     // Invoice badges: D{draft} S{sent} P{partially_paid}
     const invoicesLink = screen.getByRole("link", { name: /Invoices/ });

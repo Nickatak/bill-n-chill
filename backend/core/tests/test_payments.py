@@ -100,7 +100,7 @@ class PaymentTests(TestCase):
             created_by=self.user,
         )
 
-    def _create_vendor_bill(self, *, total="1000.00", status="approved"):
+    def _create_vendor_bill(self, *, total="1000.00", status="open"):
         vendor = Vendor.objects.create(
             name=f"Vendor {Vendor.objects.filter(created_by=self.user, organization=self.org).count() + 1}",
             email=f"vendor{Vendor.objects.filter(created_by=self.user).count() + 1}@example.com",
@@ -161,7 +161,7 @@ class PaymentTests(TestCase):
             payload["allocation_target_by_direction"],
             {
                 Payment.Direction.INBOUND: ["invoice"],
-                Payment.Direction.OUTBOUND: ["vendor_bill", "receipt"],
+                Payment.Direction.OUTBOUND: ["vendor_bill"],
             },
         )
         self.assertTrue(str(payload["policy_version"]).startswith("2026-03-05.payments."))
@@ -228,7 +228,7 @@ class PaymentTests(TestCase):
         )
         bill.refresh_from_db()
         self.assertEqual(str(bill.balance_due), "600.00")
-        self.assertEqual(bill.status, VendorBill.Status.APPROVED)
+        self.assertEqual(bill.status, VendorBill.Status.OPEN)
 
     def test_payment_list_scoped_by_project_and_user(self):
         self._create_payment()
@@ -484,13 +484,13 @@ class PaymentTests(TestCase):
 
     def test_void_payment_restores_vendor_bill_balance(self):
         """Voiding a payment restores the vendor bill's balance_due without changing document status."""
-        bill = self._create_vendor_bill(total="1000.00", status="approved")
+        bill = self._create_vendor_bill(total="1000.00")
         payment_id = self._create_payment(
             status="settled", amount="1000.00", direction="outbound",
             target_type="vendor_bill", target_id=bill.id,
         )
         bill.refresh_from_db()
-        self.assertEqual(bill.status, VendorBill.Status.APPROVED)
+        self.assertEqual(bill.status, VendorBill.Status.OPEN)
         self.assertEqual(str(bill.balance_due), "0.00")
 
         void_resp = self.client.patch(
@@ -501,7 +501,7 @@ class PaymentTests(TestCase):
         )
         self.assertEqual(void_resp.status_code, 200)
         bill.refresh_from_db()
-        self.assertEqual(bill.status, VendorBill.Status.APPROVED)
+        self.assertEqual(bill.status, VendorBill.Status.OPEN)
         self.assertEqual(str(bill.balance_due), "1000.00")
 
     def test_user_cannot_manually_transition_paid_invoice_to_sent(self):

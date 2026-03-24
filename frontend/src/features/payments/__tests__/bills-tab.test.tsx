@@ -31,7 +31,7 @@ function makeBill(overrides: Record<string, unknown> = {}) {
     vendor: 30,
     vendor_name: "Ace Lumber",
     bill_number: "BILL-001",
-    status: "received",
+    status: "open",
     payment_status: "unpaid",
     received_date: "2026-03-01",
     issue_date: "2026-03-01",
@@ -144,7 +144,7 @@ describe("BillsTab", () => {
 
   it("hides voided/closed bills by default, shows them when toggled", async () => {
     setupFetch([
-      makeBill({ id: 1, status: "received", bill_number: "BILL-OPEN" }),
+      makeBill({ id: 1, status: "open", bill_number: "BILL-OPEN" }),
       makeBill({ id: 2, status: "void", bill_number: "BILL-VOID" }),
       makeBill({ id: 3, status: "closed", bill_number: "BILL-CLOSED" }),
     ]);

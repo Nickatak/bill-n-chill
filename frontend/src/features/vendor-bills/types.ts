@@ -33,8 +33,10 @@ export type VendorBillRecord = {
   id: number;
   project: number;
   project_name: string;
-  vendor: number;
+  vendor: number | null;
   vendor_name: string;
+  store: number | null;
+  store_name: string;
   bill_number: string;
   status: VendorBillStatus;
   payment_status: VendorBillPaymentStatus;

@@ -132,12 +132,8 @@
   text-transform: uppercase;
 }
 
-.tableStatusReceived {
-  composes: received from '../../../shared/styles/status.module.css';
-}
-
-.tableStatusApproved {
-  composes: approved from '../../../shared/styles/status.module.css';
+.tableStatusOpen {
+  composes: open from '../../../shared/styles/status.module.css';
 }
 
 .tableStatusDisputed {
@@ -335,16 +331,10 @@
   gap: var(--space-sm);
 }
 
-.statusFilterReceived {
+.statusFilterOpen {
   background: var(--status-blue-bg);
   color: var(--status-blue-text);
   border-color: var(--status-blue-border);
-}
-
-.statusFilterApproved {
-  background: var(--status-green-bg);
-  color: var(--status-green-text);
-  border-color: var(--status-green-border);
 }
 
 .statusFilterDisputed {
@@ -453,16 +443,10 @@
   transform: translateY(-1px);
 }
 
-.statusPillActive.statusPillReceived {
-  background: var(--status-amber-solid);
-  border-color: var(--status-amber-border);
-  color: var(--status-amber-solid-text);
-}
-
-.statusPillActive.statusPillApproved {
-  background: var(--status-green-solid);
-  border-color: var(--status-green-solid);
-  color: var(--status-green-solid-text);
+.statusPillActive.statusPillOpen {
+  background: var(--status-blue-solid);
+  border-color: var(--status-blue-border);
+  color: var(--status-blue-solid-text);
 }
 
 .statusPillActive.statusPillDisputed {
@@ -483,16 +467,10 @@
   color: var(--status-gray-solid-text);
 }
 
-.statusPillReceived {
-  border-color: var(--status-amber-border);
-  background: var(--status-amber-bg);
-  color: var(--status-amber-text);
-}
-
-.statusPillApproved {
-  border-color: var(--status-green-border);
-  background: var(--status-green-bg);
-  color: var(--status-green-text);
+.statusPillOpen {
+  border-color: var(--status-blue-border);
+  background: var(--status-blue-bg);
+  color: var(--status-blue-text);
 }
 
 .statusPillDisputed {

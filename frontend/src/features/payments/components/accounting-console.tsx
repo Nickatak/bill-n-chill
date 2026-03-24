@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Accounting console — tabbed hub for AR (invoices), AP (bills), and receipts.
+ * Accounting console — tabbed hub for AR (invoices) and AP (bills).
  *
  * Minimal orchestrator — owns only tab state. Each tab component is
  * self-contained with its own data fetching and mutation logic.
@@ -11,17 +11,16 @@
  * ## Page layout
  *
  * ┌─────────────────────────────────────┐
- * │ Tab bar (Invoices / Bills / Rcpts)  │
+ * │ Tab bar (Invoices / Bills)          │
  * ├─────────────────────────────────────┤
  * │ Tab content (one at a time):        │
  * │   ├── InvoicesTab                   │
- * │   ├── BillsTab                      │
- * │   └── ReceiptsTab                   │
+ * │   └── BillsTab                      │
  * └─────────────────────────────────────┘
  *
  * ## State (useState)
  *
- * - activeTab — "invoices" | "bills" | "receipts"
+ * - activeTab — "invoices" | "bills"
  */
 
 import { useState } from "react";
@@ -32,15 +31,13 @@ import { useMediaQuery } from "@/shared/hooks/use-media-query";
 
 import { InvoicesTab } from "./invoices-tab";
 import { BillsTab } from "./bills-tab";
-import { ReceiptsTab } from "./receipts-tab";
 import styles from "./accounting-console.module.css";
 
-type AccountingTab = "invoices" | "bills" | "receipts";
+type AccountingTab = "invoices" | "bills";
 
 const TABS: Array<{ key: AccountingTab; label: string }> = [
   { key: "invoices", label: "Invoices" },
   { key: "bills", label: "Bills" },
-  { key: "receipts", label: "Receipts" },
 ];
 
 export function AccountingConsole() {
@@ -73,9 +70,6 @@ export function AccountingConsole() {
         ) : null}
         {activeTab === "bills" ? (
           <BillsTab authToken={authToken} baseUrl={defaultApiBaseUrl} isMobile={isMobile} />
-        ) : null}
-        {activeTab === "receipts" ? (
-          <ReceiptsTab authToken={authToken} baseUrl={defaultApiBaseUrl} isMobile={isMobile} />
         ) : null}
       </div>
     </div>

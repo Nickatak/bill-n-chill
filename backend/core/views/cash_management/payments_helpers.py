@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 from django.contrib.auth import get_user_model
 from django.db.models import Model, QuerySet, Sum
 
-from core.models import Invoice, OrganizationMembership, Payment, Receipt, VendorBill
+from core.models import Invoice, OrganizationMembership, Payment, VendorBill
 from core.models.financial_auditing.invoice_status_event import InvoiceStatusEvent
 from core.utils.money import MONEY_ZERO, quantize_money
 
@@ -21,14 +21,13 @@ def _prefetch_payment_qs(queryset: QuerySet) -> QuerySet:
     """Apply standard select/prefetch for payment serialization.
 
     Prevents N+1 queries when serializing payments with their
-    related customer, project, invoice, vendor bill, and receipt.
+    related customer, project, invoice, and vendor bill.
     """
     return queryset.select_related(
         "customer",
         "project",
         "invoice",
         "vendor_bill",
-        "receipt",
     )
 
 
@@ -124,33 +123,11 @@ def _set_vendor_bill_balance_from_payments(vendor_bill: VendorBill) -> None:
         vendor_bill._skip_transition_validation = False
 
 
-def _set_receipt_balance_from_payments(receipt: Receipt) -> None:
-    """Recompute a receipt's balance_due from its settled payments.
-
-    Sums all settled payments linked to the receipt and updates
-    balance_due.  Floors at zero to prevent negative balances.
-    """
-    applied_total = (
-        Payment.objects.filter(
-            receipt=receipt,
-            status=Payment.Status.SETTLED,
-        ).aggregate(total=Sum("amount")).get("total")
-        or Decimal("0")
-    )
-
-    next_balance = quantize_money(Decimal(str(receipt.amount)) - applied_total)
-    if next_balance < MONEY_ZERO:
-        next_balance = MONEY_ZERO
-
-    receipt.balance_due = next_balance
-    receipt.save(update_fields=["balance_due", "updated_at"])
-
-
 def _recalculate_payment_target(payment: Payment, *, changed_by: "User") -> None:
     """Refresh balance_due on the single document linked to this payment.
 
     Dispatches to the appropriate balance recomputation helper based on
-    which FK is set (invoice, vendor_bill, or receipt).
+    which FK is set (invoice or vendor_bill).
     """
     if payment.invoice_id:
         invoice = Invoice.objects.get(id=payment.invoice_id)
@@ -158,19 +135,16 @@ def _recalculate_payment_target(payment: Payment, *, changed_by: "User") -> None
     elif payment.vendor_bill_id:
         vendor_bill = VendorBill.objects.get(id=payment.vendor_bill_id)
         _set_vendor_bill_balance_from_payments(vendor_bill)
-    elif payment.receipt_id:
-        receipt = Receipt.objects.get(id=payment.receipt_id)
-        _set_receipt_balance_from_payments(receipt)
 
 
-_OUTBOUND_TARGET_TYPES: set[str] = {Payment.TargetType.VENDOR_BILL, Payment.TargetType.RECEIPT}
+_OUTBOUND_TARGET_TYPES: set[str] = {Payment.TargetType.VENDOR_BILL}
 
 
 def _direction_target_mismatch(direction: str, target_type: str) -> bool:
     """Return True if the target type is incompatible with the payment direction.
 
     Inbound payments can only target invoices.  Outbound payments can
-    target vendor bills or receipts.
+    target vendor bills.
     """
     if direction == Payment.Direction.INBOUND:
         return target_type != Payment.TargetType.INVOICE
@@ -195,7 +169,7 @@ def _resolve_and_link_target(
     """Resolve ``target_type`` + ``target_id`` from payload and populate payment FK kwargs.
 
     Both fields are required — every payment must allocate to exactly one
-    document (invoice, vendor bill, or receipt).  Validates that the target
+    document (invoice or vendor bill).  Validates that the target
     exists, is org-scoped, and is in a linkable status.  Returns
     ``(target, None)`` on success or ``(None, error_payload)`` on failure.
     """
@@ -237,16 +211,6 @@ def _resolve_and_link_target(
         payment_kwargs["vendor_bill"] = target
         return target, None
 
-    if target_type == Payment.TargetType.RECEIPT:
-        target = Receipt.objects.filter(
-            id=target_id,
-            project__organization_id=membership.organization_id,
-        ).first()
-        if not target:
-            return None, _target_error({"target_id": ["Receipt not found in this organization."]})
-        payment_kwargs["receipt"] = target
-        return target, None
-
     return None, _target_error({"target_type": ["Invalid target type."]})
 
 
@@ -263,5 +227,3 @@ def _recalculate_target_balance(
         _set_invoice_balance_from_payments(target, changed_by=changed_by)
     elif target_type == Payment.TargetType.VENDOR_BILL:
         _set_vendor_bill_balance_from_payments(target)
-    elif target_type == Payment.TargetType.RECEIPT:
-        _set_receipt_balance_from_payments(target)

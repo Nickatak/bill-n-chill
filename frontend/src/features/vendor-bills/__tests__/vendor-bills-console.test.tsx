@@ -64,19 +64,17 @@ import type { VendorBillPolicyContract } from "../types";
 
 const policyContract: VendorBillPolicyContract = {
   policy_version: "1",
-  statuses: ["received", "approved", "disputed", "closed", "void"],
+  statuses: ["open", "disputed", "closed", "void"],
   status_labels: {
-    received: "Received",
-    approved: "Approved",
+    open: "Open",
     disputed: "Disputed",
     closed: "Closed",
     void: "Void",
   },
-  default_create_status: "received",
+  default_create_status: "open",
   allowed_status_transitions: {
-    received: ["approved", "void"],
-    approved: ["disputed", "closed", "void"],
-    disputed: ["approved", "closed", "void"],
+    open: ["disputed", "closed", "void"],
+    disputed: ["open", "void"],
     closed: [],
     void: [],
   },
@@ -105,7 +103,7 @@ function makeVendorBill(overrides: Record<string, unknown> = {}) {
     vendor: 1,
     vendor_name: "Acme Lumber",
     bill_number: "INV-001",
-    status: "received",
+    status: "open",
     payment_status: "unpaid",
     received_date: "2026-03-01",
     issue_date: "2026-03-01",

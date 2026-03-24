@@ -81,7 +81,7 @@ class VendorBillTests(TestCase):
         )
 
     def _create_vendor_bill(self, *, bill_number="B-1001", total="1250.00"):
-        """Create a bill via API. Bills always start as received."""
+        """Create a bill via API. Bills always start as open."""
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/vendor-bills/",
             data={
@@ -117,17 +117,17 @@ class VendorBillTests(TestCase):
 
         self.assertEqual(payload["statuses"], expected_statuses)
         self.assertEqual(payload["status_labels"], expected_labels)
-        self.assertEqual(payload["default_create_status"], VendorBill.Status.RECEIVED)
+        self.assertEqual(payload["default_create_status"], VendorBill.Status.OPEN)
 
         # Document lifecycle transitions
-        received_transitions = payload["allowed_status_transitions"]["received"]
-        self.assertIn("approved", received_transitions)
-        self.assertIn("void", received_transitions)
+        open_transitions = payload["allowed_status_transitions"]["open"]
+        self.assertIn("disputed", open_transitions)
+        self.assertIn("closed", open_transitions)
+        self.assertIn("void", open_transitions)
 
-        approved_transitions = payload["allowed_status_transitions"]["approved"]
-        self.assertIn("closed", approved_transitions)
-        self.assertIn("void", approved_transitions)
-        self.assertNotIn("disputed", approved_transitions)
+        disputed_transitions = payload["allowed_status_transitions"]["disputed"]
+        self.assertIn("open", disputed_transitions)
+        self.assertIn("void", disputed_transitions)
 
         # Terminal statuses
         self.assertIn("closed", payload["terminal_statuses"])
@@ -135,7 +135,7 @@ class VendorBillTests(TestCase):
         self.assertTrue(str(payload["policy_version"]).startswith("2026-03-18.vendor_bills."))
 
     def test_vendor_bill_create_and_project_list(self):
-        """Bills are created in received status with description+amount line items."""
+        """Bills are created in open status with description+amount line items."""
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/vendor-bills/",
             data={
@@ -153,7 +153,7 @@ class VendorBillTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         payload = response.json()["data"]
-        self.assertEqual(payload["status"], "received")
+        self.assertEqual(payload["status"], "open")
         self.assertEqual(payload["payment_status"], "unpaid")
         self.assertEqual(payload["vendor"], self.vendor.id)
         self.assertEqual(payload["bill_number"], "B-2001")
@@ -174,7 +174,7 @@ class VendorBillTests(TestCase):
         self.assertEqual(rows[0]["project"], self.project.id)
 
     def test_vendor_bill_create_requires_issue_date(self):
-        """Bills require issue_date (all bills start as received)."""
+        """Bills require issue_date (all bills start as open)."""
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/vendor-bills/",
             data={
@@ -199,7 +199,7 @@ class VendorBillTests(TestCase):
             project=self.other_project,
             vendor=self.other_vendor,
             bill_number="B-9999",
-            status=VendorBill.Status.RECEIVED,
+            status=VendorBill.Status.OPEN,
             issue_date="2026-02-13",
             due_date="2026-03-20",
             total="200.00",
@@ -221,7 +221,7 @@ class VendorBillTests(TestCase):
             project=self.project,
             vendor=self.vendor,
             bill_number="B-3100",
-            status=VendorBill.Status.RECEIVED,
+            status=VendorBill.Status.OPEN,
             issue_date="2026-02-13",
             due_date="2026-03-20",
             total="500.00",
@@ -279,45 +279,48 @@ class VendorBillTests(TestCase):
         self.assertEqual(allowed.status_code, 201)
 
     def test_vendor_bill_document_lifecycle_transitions(self):
-        """Walk through the full document lifecycle: received → approved."""
+        """Walk through the full document lifecycle: open → void, open → closed."""
         vendor_bill_id = self._create_vendor_bill(total="900.00")
 
-        # received → closed (invalid — must be approved first)
+        # open → void (valid)
+        voided = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(voided.status_code, 200)
+        self.assertEqual(voided.json()["data"]["status"], "void")
+
+        # void is terminal
         invalid = self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "closed"},
+            data={"status": "open"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(invalid.status_code, 400)
         self.assertEqual(invalid.json()["error"]["code"], "validation_error")
 
-        # received → approved
-        approved = self.client.patch(
-            f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={
-                "status": "approved",
-                "line_items": [
-                    {"cost_code": self.cost_code.id, "description": "Materials", "unit_price": "900.00"}
-                ],
-            },
+        # Create another bill to test open → closed
+        vendor_bill_id2 = self._create_vendor_bill(bill_number="B-1002", total="900.00")
+
+        # open → closed (valid)
+        closed = self.client.patch(
+            f"/api/v1/vendor-bills/{vendor_bill_id2}/",
+            data={"status": "closed"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(approved.status_code, 200)
-        payload = approved.json()["data"]
-        self.assertEqual(payload["status"], "approved")
-        # Balance is still full — payment status is derived, not from document status
-        self.assertEqual(payload["balance_due"], "900.00")
-        self.assertEqual(payload["payment_status"], "unpaid")
-        self.assertEqual(len(payload["line_items"]), 1)
-        self.assertEqual(payload["line_items"][0]["cost_code"], self.cost_code.id)
+        self.assertEqual(closed.status_code, 200)
+        payload = closed.json()["data"]
+        self.assertEqual(payload["status"], "closed")
 
     def test_vendor_bill_disputed_and_closed_transitions(self):
-        """Received bills can be disputed; disputed bills can be approved or voided."""
+        """Open bills can be disputed; disputed bills can return to open or be voided."""
         vendor_bill_id = self._create_vendor_bill(total="500.00")
 
-        # received → disputed
+        # open → disputed
         disputed = self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={"status": "disputed"},
@@ -327,17 +330,17 @@ class VendorBillTests(TestCase):
         self.assertEqual(disputed.status_code, 200)
         self.assertEqual(disputed.json()["data"]["status"], "disputed")
 
-        # disputed → approved (resolve dispute)
-        re_approved = self.client.patch(
+        # disputed → open (resolve dispute)
+        reopened = self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={"status": "approved"},
+            data={"status": "open"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(re_approved.status_code, 200)
-        self.assertEqual(re_approved.json()["data"]["status"], "approved")
+        self.assertEqual(reopened.status_code, 200)
+        self.assertEqual(reopened.json()["data"]["status"], "open")
 
-        # approved → closed (manual reconciliation)
+        # open → closed
         closed = self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={"status": "closed"},
@@ -420,20 +423,15 @@ class VendorBillTests(TestCase):
         """Each document status transition creates an immutable snapshot."""
         vendor_bill_id = self._create_vendor_bill(total="300.00")
 
-        # received → approved
+        # open → disputed
         self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
-            data={
-                "status": "approved",
-                "line_items": [
-                    {"cost_code": self.cost_code.id, "description": "Materials", "unit_price": "300.00"}
-                ],
-            },
+            data={"status": "disputed"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
 
-        # approved → void
+        # disputed → void
         self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={"status": "void"},
@@ -445,7 +443,7 @@ class VendorBillTests(TestCase):
         self.assertEqual(snapshots.count(), 2)
         self.assertEqual(
             list(snapshots.values_list("capture_status", flat=True)),
-            ["approved", "void"],
+            ["disputed", "void"],
         )
         self.assertTrue(all(snapshot.acted_by_id == self.user.id for snapshot in snapshots))
 
@@ -455,7 +453,7 @@ class VendorBillTests(TestCase):
         self.client.patch(
             f"/api/v1/vendor-bills/{vendor_bill_id}/",
             data={
-                "status": "approved",
+                "status": "closed",
                 "line_items": [
                     {"cost_code": self.cost_code.id, "description": "Materials", "unit_price": "200.00"}
                 ],
@@ -466,40 +464,106 @@ class VendorBillTests(TestCase):
 
         snapshot = VendorBillSnapshot.objects.filter(
             vendor_bill_id=vendor_bill_id,
-            capture_status=VendorBillSnapshot.CaptureStatus.APPROVED,
+            capture_status=VendorBillSnapshot.CaptureStatus.CLOSED,
         ).latest("id")
-        self.assertEqual(snapshot.snapshot_json["vendor_bill"]["status"], "approved")
+        self.assertEqual(snapshot.snapshot_json["vendor_bill"]["status"], "closed")
         self.assertEqual(snapshot.snapshot_json["vendor_bill"]["total"], "200.00")
-        self.assertEqual(snapshot.snapshot_json["decision_context"]["previous_status"], "received")
-        self.assertEqual(snapshot.snapshot_json["decision_context"]["capture_status"], "approved")
+        self.assertEqual(snapshot.snapshot_json["decision_context"]["previous_status"], "open")
+        self.assertEqual(snapshot.snapshot_json["decision_context"]["capture_status"], "closed")
         self.assertEqual(len(snapshot.snapshot_json["line_items"]), 1)
         self.assertEqual(snapshot.snapshot_json["line_items"][0]["cost_code_id"], self.cost_code.id)
         # Line items use amount, not qty × rate
         self.assertEqual(snapshot.snapshot_json["line_items"][0]["amount"], "200.00")
 
-    def test_receipt_creation_and_store_autocreate(self):
-        """Creating a receipt records the expense and auto-creates an org-scoped Store."""
+    def test_quick_expense_creation(self):
+        """Quick expense creates a VendorBill with null vendor via /expenses/ endpoint."""
         response = self.client.post(
-            f"/api/v1/projects/{self.project.id}/receipts/",
+            f"/api/v1/projects/{self.project.id}/expenses/",
             data={
                 "store_name": "Home Depot",
-                "amount": "237.50",
-                "notes": "Home Depot run.",
+                "total": "237.50",
+                "notes": "Lumber run.",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
-        receipt = response.json()["data"]
-        self.assertEqual(receipt["store_name"], "Home Depot")
-        self.assertEqual(receipt["amount"], "237.50")
-        self.assertIn("receipt_date", receipt)
-        self.assertNotIn("payment", receipt)
+        bill = response.json()["data"]
+        self.assertEqual(bill["store_name"], "Home Depot")
+        self.assertEqual(bill["total"], "237.50")
+        self.assertEqual(bill["balance_due"], "0.00")
+        self.assertIsNone(bill["vendor"])
+        self.assertEqual(bill["vendor_name"], "")
+        self.assertEqual(bill["bill_number"], "")
+        self.assertEqual(bill["status"], "open")
+        self.assertEqual(bill["payment_status"], "paid")
 
-        # Verify Store was auto-created
-        from core.models import Store
+    def test_quick_expense_defaults_issue_date_to_today(self):
+        """Quick expense sets issue_date to today when omitted."""
+        from django.utils import timezone
 
-        self.assertIsNotNone(receipt["store"])
-        store = Store.objects.get(id=receipt["store"])
-        self.assertEqual(store.name, "Home Depot")
-        self.assertEqual(store.organization_id, self.org.id)
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/expenses/",
+            data={"total": "50.00"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        bill = response.json()["data"]
+        self.assertEqual(bill["issue_date"], timezone.localdate().isoformat())
+
+    def test_quick_expense_rejects_missing_total(self):
+        """Quick expense returns 400 when total is missing."""
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/expenses/",
+            data={"store_name": "Home Depot"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_quick_expense_rejects_zero_total(self):
+        """Quick expense returns 400 when total is zero."""
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/expenses/",
+            data={"total": "0.00"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_quick_expense_rejects_negative_total(self):
+        """Quick expense returns 400 when total is negative."""
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/expenses/",
+            data={"total": "-10.00"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_full_bill_still_requires_vendor_and_bill_number(self):
+        """Full vendor bill creation still requires vendor + bill_number + line_items."""
+        # Missing vendor
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/vendor-bills/",
+            data={
+                "bill_number": "INV-001",
+                "issue_date": "2026-03-01",
+                "line_items": [{"description": "Labor", "amount": "100.00"}],
+            },
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_unique_constraint_skipped_for_null_vendor(self):
+        """Multiple expenses with null vendor don't trigger unique constraint."""
+        for _ in range(3):
+            response = self.client.post(
+                f"/api/v1/projects/{self.project.id}/expenses/",
+                data={"store_name": "Home Depot", "total": "50.00"},
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f"Token {self.token.key}",
+            )
+            self.assertEqual(response.status_code, 201)

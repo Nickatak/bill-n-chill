@@ -261,7 +261,7 @@ def project_vendor_bills_view(request, project_id: int):
                 project=project,
                 vendor=vendor,
                 bill_number=data["bill_number"],
-                status=VendorBill.Status.RECEIVED,
+                status=VendorBill.Status.OPEN,
                 received_date=received_date,
                 issue_date=issue_date,
                 due_date=due_date,
@@ -359,14 +359,6 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
         serializer = VendorBillWriteSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-
-        # Status-transition capability gates
-        if "status" in data:
-            next_status = data["status"]
-            if next_status == VendorBill.Status.APPROVED:
-                permission_error, _ = _capability_gate(request.user, "vendor_bills", "approve")
-                if permission_error:
-                    return Response(permission_error, status=403)
 
         next_vendor_id = data.get("vendor", vendor_bill.vendor_id)
         next_bill_number = data.get("bill_number", vendor_bill.bill_number)

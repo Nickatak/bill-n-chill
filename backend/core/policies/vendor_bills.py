@@ -11,6 +11,6 @@ def get_vendor_bill_policy_contract() -> dict:
     return _build_base_policy_contract(
         model_class=VendorBill,
         policy_version=VENDOR_BILL_POLICY_VERSION,
-        default_create_status=VendorBill.Status.RECEIVED,
+        default_create_status=VendorBill.Status.OPEN,
         extra_fields={},
     )

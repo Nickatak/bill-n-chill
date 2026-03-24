@@ -34,7 +34,6 @@ class PaymentSerializer(serializers.ModelSerializer):
             "target_id",
             "invoice",
             "vendor_bill",
-            "receipt",
             "created_at",
             "updated_at",
         ]
@@ -50,7 +49,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 
     def get_target_id(self, obj: Payment) -> int | None:
         """Return the linked document ID."""
-        return obj.invoice_id or obj.vendor_bill_id or obj.receipt_id
+        return obj.invoice_id or obj.vendor_bill_id
 
 
 class PaymentWriteSerializer(serializers.Serializer):

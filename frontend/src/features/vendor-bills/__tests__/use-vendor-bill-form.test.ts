@@ -24,8 +24,10 @@ function makeVendorBill(overrides: Partial<VendorBillRecord> = {}): VendorBillRe
     project_name: "Kitchen Remodel",
     vendor: 1,
     vendor_name: "Acme Lumber",
+    store: null,
+    store_name: "",
     bill_number: "INV-001",
-    status: "received",
+    status: "open",
     payment_status: "unpaid",
     received_date: "2026-03-01",
     issue_date: "2026-03-01",
@@ -154,7 +156,7 @@ describe("useVendorBillForm", () => {
     expect(result.current.formTaxAmount).toBe("100.00");
     expect(result.current.formShippingAmount).toBe("50.00");
     expect(result.current.formNotes).toBe("Rush order");
-    expect(result.current.status).toBe("received");
+    expect(result.current.status).toBe("open");
     expect(result.current.formLineItems).toHaveLength(1);
     expect(result.current.formLineItems[0].description).toBe("Lumber");
   });

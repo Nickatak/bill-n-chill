@@ -10,34 +10,32 @@ User = get_user_model()
 
 
 class VendorBill(StatusTransitionMixin, models.Model):
-    """AP bill from a vendor/subcontractor — inbound document only.
+    """AP bill or quick expense — inbound payable document.
 
     Business workflow:
-    - Internal payable document (vendor-facing), not customer-facing billing.
-    - Vendor is always a B2B relationship (sub/trade). Receipts (retail
-      expenses) are a separate model — see ``Receipt``.
-    - Bills track document lifecycle only (received → approved).
+    - Two creation paths split by vendor presence:
+      - Full bill (vendor set): B2B vendor relationship, bill_number required,
+        line items required. Unique constraint on project+vendor+bill_number.
+      - Quick expense (vendor null): retail/misc expense with optional
+        store_name, no bill_number or line items required at creation.
+    - Bills track document lifecycle only (open → closed).
       Payment status is derived from PaymentAllocation coverage, not a bill
       status. See ``docs/decisions/ap-model-separation.md``.
-    - Project + vendor + bill number must be unique for non-void bills
-      (reuse allowed after void).
     - `created_by` captures who created/owns the record, not who performed
       later lifecycle decisions (those belong in immutable decision captures).
     """
 
     class Status(models.TextChoices):
-        RECEIVED = "received", "Received"
+        OPEN = "open", "Open"
         DISPUTED = "disputed", "Disputed"
-        APPROVED = "approved", "Approved"
         CLOSED = "closed", "Closed"
         VOID = "void", "Void"
 
     _status_label = "vendor bill"
 
     ALLOWED_STATUS_TRANSITIONS = {
-        Status.RECEIVED: {Status.DISPUTED, Status.APPROVED, Status.VOID},
-        Status.DISPUTED: {Status.APPROVED, Status.VOID},
-        Status.APPROVED: {Status.CLOSED, Status.VOID},
+        Status.OPEN: {Status.DISPUTED, Status.CLOSED, Status.VOID},
+        Status.DISPUTED: {Status.OPEN, Status.VOID},
         Status.CLOSED: set(),
         Status.VOID: set(),
     }
@@ -51,12 +49,21 @@ class VendorBill(StatusTransitionMixin, models.Model):
         "Vendor",
         on_delete=models.PROTECT,
         related_name="vendor_bills",
+        null=True,
+        blank=True,
+    )
+    store = models.ForeignKey(
+        "Store",
+        on_delete=models.PROTECT,
+        related_name="vendor_bills",
+        null=True,
+        blank=True,
     )
     bill_number = models.CharField(max_length=50, blank=True, default="")
     status = models.CharField(
         max_length=32,
         choices=Status.choices,
-        default=Status.RECEIVED,
+        default=Status.OPEN,
         db_index=True,
     )
     received_date = models.DateField(
@@ -87,22 +94,41 @@ class VendorBill(StatusTransitionMixin, models.Model):
                 "project",
                 "vendor",
                 models.functions.Lower("bill_number"),
-                condition=~models.Q(status="void") & ~models.Q(bill_number=""),
+                condition=(
+                    ~models.Q(status="void")
+                    & ~models.Q(bill_number="")
+                    & models.Q(vendor__isnull=False)
+                ),
                 name="uniq_active_vendor_bill_number_per_project_vendor_ci",
             )
         ]
 
     def __str__(self) -> str:
-        return f"{self.vendor.name} {self.bill_number}"
+        if self.vendor_id:
+            return f"{self.vendor.name} {self.bill_number}"
+        if self.store_id:
+            return self.store.name
+        return "Expense"
 
     def clean(self):
-        """Validate due date and status transitions."""
+        """Validate field requirements and status transitions.
+
+        Two-path validation based on vendor presence:
+        - Vendor set → bill_number required (full bill).
+        - Vendor null → bill_number must be blank (quick expense).
+        """
         errors = {}
 
-        if not self.vendor_id:
-            errors.setdefault("vendor", []).append("Vendor is required for bills.")
-        if not self.bill_number:
-            errors.setdefault("bill_number", []).append("Bill number is required for bills.")
+        if self.vendor_id:
+            if not self.bill_number:
+                errors.setdefault("bill_number", []).append(
+                    "Bill number is required when vendor is set."
+                )
+        else:
+            if self.bill_number:
+                errors.setdefault("bill_number", []).append(
+                    "Bill number must be blank when no vendor is set."
+                )
 
         if self.due_date and self.issue_date and self.due_date < self.issue_date:
             errors.setdefault("due_date", []).append("Due date must be on or after issue date.")
@@ -123,6 +149,8 @@ class VendorBill(StatusTransitionMixin, models.Model):
                 "id": self.id,
                 "project_id": self.project_id,
                 "vendor_id": self.vendor_id,
+                "store_id": self.store_id,
+                "store_name": self.store.name if self.store_id else "",
                 "bill_number": self.bill_number,
                 "status": self.status,
                 "received_date": self.received_date.isoformat() if self.received_date else None,

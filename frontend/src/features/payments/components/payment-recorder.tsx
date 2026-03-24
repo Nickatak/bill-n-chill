@@ -55,7 +55,7 @@ const PAYMENT_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
 };
 const PAYMENT_ALLOCATION_TARGET_BY_DIRECTION_FALLBACK: Record<string, PaymentAllocationTargetType[]> = {
   inbound: ["invoice"],
-  outbound: ["vendor_bill", "receipt"],
+  outbound: ["vendor_bill"],
 };
 
 // ---------------------------------------------------------------------------
@@ -506,7 +506,7 @@ export function PaymentRecorder({
               <div className={styles.metric}>
                 <span className={styles.metricLabel}>Target</span>
                 <span className={styles.metricValue}>
-                  {selectedPayment.target_type === "invoice" ? "Invoice" : selectedPayment.target_type === "vendor_bill" ? "Vendor Bill" : "Receipt"} #{selectedPayment.target_id}
+                  {selectedPayment.target_type === "invoice" ? "Invoice" : "Vendor Bill"} #{selectedPayment.target_id}
                 </span>
               </div>
             ) : null}
