@@ -23,7 +23,7 @@ import styles from "./mobile-bottom-nav.module.css";
 export function MobileBottomNav() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
-  const { token, organization } = useSharedSessionAuth();
+  const { token } = useSharedSessionAuth();
   const { isPrintable } = usePrintable();
   const hasSession = Boolean(token);
   const isPublicDocument = isPublicDocumentRoute(pathname);
