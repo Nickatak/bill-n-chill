@@ -56,6 +56,48 @@
   min-height: 48px;
 }
 
+.comboboxWrap {
+  position: relative;
+  width: 100%;
+}
+
+.comboboxWrap .input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  margin-top: 2px;
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.suggestion {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  font-size: var(--font-sm);
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.suggestion:hover,
+.suggestionActive {
+  background: var(--surface-secondary);
+}
+
 .inputError {
   border-color: var(--status-red-text);
 }
@@ -64,6 +106,22 @@
   font-size: var(--font-xs);
   color: var(--status-red-text);
   font-weight: 400;
+}
+
+.success {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--status-green-text);
+}
+
+.successLink {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.successLink:hover {
+  text-decoration: underline;
 }
 
 .error {
