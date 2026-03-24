@@ -34,26 +34,13 @@ class ChangeOrderLineSerializer(serializers.ModelSerializer):
 
 
 class ChangeOrderSerializer(serializers.ModelSerializer):
-    """Read-only change order with nested line items and revision context."""
+    """Read-only change order with nested line items."""
 
     requested_by_email = serializers.EmailField(source="requested_by.email", read_only=True)
     approved_by_email = serializers.EmailField(source="approved_by.email", read_only=True)
     public_ref = serializers.CharField(read_only=True)
     line_items = ChangeOrderLineSerializer(many=True, read_only=True)
     line_total_delta = serializers.SerializerMethodField()
-    is_latest_revision = serializers.SerializerMethodField()
-
-    def get_is_latest_revision(self, obj) -> bool:
-        """Return whether this change order is the latest revision in its family."""
-        latest_map = self.context.get("is_latest_revision_map")
-        if latest_map is not None:
-            return latest_map.get(obj.id, False)
-        # Fallback for single-object detail views without precomputed context.
-        return not ChangeOrder.objects.filter(
-            project=obj.project,
-            family_key=obj.family_key,
-            revision_number__gt=obj.revision_number,
-        ).exists()
 
     def get_line_total_delta(self, obj) -> str:
         """Return the sum of all line item amount deltas as a decimal string."""
@@ -67,7 +54,6 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
             "id",
             "project",
             "family_key",
-            "revision_number",
             "title",
             "status",
             "public_ref",
@@ -79,7 +65,6 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
             "sender_address",
             "sender_logo_url",
             "origin_estimate",
-            "previous_change_order",
             "requested_by",
             "requested_by_email",
             "approved_by",
@@ -87,7 +72,6 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
             "approved_at",
             "line_items",
             "line_total_delta",
-            "is_latest_revision",
             "created_at",
             "updated_at",
         ]
@@ -95,11 +79,9 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
             "id",
             "project",
             "family_key",
-            "revision_number",
             "sender_name",
             "sender_address",
             "sender_logo_url",
-            "previous_change_order",
             "requested_by",
             "requested_by_email",
             "approved_by",
@@ -107,7 +89,6 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
             "approved_at",
             "line_items",
             "line_total_delta",
-            "is_latest_revision",
             "created_at",
             "updated_at",
         ]

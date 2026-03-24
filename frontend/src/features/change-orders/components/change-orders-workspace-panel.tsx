@@ -58,7 +58,7 @@ export type ChangeOrdersWorkspacePanelProps = {
 
   // Toolbar actions
   onStartNew: () => void;
-  onCloneRevision: () => void;
+  onDuplicateAsNew: () => void;
   canMutateChangeOrders: boolean;
   role: string;
 
@@ -138,7 +138,7 @@ export function ChangeOrdersWorkspacePanel({
   workspaceBadgeLabel,
   workspaceBadgeClass,
   onStartNew,
-  onCloneRevision,
+  onDuplicateAsNew,
   canMutateChangeOrders,
   role,
   actionMessage,
@@ -269,7 +269,7 @@ export function ChangeOrdersWorkspacePanel({
                     return {
                       key: `${co.id}-${line.id}`,
                       cells: [
-                        `${co.title} r${co.revision_number}`,
+                        co.title,
                         costCodeLabel,
                         line.description || "—",
                         `${line.days_delta} days`,
@@ -321,18 +321,18 @@ export function ChangeOrdersWorkspacePanel({
           >
             {selectedChangeOrder ? "Create New Change Order" : "Reset"}
           </button>
-          {selectedChangeOrder && selectedViewerChangeOrder?.is_latest_revision ? (
+          {selectedChangeOrder ? (
             <button
               type="button"
               className={styles.cloneRevisionButton}
-              onClick={onCloneRevision}
+              onClick={onDuplicateAsNew}
               disabled={!canMutateChangeOrders}
             >
-              Duplicate as New Revision
+              Duplicate as New
             </button>
           ) : null}
         </div>
-        {actionMessage && actionTone === "success" && /^Duplicated\b/i.test(actionMessage) ? (
+        {actionMessage && actionTone === "success" && /^Copied\b/i.test(actionMessage) ? (
           <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
         ) : null}
       </div>
@@ -991,11 +991,6 @@ export function ChangeOrdersWorkspacePanel({
                       </div>
                     </div>
                     <div className={changeOrderCreatorStyles.coSheetFooterActions}>
-                      {selectedChangeOrder && !selectedChangeOrder.is_latest_revision ? (
-                        <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint} ${changeOrderCreatorStyles.coFooterErrorHint}`}>
-                          This revision is historical and read-only. Save/update actions are available on the latest revision only.
-                        </p>
-                      ) : null}
                       {actionMessage && actionTone === "success" ? (
                         <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
                       ) : null}
@@ -1032,7 +1027,7 @@ export function ChangeOrdersWorkspacePanel({
                   <span>{senderEmail || "Help email not set"}</span>
                   <span>
                     {selectedChangeOrder
-                      ? `CO-${selectedChangeOrder.family_key} v${selectedChangeOrder.revision_number}`
+                      ? `CO-${selectedChangeOrder.family_key}`
                       : "Change Order"}
                   </span>
                 </div>

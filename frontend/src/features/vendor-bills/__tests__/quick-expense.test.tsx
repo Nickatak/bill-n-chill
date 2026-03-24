@@ -14,9 +14,18 @@ import { QuickExpense } from "../components/quick-expense";
 // Tests
 // ---------------------------------------------------------------------------
 
+/** Respond to the GET /stores/ call that fires on mount. */
+function mockStoresFetch() {
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: () => Promise.resolve({ data: [] }),
+  });
+}
+
 describe("QuickExpense", () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    mockStoresFetch();
   });
 
   afterEach(() => {
@@ -42,7 +51,7 @@ describe("QuickExpense", () => {
     fireEvent.submit(screen.getByRole("button", { name: /log expense/i }).closest("form")!);
 
     expect(screen.getByText(/enter an amount/i)).toBeInTheDocument();
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledTimes(1); // only the stores fetch
   });
 
   it("shows field error when amount is negative", () => {
@@ -56,7 +65,7 @@ describe("QuickExpense", () => {
     fireEvent.submit(screen.getByRole("button", { name: /log expense/i }).closest("form")!);
 
     expect(screen.getByText(/must be greater than zero/i)).toBeInTheDocument();
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockFetch).toHaveBeenCalledTimes(1); // only the stores fetch
   });
 
   it("clears amount field error when user types an amount", () => {
@@ -115,8 +124,8 @@ describe("QuickExpense", () => {
       expect(onCreated).toHaveBeenCalled();
     });
 
-    // Verify the POST payload
-    const [url, options] = mockFetch.mock.calls[0];
+    // Verify the POST payload (call[0] is GET /stores/, call[1] is POST /expenses/)
+    const [url, options] = mockFetch.mock.calls[1];
     expect(url).toContain("/projects/1/expenses/");
     const body = JSON.parse(options.body);
     expect(body.store_name).toBe("Home Depot");
@@ -177,7 +186,7 @@ describe("QuickExpense", () => {
       expect(mockFetch).toHaveBeenCalled();
     });
 
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const body = JSON.parse(mockFetch.mock.calls[1][1].body);
     expect(body.store_name).toBe("");
     expect(body.total).toBe("50.00");
   });

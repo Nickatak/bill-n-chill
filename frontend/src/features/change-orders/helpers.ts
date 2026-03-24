@@ -101,9 +101,9 @@ export function defaultChangeOrderTitle(projectName?: string): string {
   return `Change Order: ${trimmed}`;
 }
 
-/** Build a human-readable label like "CO-3 v2" for a change order. */
-export function coLabel(changeOrder: Pick<ChangeOrderRecord, "family_key" | "revision_number">): string {
-  return `CO-${changeOrder.family_key} v${changeOrder.revision_number}`;
+/** Build a human-readable label like "CO-3" for a change order. */
+export function coLabel(changeOrder: Pick<ChangeOrderRecord, "family_key">): string {
+  return `CO-${changeOrder.family_key}`;
 }
 
 /** Build the public-facing change-order URL for a viewer link. */

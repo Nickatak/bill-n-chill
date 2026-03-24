@@ -83,7 +83,8 @@ export function useChangeOrderForm() {
   const [showAllEvents, setShowAllEvents] = useState(false);
 
   const {
-    items: newLineItems,
+    items: newLineItems, setItems: setNewLineItems,
+    setNextId: setNewLineNextLocalId,
     add: addNewLineRaw, remove: removeNewLineRaw,
     update: updateNewLine, move: moveNewLine, reset: resetNewLines,
   } = useLineItems<ChangeOrderLineInput>({ createEmpty: emptyLine });
@@ -135,6 +136,31 @@ export function useChangeOrderForm() {
     setQuickStatusNote("");
     setShowAllEvents(false);
   }, [resetEditLines, setEditLineItems, setEditLineNextLocalId]);
+
+  /**
+   * Pre-fill the create form from an existing change order for duplication.
+   * Copies content but puts form in create mode (no selected CO).
+   */
+  const populateCreateFromChangeOrder = useCallback((changeOrder: ChangeOrderRecord) => {
+    setNewTitle(changeOrder.title);
+    setNewTitleManuallyEdited(true);
+    setNewReason(changeOrder.reason);
+    setNewTermsText(changeOrder.terms_text || "");
+    const copiedLines: ChangeOrderLineInput[] =
+      changeOrder.line_items.length > 0
+        ? changeOrder.line_items.map((line, index) => ({
+            localId: index + 1,
+            costCodeId: line.cost_code_id ? String(line.cost_code_id) : String(line.cost_code),
+            description: line.description ?? "",
+            adjustmentReason: line.adjustment_reason ?? "",
+            amountDelta: line.amount_delta,
+            daysDelta: String(line.days_delta),
+          }))
+        : [emptyLine(1)];
+    setNewLineItems(copiedLines);
+    setNewLineNextLocalId(copiedLines.length + 1);
+    setSelectedChangeOrderId("");
+  }, [setNewLineItems, setNewLineNextLocalId]);
 
   /**
    * Reset the create form to a fresh state for a new draft.
@@ -257,6 +283,7 @@ export function useChangeOrderForm() {
 
     // Helpers — form lifecycle
     hydrateEditForm,
+    populateCreateFromChangeOrder,
     resetCreateForm,
   };
 }

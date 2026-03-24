@@ -97,11 +97,6 @@ export function createChangeOrderDocumentAdapter(
     getMetaFields: (document): CreatorMetaField[] => [
       { key: "co_id", label: "Change Order #", value: document ? `CO-${document.id}` : "Draft" },
       {
-        key: "revision",
-        label: "Revision",
-        value: document ? `v${document.revision_number}` : "v1",
-      },
-      {
         key: "origin_estimate",
         label: "Original Estimate",
         value: document?.origin_estimate ? `#${document.origin_estimate}` : "Not set",

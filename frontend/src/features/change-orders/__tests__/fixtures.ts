@@ -52,7 +52,6 @@ export const changeOrderRecord: ChangeOrderRecord = {
   id: 10,
   project: 5,
   family_key: "3",
-  revision_number: 2,
   title: "Add bathroom tile",
   status: "pending",
   amount_delta: "2500.00",
@@ -64,7 +63,6 @@ export const changeOrderRecord: ChangeOrderRecord = {
   sender_logo_url: "",
   origin_estimate: 42,
   origin_estimate_version: 2,
-  previous_change_order: null,
   requested_by: 1,
   requested_by_email: "alice@example.com",
   approved_by: null,
@@ -72,7 +70,6 @@ export const changeOrderRecord: ChangeOrderRecord = {
   approved_at: null,
   line_items: [],
   line_total_delta: "2500.00",
-  is_latest_revision: true,
   created_at: "2026-01-15T10:00:00Z",
   updated_at: "2026-01-16T14:30:00Z",
 };

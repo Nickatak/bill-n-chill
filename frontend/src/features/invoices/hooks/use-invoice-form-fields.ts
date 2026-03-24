@@ -120,6 +120,25 @@ export function useInvoiceFormFields({
     [invoiceToWorkspaceLines, setLineItems, setNextLineId],
   );
 
+  /** Pre-fill workspace from an existing invoice for duplication (create mode, not editing). */
+  const populateCreateFromInvoice = useCallback(
+    (invoice: InvoiceRecord) => {
+      const workspaceLines = invoiceToWorkspaceLines(invoice);
+      const nextIssueDate = todayDateInput();
+      const dueDays = organizationInvoiceDefaults?.default_invoice_due_delta ?? 30;
+      setIssueDate(nextIssueDate);
+      setDueDate(dueDateFromIssueDate(nextIssueDate, dueDays));
+      setTaxPercent(invoice.tax_percent || "0");
+      setTermsText(invoice.terms_text || "");
+      setLineItems(workspaceLines);
+      setNextLineId(workspaceLines.length + 1);
+      setWorkspaceSourceInvoiceId(null);
+      setEditingDraftInvoiceId(null);
+      setWorkspaceContext("New invoice draft");
+    },
+    [organizationInvoiceDefaults, invoiceToWorkspaceLines, setLineItems, setNextLineId],
+  );
+
   /** Reset workspace to a blank new-draft state using org defaults. */
   function resetCreateDraft() {
     const nextIssueDate = todayDateInput();
@@ -158,6 +177,7 @@ export function useInvoiceFormFields({
     // Helpers
     invoiceToWorkspaceLines,
     loadInvoiceIntoWorkspace,
+    populateCreateFromInvoice,
     resetCreateDraft,
   };
 }

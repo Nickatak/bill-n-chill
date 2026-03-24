@@ -389,7 +389,7 @@ def _handle_co_status_transition(
                 note=event_note,
                 changed_by=request.user,
             )
-            logger.info("Change order status transition: id=%s CO-%s v%s (%s → %s) delta=$%s by %s", change_order.id, change_order.family_key, change_order.revision_number, previous_status, next_status, financial_delta, request.user.email)
+            logger.info("Change order status transition: id=%s CO-%s (%s → %s) delta=$%s by %s", change_order.id, change_order.family_key, previous_status, next_status, financial_delta, request.user.email)
     except ValidationError as exc:
         fields = exc.message_dict if hasattr(exc, "message_dict") else {"non_field_errors": exc.messages}
         return Response(
@@ -405,7 +405,7 @@ def _handle_co_status_transition(
         customer_email = (change_order.project.customer.email or "").strip()
         email_sent = send_document_sent_email(
             document_type="Change Order",
-            document_title=f"CO-{change_order.family_key} v{change_order.revision_number}: {change_order.title}",
+            document_title=f"CO-{change_order.family_key}: {change_order.title}",
             public_url=f"{settings.FRONTEND_URL}/change-order/{change_order.public_ref}",
             recipient_email=customer_email,
             sender_user=request.user,

@@ -305,13 +305,9 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(payload["allowed_status_transitions"], expected_transitions)
         self.assertEqual(payload["terminal_statuses"], expected_terminal_statuses)
         self.assertEqual(
-            payload["revision_rules"],
+            payload["editing_rules"],
             {
-                "edit_latest_revision_only": True,
                 "edit_requires_draft_status": True,
-                "clone_requires_latest_revision": True,
-                "revision_gt_one_requires_previous_change_order": True,
-                "previous_change_order_must_match_project_family_and_prior_revision": True,
             },
         )
         self.assertEqual(
@@ -340,12 +336,9 @@ class ChangeOrderTests(TestCase):
                 "co_origin_estimate_immutable_once_set": "origin_estimate cannot change/clear once set.",
                 "co_line_total_must_match_amount_delta": "Sum of line_items amount_delta must match change-order amount_delta.",
                 "co_line_cost_code_invalid": "Each cost_code must exist and belong to the organization.",
-                "co_edit_latest_revision_only": "Only latest revision in family can be edited.",
                 "co_edit_requires_draft_status": "Only draft change orders can edit content fields.",
-                "co_clone_requires_latest_revision": "Clone revision only from latest revision in family.",
                 "co_status_transition_not_allowed": "Status transition must match allowed_status_transitions.",
                 "co_approval_metadata_invariant": "approved_by/approved_at must match approved status invariants.",
-                "co_revision_chain_invalid": "Revision chain must keep project/family/previous linkage integrity.",
             },
         )
         self.assertTrue(str(payload["policy_version"]).startswith("2026-02-24.change_orders."))
@@ -482,8 +475,6 @@ class ChangeOrderTests(TestCase):
         payload = response.json()["data"]
         self.assertEqual(payload["origin_estimate"], estimate.id)
         self.assertNotIn("origin_estimate_version", payload)
-        self.assertEqual(payload["revision_number"], 1)
-        self.assertEqual(payload["is_latest_revision"], True)
 
     def test_change_order_create_requires_origin_estimate(self):
         response = self.client.post(
@@ -569,90 +560,6 @@ class ChangeOrderTests(TestCase):
         payload = response.json()["data"]
         self.assertEqual(payload["line_total_delta"], "1200.00")
         self.assertEqual(len(payload["line_items"]), 1)
-
-    def test_change_order_clone_revision_creates_next_revision_in_same_family(self):
-        estimate = self._create_estimate_family(title="Clone Revision Estimate")
-        create = self.client.post(
-            f"/api/v1/projects/{self.project.id}/change-orders/",
-            data={
-                "title": "Revision Family CO",
-                "amount_delta": "1800.00",
-                "days_delta": 2,
-                "reason": "Base revision",
-                "origin_estimate": estimate.id,
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(create.status_code, 201)
-        base = create.json()["data"]
-        base_id = base["id"]
-
-        clone = self.client.post(
-            f"/api/v1/change-orders/{base_id}/clone-revision/",
-            data={},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(clone.status_code, 201)
-        payload = clone.json()["data"]
-        self.assertEqual(payload["family_key"], base["family_key"])
-        self.assertEqual(payload["revision_number"], 2)
-        self.assertEqual(payload["status"], "draft")
-        self.assertEqual(payload["previous_change_order"], base_id)
-        self.assertEqual(payload["origin_estimate"], estimate.id)
-
-    def test_change_order_patch_rejects_non_latest_revision_edit(self):
-        base_id = self._create_change_order()
-        clone = self.client.post(
-            f"/api/v1/change-orders/{base_id}/clone-revision/",
-            data={},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(clone.status_code, 201)
-
-        blocked = self.client.patch(
-            f"/api/v1/change-orders/{base_id}/",
-            data={"title": "Should Not Edit"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self._assert_validation_error(blocked)
-
-    def test_change_order_patch_allows_non_latest_revision_status_update(self):
-        base_id = self._create_change_order(amount_delta="800.00")
-        to_pending = self.client.patch(
-            f"/api/v1/change-orders/{base_id}/",
-            data={"status": "sent"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(to_pending.status_code, 200)
-        to_rejected = self.client.patch(
-            f"/api/v1/change-orders/{base_id}/",
-            data={"status": "rejected"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(to_rejected.status_code, 200)
-
-        clone = self.client.post(
-            f"/api/v1/change-orders/{base_id}/clone-revision/",
-            data={},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(clone.status_code, 201)
-
-        non_latest_status_update = self.client.patch(
-            f"/api/v1/change-orders/{base_id}/",
-            data={"status": "void"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(non_latest_status_update.status_code, 200)
-        self.assertEqual(non_latest_status_update.json()["data"]["status"], "void")
 
     def test_change_order_patch_rejects_origin_estimate_change_or_clear(self):
         change_order_id = self._create_change_order()
@@ -755,43 +662,6 @@ class ChangeOrderTests(TestCase):
         with self.assertRaises(ValidationError):
             row.save()
 
-    def test_change_order_model_requires_previous_change_order_for_revision_gt_one(self):
-        self._create_estimate_family()
-        origin_estimate_id = self.last_approved_estimate_by_project[self.project.id]
-
-        with self.assertRaises(ValidationError):
-            ChangeOrder.objects.create(
-                project=self.project,
-                family_key="99",
-                revision_number=2,
-                title="Invalid direct revision",
-                status=ChangeOrder.Status.DRAFT,
-                amount_delta="100.00",
-                days_delta=0,
-                reason="Missing previous_change_order",
-                origin_estimate_id=origin_estimate_id,
-                requested_by=self.user,
-            )
-
-    def test_change_order_model_rejects_revision_number_mismatch_with_previous_change_order(self):
-        base_id = self._create_change_order(amount_delta="100.00")
-        base = ChangeOrder.objects.get(id=base_id)
-
-        with self.assertRaises(ValidationError):
-            ChangeOrder.objects.create(
-                project=self.project,
-                family_key=base.family_key,
-                revision_number=5,
-                title="Invalid revision chain",
-                status=ChangeOrder.Status.DRAFT,
-                amount_delta="120.00",
-                days_delta=0,
-                reason="Revision mismatch",
-                origin_estimate=base.origin_estimate,
-                previous_change_order=base,
-                requested_by=self.user,
-            )
-
     def test_change_order_model_rejects_cross_project_origin_estimate_on_direct_save(self):
         self._create_estimate_family()
         self._create_other_estimate_family()
@@ -801,47 +671,12 @@ class ChangeOrderTests(TestCase):
             ChangeOrder.objects.create(
                 project=self.project,
                 family_key="100",
-                revision_number=1,
                 title="Invalid origin estimate scope",
                 status=ChangeOrder.Status.DRAFT,
                 amount_delta="100.00",
                 days_delta=0,
                 reason="Cross-project origin",
                 origin_estimate_id=other_origin_estimate_id,
-                requested_by=self.user,
-            )
-
-    def test_change_order_model_rejects_cross_project_previous_change_order_on_direct_save(self):
-        self._create_estimate_family()
-        self._create_other_estimate_family()
-        other_change_order = self.client.post(
-            f"/api/v1/projects/{self.other_project.id}/change-orders/",
-            data={
-                "title": "Other user base CO",
-                "amount_delta": "200.00",
-                "days_delta": 1,
-                "reason": "Other project chain",
-                "origin_estimate": self.last_approved_estimate_by_project[self.other_project.id],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.other_token.key}",
-        )
-        self.assertEqual(other_change_order.status_code, 201)
-        other_change_order_id = other_change_order.json()["data"]["id"]
-        other_change_order_row = ChangeOrder.objects.get(id=other_change_order_id)
-
-        with self.assertRaises(ValidationError):
-            ChangeOrder.objects.create(
-                project=self.project,
-                family_key=other_change_order_row.family_key,
-                revision_number=2,
-                title="Invalid previous linkage",
-                status=ChangeOrder.Status.DRAFT,
-                amount_delta="250.00",
-                days_delta=1,
-                reason="Cross-project previous row",
-                origin_estimate_id=self.last_approved_estimate_by_project[self.project.id],
-                previous_change_order=other_change_order_row,
                 requested_by=self.user,
             )
 
@@ -1010,53 +845,6 @@ class ChangeOrderTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self._assert_validation_error(void_blocked)
-
-    def test_change_order_clone_revision_requires_latest_revision(self):
-        base_id = self._create_change_order(amount_delta="800.00")
-        clone = self.client.post(
-            f"/api/v1/change-orders/{base_id}/clone-revision/",
-            data={},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(clone.status_code, 201)
-
-        blocked = self.client.post(
-            f"/api/v1/change-orders/{base_id}/clone-revision/",
-            data={},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self._assert_validation_error(blocked)
-
-    def test_change_order_clone_from_open_revision_auto_voids_source_revision(self):
-        base_id = self._create_change_order(amount_delta="800.00")
-        to_pending = self.client.patch(
-            f"/api/v1/change-orders/{base_id}/",
-            data={"status": "sent"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(to_pending.status_code, 200)
-
-        clone = self.client.post(
-            f"/api/v1/change-orders/{base_id}/clone-revision/",
-            data={},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(clone.status_code, 201)
-        cloned_id = clone.json()["data"]["id"]
-
-        source = ChangeOrder.objects.get(id=base_id)
-        self.assertEqual(source.status, ChangeOrder.Status.VOID)
-
-        snapshot = ChangeOrderSnapshot.objects.filter(
-            change_order_id=base_id,
-            decision_status=ChangeOrderSnapshot.DecisionStatus.VOID,
-        ).latest("id")
-        self.assertEqual(snapshot.snapshot_json["decision_context"]["previous_status"], "sent")
-        self.assertEqual(snapshot.snapshot_json["decision_context"]["applied_financial_delta"], "0.00")
 
     def test_change_order_approved_status_creates_immutable_snapshot(self):
         self._create_estimate_family()
@@ -1414,38 +1202,6 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(latest.from_status, "sent")
         self.assertEqual(latest.to_status, "approved")
         self.assertIn("via public link", latest.note.lower())
-
-    def test_clone_revision_records_events_for_clone_and_source(self):
-        change_order_id = self._create_change_order()
-
-        self.client.patch(
-            f"/api/v1/change-orders/{change_order_id}/",
-            data={"status": "sent"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-
-        clone_response = self.client.post(
-            f"/api/v1/change-orders/{change_order_id}/clone-revision/",
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(clone_response.status_code, 201)
-        clone_id = clone_response.json()["data"]["id"]
-
-        # Source should have: create + sent + auto-void = 3 events
-        source_events = ChangeOrderStatusEvent.objects.filter(change_order_id=change_order_id)
-        self.assertEqual(source_events.count(), 3)
-        void_event = source_events.first()
-        self.assertEqual(void_event.from_status, "sent")
-        self.assertEqual(void_event.to_status, "void")
-        self.assertIn("auto-voided", void_event.note.lower())
-
-        # Clone should have: create = 1 event
-        clone_events = ChangeOrderStatusEvent.objects.filter(change_order_id=clone_id)
-        self.assertEqual(clone_events.count(), 1)
-        self.assertIsNone(clone_events.first().from_status)
-        self.assertEqual(clone_events.first().to_status, "draft")
 
     def test_status_events_endpoint_returns_events(self):
         change_order_id = self._create_change_order()

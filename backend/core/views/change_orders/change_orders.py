@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import F, OuterRef, Subquery
+from django.db.models import F
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -266,7 +266,7 @@ def public_change_order_decision_view(request, public_token):
             user_agent=client_ua,
         )
 
-    logger.info("Change order public decision: id=%s CO-%s v%s decision=%s delta=$%s from=%s", change_order.id, change_order.family_key, change_order.revision_number, decision, financial_delta, client_ip)
+    logger.info("Change order public decision: id=%s CO-%s decision=%s delta=$%s from=%s", change_order.id, change_order.family_key, decision, financial_delta, client_ip)
 
     # Fire push notification to document owner (best-effort, non-blocking).
     customer_name = change_order.project.customer.display_name
@@ -397,25 +397,10 @@ def project_change_orders_view(request, project_id):
         change_orders = (
             ChangeOrder.objects.filter(project=project)
             .prefetch_related("line_items", "line_items__cost_code")
-            .order_by("-created_at", "-revision_number")
+            .order_by("-created_at")
         )
-        max_rev_subquery = (
-            ChangeOrder.objects.filter(
-                project=project,
-                family_key=OuterRef("family_key"),
-            )
-            .order_by("-revision_number")
-            .values("id")[:1]
-        )
-        latest_ids = (
-            ChangeOrder.objects.filter(project=project)
-            .values("family_key")
-            .annotate(latest_id=Subquery(max_rev_subquery))
-            .values_list("latest_id", flat=True)
-        )
-        is_latest_revision_map = {pk: True for pk in latest_ids}
         return Response(
-            {"data": ChangeOrderSerializer(change_orders, many=True, context={"is_latest_revision_map": is_latest_revision_map}).data}
+            {"data": ChangeOrderSerializer(change_orders, many=True).data}
         )
 
     elif request.method == "POST":
@@ -500,7 +485,6 @@ def project_change_orders_view(request, project_id):
                 change_order = ChangeOrder.objects.create(
                     project=project,
                     family_key=_next_change_order_family_key(project=project),
-                    revision_number=1,
                     title=data["title"],
                     status=ChangeOrder.Status.DRAFT,
                     amount_delta=data["amount_delta"],
@@ -616,20 +600,10 @@ def change_order_detail_view(request, change_order_id):
         content_fields = {"title", "reason", "amount_delta", "days_delta", "origin_estimate", "line_items"}
         attempted_content_fields = sorted(field for field in content_fields if field in data)
 
-        latest_revision_exists = ChangeOrder.objects.filter(
-            project=change_order.project,
-            family_key=change_order.family_key,
-            revision_number__gt=change_order.revision_number,
-        ).exists()
-        if latest_revision_exists and attempted_content_fields:
-            return Response(
-                {"error": {"code": "validation_error", "message": "Only the latest change-order revision can be edited.", "fields": {"change_order": ["Create or edit the latest revision for this family."]}}},
-                status=400,
-            )
         if change_order.status != ChangeOrder.Status.DRAFT:
             if attempted_content_fields:
                 return Response(
-                    {"error": {"code": "validation_error", "message": "Only draft change orders can edit content fields.", "fields": {field: ["This field is read-only after draft. Clone a new revision to change content."] for field in attempted_content_fields}}},
+                    {"error": {"code": "validation_error", "message": "Only draft change orders can edit content fields.", "fields": {field: ["This field is read-only after draft."] for field in attempted_content_fields}}},
                     status=400,
                 )
 
@@ -653,142 +627,6 @@ def change_order_detail_view(request, change_order_id):
         if status_note:
             return _handle_co_status_note(request, change_order, data)
         return _handle_co_document_save(request, change_order, data, membership)
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def change_order_clone_revision_view(request, change_order_id):
-    """Clone the latest change-order revision into a new draft in the same family.
-
-    Copies title, amounts, reason, terms, origin estimate, and line items
-    into a new draft revision.  The source must be the latest family
-    revision.  If the source is in draft or sent status, it
-    is auto-voided to prevent two live revisions.
-
-    Flow:
-        1. Look up change order scoped to user's org.
-        2. Capability gate: ``change_orders.create``.
-        3. Validate source is the latest family revision.
-        4. Create cloned draft with line items (atomic).
-        5. Auto-void source if it was draft or sent.
-
-    URL: ``POST /api/v1/change-orders/<change_order_id>/clone-revision/``
-
-    Request body: (none)
-
-    Success 201::
-
-        { "data": { ... } }
-
-    Errors:
-        - 400: Source is not the latest family revision.
-        - 403: Missing ``change_orders.create`` capability.
-        - 404: Change order not found.
-    """
-    membership = _ensure_org_membership(request.user)
-    try:
-        change_order = _prefetch_change_order_qs(
-            ChangeOrder.objects.filter(
-                id=change_order_id,
-                project__organization_id=membership.organization_id,
-            )
-        ).get()
-    except ChangeOrder.DoesNotExist:
-        return Response(
-            {"error": {"code": "not_found", "message": "Change order not found.", "fields": {}}},
-            status=404,
-        )
-
-    permission_error, _ = _capability_gate(request.user, "change_orders", "create")
-    if permission_error:
-        return Response(permission_error, status=403)
-
-    latest = (
-        ChangeOrder.objects.filter(
-            project=change_order.project,
-            family_key=change_order.family_key,
-        )
-        .order_by("-revision_number")
-        .first()
-    )
-    if latest and latest.id != change_order.id:
-        return Response(
-            {"error": {"code": "validation_error", "message": "Revisions can only be cloned from the latest family version.", "fields": {"change_order": ["Select the latest revision before cloning."]}}},
-            status=400,
-        )
-
-    next_revision = (latest.revision_number + 1) if latest else (change_order.revision_number + 1)
-    organization = membership.organization
-    sender_logo_url = ""
-    if organization.logo:
-        sender_logo_url = request.build_absolute_uri(organization.logo.url)
-
-    with transaction.atomic():
-        clone = ChangeOrder.objects.create(
-            project=change_order.project,
-            family_key=change_order.family_key,
-            revision_number=next_revision,
-            title=change_order.title,
-            status=ChangeOrder.Status.DRAFT,
-            amount_delta=change_order.amount_delta,
-            days_delta=change_order.days_delta,
-            reason=change_order.reason,
-            terms_text=change_order.terms_text,
-            sender_name=(organization.display_name or "").strip(),
-            sender_address=organization.formatted_billing_address,
-            sender_logo_url=sender_logo_url,
-            origin_estimate=change_order.origin_estimate,
-            previous_change_order=change_order,
-            requested_by=request.user,
-        )
-        source_lines = list(change_order.line_items.select_related("cost_code").all())
-        _sync_change_order_lines(
-            change_order=clone,
-            line_items=[
-                {
-                    "cost_code": line.cost_code_id,
-                    "description": line.description,
-                    "adjustment_reason": line.adjustment_reason,
-                    "amount_delta": str(line.amount_delta),
-                    "days_delta": line.days_delta,
-                }
-                for line in source_lines
-            ],
-            cost_code_map={
-                line.cost_code_id: line.cost_code
-                for line in source_lines
-                if line.cost_code_id
-            },
-        )
-        if change_order.status in {ChangeOrder.Status.DRAFT, ChangeOrder.Status.SENT}:
-            previous_status = change_order.status
-            change_order.status = ChangeOrder.Status.VOID
-            change_order.save(update_fields=["status", "updated_at"])
-            ChangeOrderSnapshot.record(
-                change_order=change_order,
-                decision_status=ChangeOrder.Status.VOID,
-                previous_status=previous_status,
-                applied_financial_delta=MONEY_ZERO,
-                decided_by=request.user,
-            )
-            ChangeOrderStatusEvent.record(
-                change_order=change_order,
-                from_status=previous_status,
-                to_status=ChangeOrder.Status.VOID,
-                note="Auto-voided by revision clone.",
-                changed_by=request.user,
-            )
-        clone.refresh_from_db()
-        ChangeOrderStatusEvent.record(
-            change_order=clone,
-            from_status=None,
-            to_status=clone.status,
-            note="Cloned from previous revision.",
-            changed_by=request.user,
-        )
-
-    created = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=clone.id)).get()
-    return Response({"data": ChangeOrderSerializer(created).data}, status=201)
 
 
 @api_view(["GET"])

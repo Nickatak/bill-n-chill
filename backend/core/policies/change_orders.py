@@ -25,12 +25,8 @@ def get_change_order_policy_contract() -> dict:
         status for status in statuses if not allowed_status_transitions.get(status, [])
     ]
 
-    revision_rules = {
-        "edit_latest_revision_only": True,
+    editing_rules = {
         "edit_requires_draft_status": True,
-        "clone_requires_latest_revision": True,
-        "revision_gt_one_requires_previous_change_order": True,
-        "previous_change_order_must_match_project_family_and_prior_revision": True,
     }
     origin_estimate_rules = {
         "required_on_create": True,
@@ -50,12 +46,9 @@ def get_change_order_policy_contract() -> dict:
         "co_origin_estimate_immutable_once_set": "origin_estimate cannot change/clear once set.",
         "co_line_total_must_match_amount_delta": "Sum of line_items amount_delta must match change-order amount_delta.",
         "co_line_cost_code_invalid": "Each cost_code must exist and belong to the organization.",
-        "co_edit_latest_revision_only": "Only latest revision in family can be edited.",
         "co_edit_requires_draft_status": "Only draft change orders can edit content fields.",
-        "co_clone_requires_latest_revision": "Clone revision only from latest revision in family.",
         "co_status_transition_not_allowed": "Status transition must match allowed_status_transitions.",
         "co_approval_metadata_invariant": "approved_by/approved_at must match approved status invariants.",
-        "co_revision_chain_invalid": "Revision chain must keep project/family/previous linkage integrity.",
     }
 
     return {
@@ -65,7 +58,7 @@ def get_change_order_policy_contract() -> dict:
         "default_create_status": ChangeOrder.Status.DRAFT,
         "allowed_status_transitions": allowed_status_transitions,
         "terminal_statuses": terminal_statuses,
-        "revision_rules": revision_rules,
+        "editing_rules": editing_rules,
         "origin_estimate_rules": origin_estimate_rules,
         "approval_metadata_rules": approval_metadata_rules,
         "error_rules": error_rules,

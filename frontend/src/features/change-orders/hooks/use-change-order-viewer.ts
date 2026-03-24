@@ -70,7 +70,7 @@ type UseChangeOrderViewerOptions = {
 // Pure helpers
 // ---------------------------------------------------------------------------
 
-/** Sort change orders by created_at, then family_key, then revision_number, then id. */
+/** Sort change orders by created_at, then family_key, then id. */
 export function sortChangeOrdersForViewer(changeOrders: ChangeOrderRecord[]): ChangeOrderRecord[] {
   return [...changeOrders].sort((left, right) => {
     const leftCreatedAt = Date.parse(left.created_at);
@@ -84,10 +84,6 @@ export function sortChangeOrdersForViewer(changeOrders: ChangeOrderRecord[]): Ch
     const familyDelta = Number(left.family_key) - Number(right.family_key);
     if (familyDelta !== 0) {
       return familyDelta;
-    }
-    const revisionDelta = Number(left.revision_number) - Number(right.revision_number);
-    if (revisionDelta !== 0) {
-      return revisionDelta;
     }
     return left.id - right.id;
   });
@@ -228,7 +224,6 @@ export function useChangeOrderViewer({
   const isSelectedChangeOrderEditable =
     canMutateChangeOrders &&
     Boolean(selectedChangeOrderId) &&
-    Boolean(selectedChangeOrder?.is_latest_revision) &&
     isSelectedChangeOrderDraft;
 
   const isCreateSubmitDisabled =

@@ -168,7 +168,6 @@ class ChangeImpactSummaryTests(ReportingTestBase):
         ChangeOrder.objects.create(
             project=self.project,
             family_key="A1",
-            revision_number=1,
             title="Extra Foundation",
             amount_delta=Decimal("5000.00"),
             status=ChangeOrder.Status.APPROVED,
@@ -179,7 +178,6 @@ class ChangeImpactSummaryTests(ReportingTestBase):
         ChangeOrder.objects.create(
             project=self.project,
             family_key="A2",
-            revision_number=1,
             title="Draft CO",
             amount_delta=Decimal("2000.00"),
             status=ChangeOrder.Status.DRAFT,
@@ -209,7 +207,6 @@ class ChangeImpactSummaryTests(ReportingTestBase):
         ChangeOrder.objects.create(
             project=other_project,
             family_key="X1",
-            revision_number=1,
             title="Other CO",
             amount_delta=Decimal("9999.00"),
             status=ChangeOrder.Status.APPROVED,
@@ -271,7 +268,6 @@ class AttentionFeedTests(ReportingTestBase):
         ChangeOrder.objects.create(
             project=self.project,
             family_key="B1",
-            revision_number=1,
             title="Needs Approval",
             amount_delta=Decimal("1500.00"),
             status=ChangeOrder.Status.SENT,
@@ -399,7 +395,6 @@ class QuickJumpSearchTests(ReportingTestBase):
         ChangeOrder.objects.create(
             project=self.project,
             family_key="ROOF-FIX",
-            revision_number=1,
             title="Roof Repair",
             amount_delta=Decimal("3000.00"),
             status=ChangeOrder.Status.DRAFT,

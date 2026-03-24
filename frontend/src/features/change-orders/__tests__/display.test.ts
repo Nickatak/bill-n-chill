@@ -45,7 +45,6 @@ function makeCO(overrides: Partial<ChangeOrderRecord> = {}): ChangeOrderRecord {
     reason: "",
     status: "draft",
     family_key: "abc",
-    revision_number: 1,
     amount_delta: "500.00",
     days_delta: 0,
     origin_estimate: 10,

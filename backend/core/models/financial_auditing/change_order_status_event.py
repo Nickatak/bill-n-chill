@@ -68,4 +68,4 @@ class ChangeOrderStatusEvent(models.Model):
         )
 
     def __str__(self) -> str:
-        return f"CO-{self.change_order.family_key} v{self.change_order.revision_number}: {self.from_status} -> {self.to_status}"
+        return f"CO-{self.change_order.family_key}: {self.from_status} -> {self.to_status}"

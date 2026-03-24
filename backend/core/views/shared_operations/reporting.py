@@ -197,7 +197,7 @@ def change_impact_summary_view(request):
     project_map = {}
     total_amount = Decimal("0")
     total_count = 0
-    for change_order in approved_change_orders.order_by("project_id", "family_key", "revision_number"):
+    for change_order in approved_change_orders.order_by("project_id", "family_key"):
         total_amount += change_order.amount_delta
         total_count += 1
         project_bucket = project_map.setdefault(
@@ -436,13 +436,13 @@ def quick_jump_search_view(request):
 
     change_orders = ChangeOrder.objects.filter(project__organization_id=membership.organization_id).select_related("project")
     for change_order in change_orders:
-        candidate = f"co-{change_order.family_key} v{change_order.revision_number} {change_order.title or ''}".lower()
+        candidate = f"co-{change_order.family_key} {change_order.title or ''}".lower()
         if query_lower in candidate or query_lower in str(change_order.id):
             items.append(
                 {
                     "kind": "change_order",
                     "record_id": change_order.id,
-                    "label": f"CO-{change_order.family_key} v{change_order.revision_number}",
+                    "label": f"CO-{change_order.family_key}",
                     "sub_label": f"{change_order.title} ({change_order.status})",
                     "project_id": change_order.project_id,
                     "project_name": change_order.project.name,
@@ -617,7 +617,7 @@ def project_timeline_events_view(request, project_id):
                 "category": "workflow",
                 "event_type": "change_order_decision",
                 "occurred_at": snapshot.created_at,
-                "label": f"CO {change_order.family_key} v{change_order.revision_number} {snapshot.decision_status}",
+                "label": f"CO {change_order.family_key} {snapshot.decision_status}",
                 "detail": "",
                 "object_type": "change_order",
                 "object_id": change_order.id,

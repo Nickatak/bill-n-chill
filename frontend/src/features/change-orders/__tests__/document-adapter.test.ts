@@ -114,7 +114,6 @@ describe("createChangeOrderDocumentAdapter", () => {
       const fields = adapter.getMetaFields(changeOrderRecord);
       expect(fields).toEqual([
         { key: "co_id", label: "Change Order #", value: "CO-10" },
-        { key: "revision", label: "Revision", value: "v2" },
         { key: "origin_estimate", label: "Original Estimate", value: "#42" },
         { key: "line_delta_total", label: "Line Delta Total", value: "$2500.00" },
       ]);
@@ -124,7 +123,6 @@ describe("createChangeOrderDocumentAdapter", () => {
       const fields = adapter.getMetaFields(null as never);
       expect(fields).toEqual([
         { key: "co_id", label: "Change Order #", value: "Draft" },
-        { key: "revision", label: "Revision", value: "v1" },
         { key: "origin_estimate", label: "Original Estimate", value: "Not set" },
         { key: "line_delta_total", label: "Line Delta Total", value: "$0.00" },
       ]);

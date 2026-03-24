@@ -7,7 +7,6 @@ from core.views import (
     impersonate_exit_view,
     impersonate_start_view,
     impersonate_users_view,
-    change_order_clone_revision_view,
     change_order_contract_view,
     change_order_detail_view,
     change_order_status_events_view,
@@ -289,11 +288,6 @@ urlpatterns = [
         "change-orders/<int:change_order_id>/",
         change_order_detail_view,
         name="change-order-detail",
-    ),
-    path(
-        "change-orders/<int:change_order_id>/clone-revision/",
-        change_order_clone_revision_view,
-        name="change-order-clone-revision",
     ),
     path(
         "change-orders/<int:change_order_id>/status-events/",

@@ -77,7 +77,6 @@ export type ChangeOrderRecord = {
   id: number;
   project: number;
   family_key: string;
-  revision_number: number;
   title: string;
   status: string;
   public_ref?: string;
@@ -90,7 +89,6 @@ export type ChangeOrderRecord = {
   sender_logo_url: string;
   origin_estimate: number | null;
   origin_estimate_version?: number | null;
-  previous_change_order: number | null;
   requested_by: number;
   requested_by_email: string;
   approved_by: number | null;
@@ -98,7 +96,6 @@ export type ChangeOrderRecord = {
   approved_at: string | null;
   line_items: ChangeOrderLineRecord[];
   line_total_delta: string;
-  is_latest_revision: boolean;
   created_at: string;
   updated_at: string;
   project_context?: {
@@ -135,7 +132,6 @@ export type ChangeOrderRecord = {
     id: number;
     title: string;
     family_key: string;
-    revision_number: number;
     status: string;
     amount_delta: string;
     line_total_delta: string;
@@ -150,11 +146,8 @@ export type ChangeOrderPolicyContract = {
   default_create_status: string;
   allowed_status_transitions: Record<string, string[]>;
   terminal_statuses: string[];
-  revision_rules?: {
-    edit_latest_revision_only: boolean;
-    clone_requires_latest_revision: boolean;
-    revision_gt_one_requires_previous_change_order: boolean;
-    previous_change_order_must_match_project_family_and_prior_revision: boolean;
+  editing_rules?: {
+    edit_requires_draft_status: boolean;
   };
   origin_estimate_rules?: {
     required_on_create: boolean;

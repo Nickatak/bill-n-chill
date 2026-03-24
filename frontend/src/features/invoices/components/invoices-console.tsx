@@ -755,56 +755,16 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     }
   }
 
-  /** Clone the selected invoice's line items into a fresh draft with a new invoice number. */
-  async function handleDuplicateInvoiceIntoDraft() {
+  /** Pre-fill workspace from selected invoice for duplication (user reviews + submits). */
+  function handleDuplicateInvoiceIntoDraft() {
     if (!selectedInvoice) {
       setErrorStatus("Select an invoice first.");
       return;
     }
-    const nextDraftLines = formFields.invoiceToWorkspaceLines(selectedInvoice);
-    const nextIssueDate = todayDateInput();
-    const nextDueDate = dueDateFromIssueDate(
-      nextIssueDate,
-      invoiceData.organizationInvoiceDefaults?.default_invoice_due_delta ?? 30,
-    );
-    const nextTaxPercent = selectedInvoice.tax_percent || "0";
-    const nextTermsText = selectedInvoice.terms_text || "";
-
-    setNeutralStatus("Duplicating invoice...");
-    try {
-      const subtotal = nextDraftLines.reduce((sum, line) => sum + parseAmount(line.quantity) * parseAmount(line.unitPrice), 0);
-      const taxAmount = subtotal * (parseAmount(nextTaxPercent) / 100);
-      const duplicateFormState: InvoiceFormState = {
-        issueDate: nextIssueDate,
-        dueDate: nextDueDate,
-        taxPercent: nextTaxPercent,
-        termsText: nextTermsText,
-        subtotal,
-        taxAmount,
-        totalAmount: subtotal + taxAmount,
-        lineItems: nextDraftLines,
-      };
-      const createPayload = invoiceCreatorAdapter.toCreatePayload(duplicateFormState);
-      const response = await fetch(`${apiBaseUrl}/projects/${scopedProjectId}/invoices/`, {
-        method: "POST",
-        headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
-        body: JSON.stringify(createPayload),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        setErrorStatus(readInvoiceApiError(payload, "Duplicate failed."));
-        return;
-      }
-      const created = payload.data as InvoiceRecord;
-      await invoiceData.loadInvoices();
-      setSelectedInvoiceId(String(created.id));
-      setSelectedStatus("");
-      formFields.loadInvoiceIntoWorkspace(created);
-      setSuccessStatus(`Duplicated as ${created.invoice_number}.`);
-      flashCreator();
-    } catch {
-      setErrorStatus("Could not reach invoice create endpoint.");
-    }
+    formFields.populateCreateFromInvoice(selectedInvoice);
+    setSelectedInvoiceId("");
+    setSuccessStatus(`Copied ${selectedInvoice.invoice_number} into create form.`);
+    flashCreator();
   }
 
   // -------------------------------------------------------------------------

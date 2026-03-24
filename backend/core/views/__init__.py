@@ -18,7 +18,6 @@ from core.views.shared_operations.organization_management import (
 from core.views.auth import accept_invite_view, check_invite_by_email_view, forgot_password_view, health_view, impersonate_exit_view, impersonate_start_view, impersonate_users_view, login_view, me_view, register_view, resend_verification_view, reset_password_view, verify_email_view, verify_invite_view
 from core.views.change_orders.change_orders import (
     change_order_contract_view,
-    change_order_clone_revision_view,
     change_order_detail_view,
     change_order_status_events_view,
     public_change_order_decision_view,
@@ -149,7 +148,6 @@ __all__ = [
     "project_change_orders_view",
     "change_order_contract_view",
     "change_order_detail_view",
-    "change_order_clone_revision_view",
     "public_change_order_detail_view",
     "change_order_status_events_view",
     "public_change_order_decision_view",

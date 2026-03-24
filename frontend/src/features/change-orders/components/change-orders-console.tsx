@@ -34,7 +34,7 @@
  * - handleStartNewChangeOrder         — reset workspace to create mode
  * - handleCreateChangeOrder           — POST new CO, refresh list, hydrate edit
  * - handleUpdateChangeOrder           — PATCH existing CO, refresh list
- * - handleCloneRevision               — POST clone, refresh list, hydrate edit
+ * - handleDuplicateAsNew              — pre-fill create form from selected CO
  * - handleQuickUpdateStatus           — PATCH status transition or resend
  * - handleAddChangeOrderStatusNote    — PATCH status note (no status change)
  * - handleSelectViewerEstimate        — estimate rail click handler
@@ -389,48 +389,18 @@ export function ChangeOrdersConsole({
     }
   }
 
-  /** Clone the selected change order as a new draft revision. */
-  async function handleCloneRevision() {
-    if (!viewer.canMutateChangeOrders) {
-      projectData.setFeedback(`Role ${role} is read-only for change order mutations.`, "error");
-      return;
-    }
-    const changeOrderId = Number(form.selectedChangeOrderId);
-    if (!changeOrderId) {
+  /** Pre-fill the create form from the selected change order for duplication. */
+  function handleDuplicateAsNew() {
+    const selected = projectData.changeOrders.find(
+      (co) => String(co.id) === form.selectedChangeOrderId,
+    );
+    if (!selected) {
       projectData.setFeedback("Select a change order first.", "error");
       return;
     }
-    const projectId = Number(projectData.selectedProjectId);
-    if (!projectId) {
-      projectData.setFeedback("Select a project first.", "error");
-      return;
-    }
-
-    projectData.setFeedback("");
-    try {
-      const response = await fetch(`${apiBaseUrl}/change-orders/${changeOrderId}/clone-revision/`, {
-        method: "POST",
-        headers: buildAuthHeaders(authToken),
-      });
-      const payload: ApiResponse = await response.json();
-      if (!response.ok) {
-        projectData.setFeedback(readChangeOrderApiError(payload, "Clone revision failed."), "error");
-        return;
-      }
-      const created = payload.data as ChangeOrderRecord;
-      const { rows } = await projectData.fetchProjectChangeOrders(projectId);
-
-      if (rows) {
-        projectData.setChangeOrders(rows);
-        const persisted = rows.find((row) => row.id === created.id);
-        form.hydrateEditForm(persisted ?? created);
-        await projectData.loadChangeOrderStatusEvents(created.id);
-      }
-      projectData.setFeedback(`Duplicated as ${coLabel(created)}.`, "success");
-      flashEdit();
-    } catch {
-      projectData.setFeedback("Could not reach clone revision endpoint.", "error");
-    }
+    form.populateCreateFromChangeOrder(selected);
+    projectData.setFeedback(`Copied ${coLabel(selected)} into create form.`, "success");
+    flashCreate();
   }
 
   /** Handle form submission for saving edits to an existing draft change order. */
@@ -744,7 +714,7 @@ export function ChangeOrdersConsole({
         workspaceBadgeLabel={workspaceBadgeLabel}
         workspaceBadgeClass={workspaceBadgeClass}
         onStartNew={handleStartNewChangeOrder}
-        onCloneRevision={handleCloneRevision}
+        onDuplicateAsNew={handleDuplicateAsNew}
         canMutateChangeOrders={viewer.canMutateChangeOrders}
         role={role}
         actionMessage={projectData.actionMessage}

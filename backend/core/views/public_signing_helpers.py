@@ -88,7 +88,7 @@ def _resolve_document_title(document_type: str, document: models.Model) -> str:
     if document_type == "estimate":
         return document.title or f"Estimate #{document.id}"
     elif document_type == "change_order":
-        return f"CO-{document.family_key}-v{document.revision_number}"
+        return f"CO-{document.family_key}"
     elif document_type == "invoice":
         return document.invoice_number or f"Invoice #{document.id}"
     return f"Document #{document.id}"

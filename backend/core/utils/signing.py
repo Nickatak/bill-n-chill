@@ -69,7 +69,6 @@ def compute_document_content_hash(document_type: str, serialized_data: dict) -> 
     elif document_type == "change_order":
         content = {
             "family_key": serialized_data.get("family_key"),
-            "revision_number": serialized_data.get("revision_number"),
             "reason": serialized_data.get("reason"),
             "amount_delta": serialized_data.get("amount_delta"),
             "terms_text": serialized_data.get("terms_text"),

@@ -164,12 +164,12 @@ describe("defaultChangeOrderTitle", () => {
 // ---------------------------------------------------------------------------
 
 describe("coLabel", () => {
-  it("formats family_key and revision_number", () => {
-    expect(coLabel({ family_key: "3", revision_number: 2 })).toBe("CO-3 v2");
+  it("formats family_key", () => {
+    expect(coLabel({ family_key: "3" })).toBe("CO-3");
   });
 
-  it("handles first revision", () => {
-    expect(coLabel({ family_key: "1", revision_number: 1 })).toBe("CO-1 v1");
+  it("handles single-digit family_key", () => {
+    expect(coLabel({ family_key: "1" })).toBe("CO-1");
   });
 });
 

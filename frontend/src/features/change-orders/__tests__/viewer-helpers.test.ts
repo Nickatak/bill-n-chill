@@ -22,7 +22,6 @@ function makeCO(overrides: Partial<ChangeOrderRecord> = {}): ChangeOrderRecord {
     id: 1,
     project: 7,
     family_key: "1",
-    revision_number: 1,
     title: "Test CO",
     status: "draft",
     amount_delta: "1000.00",
@@ -33,7 +32,6 @@ function makeCO(overrides: Partial<ChangeOrderRecord> = {}): ChangeOrderRecord {
     sender_address: "",
     sender_logo_url: "",
     origin_estimate: 42,
-    previous_change_order: null,
     requested_by: 1,
     requested_by_email: "test@example.com",
     approved_by: null,
@@ -41,7 +39,6 @@ function makeCO(overrides: Partial<ChangeOrderRecord> = {}): ChangeOrderRecord {
     approved_at: null,
     line_items: [],
     line_total_delta: "1000.00",
-    is_latest_revision: true,
     created_at: "2026-03-01T10:00:00Z",
     updated_at: "2026-03-01T10:00:00Z",
     ...overrides,
@@ -74,25 +71,15 @@ describe("sortChangeOrdersForViewer", () => {
     expect(sorted.map((co) => co.id)).toEqual([1, 3, 2]);
   });
 
-  it("breaks family_key ties by revision_number", () => {
+  it("breaks family_key ties by id", () => {
     const sameTime = "2026-03-01T10:00:00Z";
     const rows = [
-      makeCO({ id: 3, family_key: "1", revision_number: 3, created_at: sameTime }),
-      makeCO({ id: 1, family_key: "1", revision_number: 1, created_at: sameTime }),
-      makeCO({ id: 2, family_key: "1", revision_number: 2, created_at: sameTime }),
+      makeCO({ id: 3, family_key: "1", created_at: sameTime }),
+      makeCO({ id: 1, family_key: "1", created_at: sameTime }),
+      makeCO({ id: 2, family_key: "1", created_at: sameTime }),
     ];
     const sorted = sortChangeOrdersForViewer(rows);
     expect(sorted.map((co) => co.id)).toEqual([1, 2, 3]);
-  });
-
-  it("breaks full ties by id", () => {
-    const sameTime = "2026-03-01T10:00:00Z";
-    const rows = [
-      makeCO({ id: 5, family_key: "1", revision_number: 1, created_at: sameTime }),
-      makeCO({ id: 2, family_key: "1", revision_number: 1, created_at: sameTime }),
-    ];
-    const sorted = sortChangeOrdersForViewer(rows);
-    expect(sorted.map((co) => co.id)).toEqual([2, 5]);
   });
 
   it("does not mutate the input array", () => {

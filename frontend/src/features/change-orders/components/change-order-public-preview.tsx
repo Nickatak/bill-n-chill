@@ -222,7 +222,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
                   <h2 className={frameStyles.identityTitle}>{changeOrder.title || "Untitled Change Order"}</h2>
                   <p className={frameStyles.identitySubhead}>
                     {(changeOrder.project_context?.name || "Project") +
-                      ` · CO-${changeOrder.family_key} v${changeOrder.revision_number}`}
+                      ` · CO-${changeOrder.family_key}`}
                   </p>
                 </div>
                 <div className={frameStyles.identityMetaRow}>
@@ -350,7 +350,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
                                   <tr key={`${co.id}-${line.id}`}>
                                     {idx === 0 ? (
                                       <td rowSpan={co.line_items.length}>
-                                        {co.title} r{co.revision_number}
+                                        {co.title}
                                       </td>
                                     ) : null}
                                     <td>{line.cost_code_code || "—"}</td>

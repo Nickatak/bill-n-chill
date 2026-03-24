@@ -221,7 +221,6 @@ class SigningUtilitiesTests(TestCase):
     def test_compute_change_order_content_hash_is_deterministic(self):
         data = {
             "family_key": 1,
-            "revision_number": 1,
             "reason": "Scope change",
             "amount_delta": "1500.00",
             "terms_text": "Net 30",

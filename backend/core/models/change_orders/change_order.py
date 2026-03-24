@@ -60,10 +60,8 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
         on_delete=models.PROTECT,
         related_name="change_orders",
     )
-    # Stable family/thread identifier across revisions within a project.
-    # Intended as a semantic key (not DB/FK id) and may be numeric or string.
+    # Sequential identifier for this change order within its project.
     family_key = models.CharField(max_length=64)
-    revision_number = models.PositiveIntegerField(default=1)
     title = models.CharField(max_length=255)
     status = models.CharField(
         max_length=32,
@@ -86,16 +84,6 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
         null=True,
         blank=True,
     )
-    # Explicit parent revision pointer.
-    # This relationship is derivable from (`family_key`, `revision_number - 1`),
-    # but stored directly for audit/replay clarity and parent-chain integrity.
-    previous_change_order = models.ForeignKey(
-        "ChangeOrder",
-        on_delete=models.PROTECT,
-        related_name="revision_children",
-        null=True,
-        blank=True,
-    )
     requested_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -114,7 +102,7 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        unique_together = ("project", "family_key", "revision_number")
+        unique_together = ("project", "family_key")
         constraints = [
             models.CheckConstraint(
                 condition=Q(status="approved", approved_by__isnull=False, approved_at__isnull=False)
@@ -127,12 +115,12 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.project.name} CO-{self.family_key} v{self.revision_number}"
+        return f"{self.project.name} CO-{self.family_key}"
 
     @property
     def public_slug(self) -> str:
-        """URL-safe slug derived from family key and revision number."""
-        normalized = slugify(f"co-{self.family_key}-v{self.revision_number}")
+        """URL-safe slug derived from family key."""
+        normalized = slugify(f"co-{self.family_key}")
         return normalized or "change-order"
 
     @property
@@ -143,7 +131,7 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
         return f"{self.public_slug}--{self.public_token}"
 
     def clean(self):
-        """Validate approval fields, origin estimate, revision chain, and status transitions."""
+        """Validate approval fields, origin estimate, and status transitions."""
         from core.models.estimating.estimate import Estimate
 
         errors = {}
@@ -179,36 +167,6 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
                 errors.setdefault("origin_estimate", []).append(
                     "origin_estimate must belong to the same project."
                 )
-
-        if self.revision_number > 1 and self.previous_change_order_id is None:
-            errors.setdefault("previous_change_order", []).append(
-                "previous_change_order is required when revision_number is greater than 1."
-            )
-        if self.previous_change_order_id is not None:
-            previous_row = (
-                type(self)
-                .objects.filter(id=self.previous_change_order_id)
-                .values("project_id", "family_key", "revision_number")
-                .first()
-            )
-            if previous_row is None:
-                errors.setdefault("previous_change_order", []).append(
-                    "previous_change_order does not exist."
-                )
-            else:
-                if self.project_id and previous_row["project_id"] != self.project_id:
-                    errors.setdefault("previous_change_order", []).append(
-                        "previous_change_order must belong to the same project."
-                    )
-                if self.family_key and previous_row["family_key"] != self.family_key:
-                    errors.setdefault("family_key", []).append(
-                        "family_key must match previous_change_order family."
-                    )
-                expected_revision = previous_row["revision_number"] + 1
-                if self.revision_number != expected_revision:
-                    errors.setdefault("revision_number", []).append(
-                        f"revision_number must be {expected_revision} for this previous_change_order."
-                    )
 
         self.validate_status_transition(errors)
 
@@ -254,7 +212,6 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
                 "id": self.id,
                 "project_id": self.project_id,
                 "family_key": self.family_key,
-                "revision_number": self.revision_number,
                 "title": self.title,
                 "status": self.status,
                 "amount_delta": str(self.amount_delta),
@@ -266,7 +223,6 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
                 "sender_logo_url": self.sender_logo_url,
                 "origin_estimate_id": self.origin_estimate_id,
                 "origin_estimate_version": origin_estimate_version,
-                "previous_change_order_id": self.previous_change_order_id,
                 "approved_by_id": self.approved_by_id,
                 "approved_at": self.approved_at.isoformat() if self.approved_at else None,
             },
