@@ -11,7 +11,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import Invoice, InvoiceStatusEvent, SigningCeremonyRecord
+from core.models import Estimate, Invoice, InvoiceStatusEvent, SigningCeremonyRecord
 from core.policies import get_invoice_policy_contract
 from core.serializers import (
     InvoiceSerializer,
@@ -449,6 +449,58 @@ def project_invoices_view(request, project_id: int):
                 status=400,
             )
 
+        # --- Validate related_estimate if provided ---
+        related_estimate = None
+        if ingress.related_estimate_id:
+            try:
+                related_estimate = Estimate.objects.get(
+                    id=ingress.related_estimate_id,
+                    project=project,
+                )
+            except Estimate.DoesNotExist:
+                return Response(
+                    {
+                        "error": {
+                            "code": "validation_error",
+                            "message": "Estimate not found for this project.",
+                            "fields": {"related_estimate": ["Estimate not found for this project."]},
+                        }
+                    },
+                    status=400,
+                )
+            if related_estimate.status != Estimate.Status.APPROVED:
+                return Response(
+                    {
+                        "error": {
+                            "code": "validation_error",
+                            "message": "Related estimate must be approved.",
+                            "fields": {"related_estimate": ["Only approved estimates can be linked."]},
+                        }
+                    },
+                    status=400,
+                )
+            # Guard: one invoice per related estimate (via this shortcut).
+            if Invoice.objects.filter(
+                related_estimate=related_estimate,
+            ).exclude(status=Invoice.Status.VOID).exists():
+                return Response(
+                    {
+                        "error": {
+                            "code": "conflict",
+                            "message": "An invoice already exists for this estimate.",
+                            "fields": {"related_estimate": ["An active invoice is already linked to this estimate."]},
+                        }
+                    },
+                    status=409,
+                )
+
+        # --- Check send capability upfront if initial_status is sent ---
+        send_immediately = ingress.initial_status == "sent"
+        if send_immediately:
+            send_error, _ = _capability_gate(request.user, "invoices", "send")
+            if send_error:
+                return Response(send_error, status=403)
+
         with transaction.atomic():
             invoice = Invoice.objects.create(
                 project=project,
@@ -465,6 +517,7 @@ def project_invoices_view(request, project_id: int):
                 footer_text=ingress.footer_text,
                 notes_text=ingress.notes_text,
                 tax_percent=ingress.tax_percent,
+                related_estimate=related_estimate,
                 created_by=request.user,
             )
 
@@ -482,12 +535,45 @@ def project_invoices_view(request, project_id: int):
             InvoiceStatusEvent.record(
                 invoice=invoice,
                 from_status=None,
-                to_status=invoice.status,
+                to_status=Invoice.Status.DRAFT,
                 note="Invoice created.",
                 changed_by=request.user,
             )
+
+            # --- Atomic send if requested ---
+            if send_immediately:
+                invoice.status = Invoice.Status.SENT
+                update_fields = ["status", "updated_at"]
+                _freeze_org_identity_on_invoice(
+                    invoice, organization, request, update_fields,
+                )
+                invoice.save(update_fields=update_fields)
+                InvoiceStatusEvent.record(
+                    invoice=invoice,
+                    from_status=Invoice.Status.DRAFT,
+                    to_status=Invoice.Status.SENT,
+                    note="Invoice sent.",
+                    changed_by=request.user,
+                )
+
             _activate_project_from_invoice_creation(invoice=invoice, actor=request.user)
-        return Response({"data": InvoiceSerializer(invoice).data}, status=201)
+
+        # --- Send email outside transaction if sent ---
+        email_sent = False
+        if send_immediately:
+            customer_email = (invoice.customer.email or "").strip()
+            email_sent = send_document_sent_email(
+                document_type="Invoice",
+                document_title=f"Invoice {invoice.invoice_number}",
+                public_url=f"{settings.FRONTEND_URL}/invoice/{invoice.public_ref}",
+                recipient_email=customer_email,
+                sender_user=request.user,
+            )
+
+        response_data = {"data": InvoiceSerializer(invoice).data}
+        if send_immediately:
+            response_data["email_sent"] = email_sent
+        return Response(response_data, status=201)
 
 
 @api_view(["GET", "PATCH"])

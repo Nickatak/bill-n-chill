@@ -64,7 +64,8 @@ import styles from "./projects-console.module.css";
 import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
 import { QuickReceipt } from "@/features/vendor-bills/components/quick-receipt";
 import { ProjectListViewer } from "@/shared/project-list-viewer";
-import { ApiResponse, ProjectFinancialSummary, ProjectRecord } from "../types";
+import { DepositPanel } from "./deposit-panel";
+import { ApiResponse, ApprovedEstimate, ProjectFinancialSummary, ProjectRecord } from "../types";
 import {
   PROJECT_STATUS_VALUES,
   DEFAULT_PROJECT_STATUS_FILTERS,
@@ -114,7 +115,11 @@ export function ProjectsConsole() {
   } | null>(null);
   const [acceptedEstimateTotal, setAcceptedEstimateTotal] = useState("--");
   const [invoiceAllocationTargets, setInvoiceAllocationTargets] = useState<AllocationTarget[]>([]);
-  const [toolbarPanel, setToolbarPanel] = useState<"payment" | "receipt" | null>(null);
+  const [toolbarPanel, setToolbarPanel] = useState<"deposit" | "payment" | "receipt" | null>(null);
+  const [approvedEstimates, setApprovedEstimates] = useState<ApprovedEstimate[]>([]);
+  const [linkedEstimateIds, setLinkedEstimateIds] = useState<Set<number>>(new Set());
+  /** After a deposit invoice is created, holds the new invoice for payment pivot. */
+  const [depositInvoice, setDepositInvoice] = useState<{ id: number; invoice_number: string; balance_due: string } | null>(null);
   const [isProjectEditOpen, setIsProjectEditOpen] = useState(false);
   const projectEditFormRef = useRef<HTMLFormElement | null>(null);
 
@@ -292,11 +297,12 @@ export function ProjectsConsole() {
         setEstimateStatusCounts(null);
         return;
       }
-      const rows = (payload.data as Array<{ status?: string; grand_total?: string | number }>) ?? [];
+      const rows = (payload.data as Array<{ id?: number; status?: string; title?: string; grand_total?: string | number }>) ?? [];
       let draft = 0;
       let sent = 0;
       let approved = 0;
       let acceptedTotal = 0;
+      const approvedList: ApprovedEstimate[] = [];
       for (const estimate of rows) {
         if (estimate.status === "draft") {
           draft += 1;
@@ -305,10 +311,16 @@ export function ProjectsConsole() {
         } else if (estimate.status === "approved") {
           approved += 1;
           acceptedTotal += parseMoneyValue(estimate.grand_total);
+          approvedList.push({
+            id: estimate.id ?? 0,
+            title: estimate.title ?? "",
+            grand_total: String(estimate.grand_total ?? "0"),
+          });
         }
       }
       setEstimateStatusCounts({ draft, sent, approved });
       setAcceptedEstimateTotal(formatCurrency(acceptedTotal));
+      setApprovedEstimates(approvedList);
     } catch {
       setEstimateStatusCounts(null);
       setAcceptedEstimateTotal("--");
@@ -421,6 +433,7 @@ export function ProjectsConsole() {
         invoice_number?: string;
         balance_due?: string;
         status?: string;
+        related_estimate?: number | null;
       }>) ?? [];
       setInvoiceAllocationTargets(
         rows
@@ -431,6 +444,14 @@ export function ProjectsConsole() {
             balanceDue: inv.balance_due ?? "0.00",
           })),
       );
+      // Track which estimates already have a non-void linked invoice.
+      const linked = new Set<number>();
+      for (const inv of rows) {
+        if (inv.related_estimate && inv.status !== "void") {
+          linked.add(inv.related_estimate);
+        }
+      }
+      setLinkedEstimateIds(linked);
     } catch {
       setInvoiceAllocationTargets([]);
     }
@@ -793,27 +814,20 @@ export function ProjectsConsole() {
               </nav>
 
               <div className={styles.actionToolbar} role="toolbar" aria-label="Project actions">
-                <Link
-                  href={`/projects/${selectedProject.id}/invoices?action=deposit`}
-                  className={`${styles.toolbarAction} ${styles.toolbarActionLaunch} ${!hasApprovedEstimate ? styles.toolbarActionDisabled : ""}`}
-                  aria-disabled={!hasApprovedEstimate}
-                  tabIndex={!hasApprovedEstimate ? -1 : undefined}
-                  onClick={(e) => { if (!hasApprovedEstimate) e.preventDefault(); }}
-                >
-                  Invoice Deposit
-                </Link>
-                <Link
-                  href={`/projects/${selectedProject.id}/invoices?action=from-estimate`}
-                  className={`${styles.toolbarAction} ${styles.toolbarActionLaunch} ${!hasApprovedEstimate ? styles.toolbarActionDisabled : ""}`}
-                  aria-disabled={!hasApprovedEstimate}
-                  tabIndex={!hasApprovedEstimate ? -1 : undefined}
-                  onClick={(e) => { if (!hasApprovedEstimate) e.preventDefault(); }}
-                >
-                  Invoice from Estimate + COs
-                </Link>
                 <button
                   type="button"
-                  className={`${styles.toolbarAction} ${toolbarPanel === "payment" ? styles.toolbarActionActive : ""}`}
+                  className={`${styles.toolbarAction} ${toolbarPanel === "deposit" && !depositInvoice ? styles.toolbarActionActive : ""}`}
+                  disabled={!hasApprovedEstimate}
+                  onClick={() => {
+                    setDepositInvoice(null);
+                    setToolbarPanel(toolbarPanel === "deposit" ? null : "deposit");
+                  }}
+                >
+                  Invoice Deposit
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.toolbarAction} ${toolbarPanel === "payment" || (toolbarPanel === "deposit" && depositInvoice) ? styles.toolbarActionActive : ""}`}
                   disabled={!hasPayableInvoices || isSelectedProjectProspect}
                   onClick={() => setToolbarPanel(toolbarPanel === "payment" ? null : "payment")}
                 >
@@ -831,7 +845,41 @@ export function ProjectsConsole() {
             </div>
 
             <div className={styles.paymentRecorderSection}>
-              {toolbarPanel === "payment" ? (
+              {toolbarPanel === "deposit" && !depositInvoice ? (
+                <DepositPanel
+                  projectId={selectedProject.id}
+                  approvedEstimates={approvedEstimates}
+                  linkedEstimateIds={linkedEstimateIds}
+                  onInvoiceCreated={(invoice) => {
+                    setDepositInvoice(invoice);
+                    // Refresh data so the new invoice shows up in counts + targets.
+                    void loadFinancialSummary();
+                    void loadInvoiceStatusCounts(selectedProject.id);
+                    void loadInvoiceAllocationTargets(selectedProject.id);
+                  }}
+                />
+              ) : toolbarPanel === "deposit" && depositInvoice ? (
+                <PaymentRecorder
+                  projectId={selectedProject.id}
+                  direction="inbound"
+                  allocationTargets={[
+                    {
+                      id: depositInvoice.id,
+                      label: `Invoice ${depositInvoice.invoice_number}`,
+                      balanceDue: depositInvoice.balance_due,
+                    },
+                  ]}
+                  hideHeader
+                  createOnly
+                  hideWorkspaceTitle
+                  onPaymentsChanged={() => {
+                    void loadFinancialSummary();
+                    void loadInvoiceAllocationTargets(selectedProject.id);
+                    setToolbarPanel(null);
+                    setDepositInvoice(null);
+                  }}
+                />
+              ) : toolbarPanel === "payment" ? (
                 <PaymentRecorder
                   projectId={selectedProject.id}
                   direction="inbound"

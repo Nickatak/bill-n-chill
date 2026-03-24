@@ -92,6 +92,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "invoice_number",
             "public_ref",
             "status",
+            "related_estimate",
             "issue_date",
             "due_date",
             "sender_name",
@@ -117,6 +118,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "customer",
             "customer_display_name",
             "invoice_number",
+            "related_estimate",
             "subtotal",
             "tax_total",
             "total",
@@ -140,8 +142,15 @@ class InvoiceLineItemInputSerializer(serializers.Serializer):
 class InvoiceWriteSerializer(serializers.Serializer):
     """Write serializer for creating or updating an invoice with line items."""
 
+    ALLOWED_INITIAL_STATUSES = {"draft", "sent"}
+
     status = serializers.ChoiceField(choices=Invoice.Status.choices, required=False)
     status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True)
+    related_estimate = serializers.IntegerField(required=False, allow_null=True)
+    initial_status = serializers.ChoiceField(
+        choices=[("draft", "Draft"), ("sent", "Sent")],
+        required=False,
+    )
     issue_date = serializers.DateField(required=False)
     due_date = serializers.DateField(required=False)
     sender_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")

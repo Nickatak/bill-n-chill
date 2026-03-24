@@ -67,6 +67,12 @@ export type ProjectTraceabilityBucket = {
   records: ProjectTraceabilityRecord[];
 };
 
+export type ApprovedEstimate = {
+  id: number;
+  title: string;
+  grand_total: string;
+};
+
 export type ApiResponse = {
   data?:
     | UserData
