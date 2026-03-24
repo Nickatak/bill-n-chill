@@ -79,9 +79,9 @@ type OrgTab = "business" | "team" | "documents" | "notifications";
 
 const TABS: Array<{ key: OrgTab; label: string }> = [
   { key: "business", label: "Business" },
-  { key: "team", label: "Team" },
   { key: "documents", label: "Docs" },
   { key: "notifications", label: "Notifications" },
+  { key: "team", label: "Team" },
 ];
 
 const FALLBACK_EDITABLE_ROLES = ["owner", "pm", "bookkeeping", "worker", "viewer"];

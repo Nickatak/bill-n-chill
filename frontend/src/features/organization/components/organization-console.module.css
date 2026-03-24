@@ -1,8 +1,14 @@
-/* ── Error / Loading ── */
+/* ── Error / Success / Loading ── */
 
 .errorText {
   margin: 0;
   color: var(--tone-error-text);
+  font-size: 0.88rem;
+}
+
+.successText {
+  margin: 0;
+  color: var(--tone-success-text);
   font-size: 0.88rem;
 }
 
@@ -214,6 +220,11 @@
 .logoHint {
   font-size: 0.72rem;
   color: var(--text-muted);
+}
+
+.logoHintPending {
+  font-size: 0.72rem;
+  color: var(--tone-warning-text);
 }
 
 /* ── Document Settings Tab ── */

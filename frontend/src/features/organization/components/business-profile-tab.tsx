@@ -8,7 +8,7 @@
  * Parent: OrganizationConsole
  */
 
-import { ChangeEvent, FormEvent, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { normalizeApiBaseUrl, defaultApiBaseUrl } from "../api";
@@ -54,11 +54,29 @@ export function BusinessProfileTab({
   const [billingStateDraft, setBillingStateDraft] = useState(profile.billing_state ?? "");
   const [billingZipDraft, setBillingZipDraft] = useState(profile.billing_zip ?? "");
   const [isSaving, setIsSaving] = useState(false);
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [logoUrl, setLogoUrl] = useState(profile.logo_url ?? "");
+  const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
+  const [pendingLogoPreview, setPendingLogoPreview] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showSuccess = useCallback((msg: string) => {
+    setSuccessMessage(msg);
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    successTimerRef.current = setTimeout(() => setSuccessMessage(""), 4000);
+  }, []);
+
+  // Create/revoke object URL for local logo preview.
+  useEffect(() => {
+    if (!pendingLogoFile) { setPendingLogoPreview(""); return; }
+    const url = URL.createObjectURL(pendingLogoFile);
+    setPendingLogoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pendingLogoFile]);
 
   const hasChanges =
+    pendingLogoFile !== null ||
     displayNameDraft.trim() !== profile.display_name ||
     phoneNumberDraft.trim() !== (profile.phone_number || "") ||
     helpEmailDraft.trim() !== (profile.help_email || "") ||
@@ -71,39 +89,12 @@ export function BusinessProfileTab({
     billingStateDraft.trim() !== (profile.billing_state || "") ||
     billingZipDraft.trim() !== (profile.billing_zip || "");
 
-  async function handleLogoUpload(event: ChangeEvent<HTMLInputElement>) {
+  function handleLogoSelect(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-
-    setIsUploadingLogo(true);
-    onError("");
-
-    const formData = new FormData();
-    formData.append("logo", file);
-
-    try {
-      const response = await fetch(`${normalizedBaseUrl}/organization/logo/`, {
-        method: "POST",
-        headers: buildAuthHeaders(authToken),
-        body: formData,
-      });
-      const body: ApiResponse = await response.json();
-      if (!response.ok) {
-        onError(extractErrorMessage(body, "Could not upload logo."));
-        return;
-      }
-
-      const data = body.data as { organization?: OrganizationProfile } | undefined;
-      if (data?.organization) {
-        setLogoUrl(data.organization.logo_url ?? "");
-        onProfileUpdate(data.organization);
-      }
-    } catch {
-      onError("Could not reach logo upload endpoint.");
-    } finally {
-      setIsUploadingLogo(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+    setPendingLogoFile(file);
+    setSuccessMessage("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   async function handleSave(event: FormEvent) {
@@ -112,22 +103,48 @@ export function BusinessProfileTab({
 
     setIsSaving(true);
     onError("");
-
-    const payload = {
-      display_name: displayNameDraft.trim(),
-      phone_number: phoneNumberDraft.trim(),
-      help_email: helpEmailDraft.trim(),
-      website_url: websiteUrlDraft.trim(),
-      license_number: licenseNumberDraft.trim(),
-      tax_id: taxIdDraft.trim(),
-      billing_street_1: billingStreet1Draft.trim(),
-      billing_street_2: billingStreet2Draft.trim(),
-      billing_city: billingCityDraft.trim(),
-      billing_state: billingStateDraft.trim(),
-      billing_zip: billingZipDraft.trim(),
-    };
+    setSuccessMessage("");
 
     try {
+      // Upload logo first if a new file was selected.
+      if (pendingLogoFile) {
+        const formData = new FormData();
+        formData.append("logo", pendingLogoFile);
+
+        const logoRes = await fetch(`${normalizedBaseUrl}/organization/logo/`, {
+          method: "POST",
+          headers: buildAuthHeaders(authToken),
+          body: formData,
+        });
+        const logoBody: ApiResponse = await logoRes.json();
+        if (!logoRes.ok) {
+          onError(extractErrorMessage(logoBody, "Could not upload logo."));
+          setIsSaving(false);
+          return;
+        }
+
+        const logoData = logoBody.data as { organization?: OrganizationProfile } | undefined;
+        if (logoData?.organization) {
+          setLogoUrl(logoData.organization.logo_url ?? "");
+        }
+        setPendingLogoFile(null);
+      }
+
+      // Then save the text fields.
+      const payload = {
+        display_name: displayNameDraft.trim(),
+        phone_number: phoneNumberDraft.trim(),
+        help_email: helpEmailDraft.trim(),
+        website_url: websiteUrlDraft.trim(),
+        license_number: licenseNumberDraft.trim(),
+        tax_id: taxIdDraft.trim(),
+        billing_street_1: billingStreet1Draft.trim(),
+        billing_street_2: billingStreet2Draft.trim(),
+        billing_city: billingCityDraft.trim(),
+        billing_state: billingStateDraft.trim(),
+        billing_zip: billingZipDraft.trim(),
+      };
+
       const response = await fetch(`${normalizedBaseUrl}/organization/`, {
         method: "PATCH",
         headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
@@ -157,9 +174,10 @@ export function BusinessProfileTab({
         setBillingZipDraft(org.billing_zip ?? "");
         setLogoUrl(org.logo_url ?? "");
         onProfileUpdate(org, data.role_policy ?? undefined);
+        showSuccess("Saved.");
       }
     } catch {
-      onError("Could not reach organization profile update endpoint.");
+      onError("Could not reach organization endpoint.");
     } finally {
       setIsSaving(false);
     }
@@ -181,10 +199,14 @@ export function BusinessProfileTab({
       <div className={styles.field}>
         <span className={styles.fieldLabel}>Logo</span>
         <div className={styles.logoUploadArea}>
-          {logoUrl ? (
+          {pendingLogoPreview || logoUrl ? (
             <div className={styles.logoPreviewBox}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={logoUrl} alt="Organization logo" className={styles.logoPreviewImage} />
+              <img
+                src={pendingLogoPreview || logoUrl}
+                alt="Organization logo"
+                className={styles.logoPreviewImage}
+              />
             </div>
           ) : (
             <div className={styles.logoPlaceholder}>No logo uploaded</div>
@@ -193,19 +215,23 @@ export function BusinessProfileTab({
             ref={fileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            onChange={handleLogoUpload}
-            disabled={disabled || isUploadingLogo}
+            onChange={handleLogoSelect}
+            disabled={disabled}
             className={styles.logoFileInput}
           />
           <button
             type="button"
             className={styles.secondaryButton}
             onClick={() => fileInputRef.current?.click()}
-            disabled={disabled || isUploadingLogo}
+            disabled={disabled}
           >
-            {isUploadingLogo ? "Uploading\u2026" : logoUrl ? "Replace Logo" : "Upload Logo"}
+            {logoUrl || pendingLogoFile ? "Replace Logo" : "Upload Logo"}
           </button>
-          <span className={styles.logoHint}>JPEG, PNG, or WebP. Max 2 MB.</span>
+          {pendingLogoFile ? (
+            <span className={styles.logoHintPending}>New logo selected — save to apply.</span>
+          ) : (
+            <span className={styles.logoHint}>JPEG, PNG, or WebP. Max 2 MB.</span>
+          )}
         </div>
       </div>
 
@@ -318,6 +344,9 @@ export function BusinessProfileTab({
         </label>
       </div>
 
+      {successMessage ? (
+        <p className={styles.successText}>{successMessage}</p>
+      ) : null}
       <div className={styles.profileActions}>
         <button
           className={styles.primaryButton}

@@ -79,6 +79,13 @@ export function NotificationsTab({ authToken }: NotificationsTabProps) {
           </button>
         )}
       </div>
+
+      <hr className={styles.fieldGroupDivider} />
+
+      <p className={styles.fieldLabel}>Email Notifications</p>
+      <p className={styles.emptyText}>
+        Customers are automatically emailed when documents are sent. Controls to customize which emails are sent are coming soon.
+      </p>
     </div>
   );
 }

@@ -8,7 +8,7 @@
  * Parent: OrganizationConsole
  */
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useRef, useState } from "react";
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { normalizeApiBaseUrl, defaultApiBaseUrl } from "../api";
@@ -68,6 +68,14 @@ export function DocumentSettingsTab({
     profile.change_order_terms_and_conditions ?? "",
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showSuccess = useCallback((msg: string) => {
+    setSuccessMessage(msg);
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    successTimerRef.current = setTimeout(() => setSuccessMessage(""), 4000);
+  }, []);
 
   const hasChanges =
     String(Number(invoiceDueDeltaDraft || "30")) !==
@@ -125,6 +133,7 @@ export function DocumentSettingsTab({
         setEstimateTermsDraft(org.estimate_terms_and_conditions ?? "");
         setChangeOrderTermsDraft(org.change_order_terms_and_conditions ?? "");
         onProfileUpdate(org, data.role_policy ?? undefined);
+        showSuccess("Saved.");
       }
     } catch {
       onError("Could not reach organization profile update endpoint.");
@@ -215,6 +224,9 @@ export function DocumentSettingsTab({
         </label>
       ) : null}
 
+      {successMessage ? (
+        <p className={styles.successText}>{successMessage}</p>
+      ) : null}
       <div className={styles.profileActions}>
         <button
           className={styles.primaryButton}
