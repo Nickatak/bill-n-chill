@@ -224,7 +224,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
     }
 
     setIsSubmitting(true);
-    setMessage(inviteFlow === "flow-b" ? "Joining organization..." : "Creating account...");
+    setMessage("");
     setMessageTone("neutral");
 
     try {
@@ -319,7 +319,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
     }
 
     setIsSubmitting(true);
-    setMessage("Confirming and switching organization...");
+    setMessage("");
     setMessageTone("neutral");
 
     try {
@@ -364,23 +364,21 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
               {message}
             </p>
           )}
-          <div className={styles.formHintStack} style={{ width: "100%" }}>
-            <button
-              className={styles.button}
-              type="button"
-              disabled={isResending || resendCooldown > 0}
-              onClick={handleResendVerification}
-            >
-              {isResending
-                ? <span className={animStyles.sendingDots}>Sending</span>
-                : resendCooldown > 0
-                  ? `Wait ${resendCooldown}s`
-                  : "Didn\u2019t get it? Resend"}
-            </button>
-            <p className={styles.formHintRight}>
-              <Link href="/login">Back to sign in</Link>
-            </p>
-          </div>
+          <button
+            className={styles.button}
+            type="button"
+            disabled={isResending || resendCooldown > 0}
+            onClick={handleResendVerification}
+          >
+            {isResending
+              ? <span className={animStyles.sendingDots}>Sending</span>
+              : resendCooldown > 0
+                ? `Wait ${resendCooldown}s`
+                : "Didn\u2019t get it? Resend"}
+          </button>
+          <p className={styles.formHintRight}>
+            <Link href="/login">Back to sign in</Link>
+          </p>
         </div>
       </section>
     );
@@ -432,7 +430,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
             <div className={styles.formHintRow}>
               <div className={styles.buttonRow}>
                 <button className={styles.button} type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? "Accepting..." : "Accept Invite"}
+                  {isSubmitting ? <span className={animStyles.sendingDots}>Accepting</span> : "Accept Invite"}
                 </button>
               </div>
               <div className={styles.formHintStack}>
@@ -491,7 +489,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
             <div className={styles.buttonRow}>
               <button className={styles.button} type="submit" disabled={isSubmitting}>
                 {isSubmitting
-                  ? "Creating..."
+                  ? <span className={animStyles.sendingDots}>{inviteFlow === "flow-b" ? "Joining" : "Creating"}</span>
                   : inviteFlow === "flow-b"
                     ? "Create Account & Join"
                     : "Create account"}

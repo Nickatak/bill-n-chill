@@ -45,7 +45,7 @@ function toSessionOrganization(
 
 /**
  * Handles the email verification callback. POSTs the token from the verification
- * link to the backend, saves the resulting session, and redirects to the dashboard.
+ * link to the backend, saves the resulting session, and redirects to customers.
  */
 export function VerifyEmailConsole({ token }: VerifyEmailConsoleProps) {
   const router = useRouter();
@@ -119,7 +119,7 @@ export function VerifyEmailConsole({ token }: VerifyEmailConsoleProps) {
       <section className={styles.shell}>
         <div className={`${styles.card} ${styles.cardCentered}`}>
           <p className={styles.message}>Email confirmed! Welcome to Bill n&apos; Chill.</p>
-          <p className={styles.message}>Redirecting to your dashboard&hellip;</p>
+          <p className={styles.message}>Redirecting&hellip;</p>
         </div>
       </section>
     );

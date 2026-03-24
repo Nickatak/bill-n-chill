@@ -205,7 +205,7 @@ function ResetForm({ token }: { token: string }) {
     }
 
     setIsSubmitting(true);
-    setMessage("Resetting password...");
+    setMessage("");
     setMessageTone("neutral");
 
     try {
@@ -272,7 +272,7 @@ function ResetForm({ token }: { token: string }) {
           <div className={styles.formHintRow}>
             <div className={styles.buttonRow}>
               <button className={styles.button} type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Resetting..." : "Reset password"}
+                {isSubmitting ? <span className={animStyles.sendingDots}>Resetting</span> : "Reset password"}
               </button>
             </div>
             <div className={styles.formHintStack}>

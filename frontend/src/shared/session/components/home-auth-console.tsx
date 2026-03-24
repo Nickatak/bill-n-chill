@@ -67,7 +67,7 @@ function toSessionOrganization(
 
 /**
  * Login form console. Authenticates credentials against the Django auth endpoint,
- * persists the session to localStorage, and navigates to the dashboard on success.
+ * persists the session to localStorage, and navigates to the customers on success.
  */
 export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
   const router = useRouter();
@@ -96,7 +96,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
   /**
    * Form submission handler for the login form. POSTs credentials to
    * the Django auth endpoint, persists the session to localStorage on
-   * success, and navigates to the dashboard.
+   * success, and navigates to the customers.
    */
   async function handleLogin(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -113,7 +113,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
     }
 
     setIsChecking(true);
-    setMessage("Signing in...");
+    setMessage("");
     setMessageTone("neutral");
 
     try {
@@ -220,7 +220,7 @@ export function HomeAuthConsole({ health }: HomeAuthConsoleProps) {
           <div className={styles.formHintRow}>
             <div className={styles.buttonRow}>
               <button className={styles.button} type="submit" disabled={isChecking}>
-                {isChecking ? "Checking..." : "Sign in"}
+                {isChecking ? <span className={animStyles.sendingDots}>Signing in</span> : "Sign in"}
               </button>
               {emailNotVerified && (
                 <button
