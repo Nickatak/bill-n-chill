@@ -19,7 +19,7 @@ export const PROJECT_STATUS_VALUES = [
 export type ProjectStatusValue = (typeof PROJECT_STATUS_VALUES)[number];
 
 /** Default status filters applied on page load. */
-export const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "prospect"];
+export const DEFAULT_PROJECT_STATUS_FILTERS: ProjectStatusValue[] = ["active", "on_hold", "prospect"];
 
 /** Valid status transitions for each project status. Terminal states have no transitions. */
 export const PROJECT_STATUS_TRANSITIONS: Record<ProjectStatusValue, ProjectStatusValue[]> = {

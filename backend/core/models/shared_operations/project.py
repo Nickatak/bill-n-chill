@@ -92,13 +92,31 @@ class Project(StatusTransitionMixin, models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["customer", "name"],
+                name="unique_project_name_per_customer",
+            ),
+        ]
 
     def __str__(self) -> str:
         return self.name
 
     def clean(self):
-        """Validate status transitions and prevent activation under an archived customer."""
+        """Validate status transitions, uniqueness, and prevent activation under an archived customer."""
         errors = {}
+
+        if self.customer_id is not None and self.name:
+            if (
+                Project.objects.filter(customer_id=self.customer_id, name=self.name)
+                .exclude(pk=self.pk)
+                .exists()
+            ):
+                errors.setdefault("name", []).append(
+                    "A project with this name already exists for this customer."
+                    " Try adding a year or phase (e.g. \"Kitchen Remodel 2026\""
+                    " or \"Kitchen Remodel Phase 2\")."
+                )
 
         if self.status in {self.Status.ACTIVE, self.Status.ON_HOLD} and self.customer_id is not None:
             if self.customer.is_archived:

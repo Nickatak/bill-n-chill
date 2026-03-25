@@ -152,8 +152,8 @@ describe("constants", () => {
     ]);
   });
 
-  it("DEFAULT_PROJECT_STATUS_FILTERS defaults to active + prospect", () => {
-    expect(DEFAULT_PROJECT_STATUS_FILTERS).toEqual(["active", "prospect"]);
+  it("DEFAULT_PROJECT_STATUS_FILTERS defaults to active + on_hold + prospect", () => {
+    expect(DEFAULT_PROJECT_STATUS_FILTERS).toEqual(["active", "on_hold", "prospect"]);
   });
 
   it("terminal states have no outbound transitions", () => {
