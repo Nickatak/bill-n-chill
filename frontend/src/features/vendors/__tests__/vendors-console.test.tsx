@@ -164,15 +164,15 @@ describe("VendorsConsole", () => {
     expect(screen.getByLabelText("Email")).toHaveValue("acme@example.com");
   });
 
-  it("creates a new vendor via POST", async () => {
+  it("creates a new vendor via quick-add", async () => {
     setupDefaultFetch({ vendors: [] });
     render(<VendorsConsole />);
 
     await waitFor(() => {
-      expect(screen.getByText("New Vendor")).toBeInTheDocument();
+      expect(screen.getByLabelText("New vendor name")).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "New Vendor Co" } });
+    fireEvent.change(screen.getByLabelText("New vendor name"), { target: { value: "New Vendor Co" } });
 
     mockFetch.mockImplementation((_url: string, opts?: RequestInit) => {
       if (opts?.method === "POST") {
@@ -187,10 +187,10 @@ describe("VendorsConsole", () => {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Create Vendor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Created vendor #20/)).toBeInTheDocument();
+      expect(screen.getByText(/Created vendor "New Vendor Co"/)).toBeInTheDocument();
     });
   });
 
@@ -218,7 +218,7 @@ describe("VendorsConsole", () => {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [] }) });
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Save Vendor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
       expect(screen.getByText(/Saved vendor #1/)).toBeInTheDocument();
@@ -230,10 +230,10 @@ describe("VendorsConsole", () => {
     render(<VendorsConsole />);
 
     await waitFor(() => {
-      expect(screen.getByText("New Vendor")).toBeInTheDocument();
+      expect(screen.getByLabelText("New vendor name")).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Acme Supply" } });
+    fireEvent.change(screen.getByLabelText("New vendor name"), { target: { value: "Acme Supply" } });
 
     // POST returns 409 — duplicate name is blocked outright (no override)
     mockFetch.mockResolvedValueOnce({
@@ -251,7 +251,7 @@ describe("VendorsConsole", () => {
         }),
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Create Vendor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
       expect(screen.getByText("Existing vendor with this name")).toBeInTheDocument();
@@ -277,7 +277,7 @@ describe("VendorsConsole", () => {
     expect(screen.getByRole("button", { name: "Next" })).not.toBeDisabled();
   });
 
-  it("switches to create mode with + New button", async () => {
+  it("deselects vendor to return to browse mode", async () => {
     setupDefaultFetch();
     render(<VendorsConsole />);
 
@@ -288,8 +288,8 @@ describe("VendorsConsole", () => {
     fireEvent.click(screen.getByText(/Acme Supply/).closest("tr")!);
     expect(screen.getByText("Edit: Acme Supply")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("+ New"));
-    expect(screen.getByText("New Vendor")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Deselect"));
+    expect(screen.queryByText("Edit: Acme Supply")).not.toBeInTheDocument();
   });
 
   it("toggles CSV import section", async () => {

@@ -391,7 +391,7 @@ describe("ProjectsConsole", () => {
     expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
     expect(screen.getByRole("link", { name: /Change Orders/ })).toHaveAttribute("href", "/projects/1/change-orders");
     expect(screen.getByRole("link", { name: /Invoices/ })).toHaveAttribute("href", "/projects/1/invoices");
-    expect(screen.getByRole("link", { name: /Bills/ })).toHaveAttribute("href", "/projects/1/bills");
+    expect(screen.getByRole("link", { name: /Expenses/ })).toHaveAttribute("href", "/projects/1/bills");
   });
 
   // ---------------------------------------------------------------------------
@@ -643,10 +643,10 @@ describe("ProjectsConsole", () => {
 
     // Bill badges: O{open} D{disputed}
     await waitFor(() => {
-      const billsLink = screen.getByRole("link", { name: /Bills/ });
+      const billsLink = screen.getByRole("link", { name: /Expenses/ });
       expect(within(billsLink).getByText("O2")).toBeInTheDocument();
     });
-    const billsLink = screen.getByRole("link", { name: /Bills/ });
+    const billsLink = screen.getByRole("link", { name: /Expenses/ });
     expect(within(billsLink).getByText("D1")).toBeInTheDocument();
 
     // Invoice badges: D{draft} S{sent} P{partially_paid}
