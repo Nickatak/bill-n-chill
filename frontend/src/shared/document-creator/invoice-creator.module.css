@@ -24,36 +24,14 @@
   align-content: start;
 }
 
-.invoiceNumberContext {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
 .invoiceNumberInput {
-  width: 148px;
-  min-width: 0;
-  text-align: right;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
 
-.invoiceNumberIndicator {
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  padding: 2px var(--space-sm);
-  font-size: 0.64rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-weight: 700;
-}
-
-.invoiceNumberIndicatorGenerated {
-  background: var(--status-blue-bg);
+.invoiceNumberNew {
   border-color: var(--status-blue-border);
-  color: var(--status-blue-text);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--status-blue-border) 40%, transparent);
 }
 
 .invoiceLineSectionIntro {
@@ -198,16 +176,6 @@
     border-radius: 14px;
   }
 
-  .invoiceNumberInput {
-    width: 100%;
-    text-align: left;
-  }
-
-  .invoiceNumberContext {
-    justify-content: flex-start;
-    width: 100%;
-  }
-
   .invoiceLineHeader,
   .invoiceLineRow {
     min-width: 0;
@@ -228,7 +196,6 @@
   .invoiceLineActionsCell,
   .invoiceCreateActions,
   .invoiceCreateStatusMessage,
-  .invoiceNumberIndicator,
   .invoiceLineSectionIntro {
     display: none !important;
   }

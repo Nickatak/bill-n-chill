@@ -255,26 +255,17 @@ export function InvoicesWorkspacePanel({
 
                 <div className={creatorStyles.metaBlock}>
                   <div className={creatorStyles.metaTitle}>Invoice Details</div>
-                  <div className={creatorStyles.metaLine}>
-                    <span>Invoice #</span>
-                    <div className={invoiceCreatorStyles.invoiceNumberContext}>
-                      <input
-                        className={`${creatorStyles.fieldInput} ${invoiceCreatorStyles.invoiceNumberInput}`}
-                        value={workspaceInvoiceNumber}
-                        readOnly
-                        disabled
-                        autoComplete="one-time-code"
-                        aria-label="Invoice number"
-                      />
-                      {!workspaceSourceInvoice ? (
-                        <span
-                          className={`${invoiceCreatorStyles.invoiceNumberIndicator} ${invoiceCreatorStyles.invoiceNumberIndicatorGenerated}`}
-                        >
-                          New
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
+                  <label className={creatorStyles.inlineField}>
+                    Invoice #
+                    <input
+                      className={`${creatorStyles.fieldInput} ${invoiceCreatorStyles.invoiceNumberInput} ${!workspaceSourceInvoice ? invoiceCreatorStyles.invoiceNumberNew : ""}`}
+                      value={workspaceInvoiceNumber}
+                      readOnly
+                      disabled
+                      autoComplete="one-time-code"
+                      aria-label="Invoice number"
+                    />
+                  </label>
                   <label className={creatorStyles.inlineField}>
                     Issue date
                     <input
