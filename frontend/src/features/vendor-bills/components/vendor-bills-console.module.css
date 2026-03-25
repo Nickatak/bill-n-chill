@@ -907,12 +907,15 @@
 @media (max-width: 700px) {
   /* ── Containment: every grid/flex ancestor must allow shrinking ── */
   .console,
+  .workspace {
+    min-width: 0;
+  }
+
   .viewerPanel,
   .tableWrap,
   .expandedSections,
   .viewerSection,
   .viewerSectionContent,
-  .workspace,
   .formSection,
   .allocationsBlock {
     min-width: 0;
