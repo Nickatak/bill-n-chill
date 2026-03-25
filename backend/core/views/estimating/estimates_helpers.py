@@ -22,7 +22,7 @@ from core.models import (
 )
 from core.serializers import EstimateSerializer
 from core.user_helpers import _ensure_org_membership
-from core.utils.email import send_document_sent_email
+from django_q.tasks import async_task
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import _promote_prospect_to_active, _resolve_cost_codes_for_user
 
@@ -455,19 +455,22 @@ def _handle_estimate_status_transition(
         if next_status in (Estimate.Status.SENT, Estimate.Status.APPROVED):
             _promote_prospect_to_active(estimate.project)
 
-    # Email notification (outside transaction)
+    # Email notification (outside transaction, async)
     email_sent = False
     if next_status == Estimate.Status.SENT and (
         previous_status != Estimate.Status.SENT or is_resend
     ):
         customer_email = (estimate.project.customer.email or "").strip()
-        email_sent = send_document_sent_email(
-            document_type="Estimate",
-            document_title=f"{estimate.title} (v{estimate.version})",
-            public_url=f"{settings.FRONTEND_URL}/estimate/{estimate.public_ref}",
-            recipient_email=customer_email,
-            sender_user=request.user,
-        )
+        if customer_email:
+            async_task(
+                "core.tasks.send_document_sent_email_task",
+                "Estimate",
+                f"{estimate.title} (v{estimate.version})",
+                f"{settings.FRONTEND_URL}/estimate/{estimate.public_ref}",
+                customer_email,
+                request.user.id,
+            )
+            email_sent = True
 
     estimate.refresh_from_db()
     return Response({"data": EstimateSerializer(estimate).data, "email_sent": email_sent})

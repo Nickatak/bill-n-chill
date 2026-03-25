@@ -18,8 +18,7 @@ from core.serializers import (
     InvoiceStatusEventSerializer,
     InvoiceWriteSerializer,
 )
-from core.utils.email import send_document_sent_email
-from core.utils.push import build_document_decision_payload, send_push_to_user
+from django_q.tasks import async_task
 from core.utils.request import get_client_ip
 from core.utils.signing import compute_document_content_hash
 from core.views.accounts_receivable.invoice_ingress import (
@@ -287,16 +286,16 @@ def public_invoice_decision_view(request, public_token: str):
 
     logger.info("Invoice public decision: id=%s %s decision=%s from=%s", invoice.id, invoice.invoice_number, decision_type, client_ip)
 
-    # Fire push notification to document owner (best-effort, non-blocking).
-    customer_name = invoice.project.customer.display_name
-    push_payload = build_document_decision_payload(
-        document_type="invoice",
-        document_title=invoice.invoice_number,
-        customer_name=customer_name,
-        decision=decision_type,
-        url=f"/projects/{invoice.project_id}/invoices",
+    # Queue push + email notification to document owner (non-blocking).
+    async_task(
+        "core.tasks.send_document_decision_notification",
+        invoice.created_by_id,
+        "invoice",
+        invoice.invoice_number,
+        invoice.project.customer.display_name,
+        decision_type,
+        f"/projects/{invoice.project_id}/invoices",
     )
-    send_push_to_user(invoice.created_by_id, push_payload)
 
     refreshed = _prefetch_invoice_qs(
         Invoice.objects.filter(id=invoice.id)
@@ -558,17 +557,20 @@ def project_invoices_view(request, project_id: int):
 
             _activate_project_from_invoice_creation(invoice=invoice, actor=request.user)
 
-        # --- Send email outside transaction if sent ---
+        # --- Queue email outside transaction if sent ---
         email_sent = False
         if send_immediately:
             customer_email = (invoice.customer.email or "").strip()
-            email_sent = send_document_sent_email(
-                document_type="Invoice",
-                document_title=f"Invoice {invoice.invoice_number}",
-                public_url=f"{settings.FRONTEND_URL}/invoice/{invoice.public_ref}",
-                recipient_email=customer_email,
-                sender_user=request.user,
-            )
+            if customer_email:
+                async_task(
+                    "core.tasks.send_document_sent_email_task",
+                    "Invoice",
+                    f"Invoice {invoice.invoice_number}",
+                    f"{settings.FRONTEND_URL}/invoice/{invoice.public_ref}",
+                    customer_email,
+                    request.user.id,
+                )
+                email_sent = True
 
         response_data = {"data": InvoiceSerializer(invoice).data}
         if send_immediately:
@@ -747,13 +749,17 @@ def invoice_send_view(request, invoice_id: int):
         )
 
     customer_email = (invoice.customer.email or "").strip()
-    email_sent = send_document_sent_email(
-        document_type="Invoice",
-        document_title=f"Invoice {invoice.invoice_number}",
-        public_url=f"{settings.FRONTEND_URL}/invoice/{invoice.public_ref}",
-        recipient_email=customer_email,
-        sender_user=request.user,
-    )
+    email_sent = False
+    if customer_email:
+        async_task(
+            "core.tasks.send_document_sent_email_task",
+            "Invoice",
+            f"Invoice {invoice.invoice_number}",
+            f"{settings.FRONTEND_URL}/invoice/{invoice.public_ref}",
+            customer_email,
+            request.user.id,
+        )
+        email_sent = True
 
     return Response({"data": InvoiceSerializer(invoice).data, "email_sent": email_sent})
 

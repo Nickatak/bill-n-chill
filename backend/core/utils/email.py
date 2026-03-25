@@ -192,3 +192,81 @@ def send_document_sent_email(*, document_type, document_title, public_url, recip
     logger.info("Document sent email delivered: %s '%s' to %s", document_type, document_title, recipient_email)
 
     return True
+
+
+def send_document_decision_email(*, user_id, document_type, document_title, customer_name, decision, project_url):
+    """Send email to document owner when a customer makes a decision.
+
+    Called asynchronously via django-q2 after a customer approves, rejects,
+    or disputes a document through the public link. Skips silently if the
+    user has no email or the send fails.
+
+    Args:
+        user_id: The document owner's user PK.
+        document_type: "estimate", "invoice", or "change_order".
+        document_title: Human-readable document identifier.
+        customer_name: The customer who made the decision.
+        decision: "approve", "reject", or "dispute".
+        project_url: App route to the project's document list.
+    """
+    from django.contrib.auth import get_user_model
+    from core.models import OrganizationMembership
+
+    User = get_user_model()
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        logger.warning("Document decision email skipped — user %s not found", user_id)
+        return False
+
+    if not user.email:
+        return False
+
+    membership = (
+        OrganizationMembership.objects
+        .select_related("organization")
+        .filter(user=user, status=OrganizationMembership.Status.ACTIVE)
+        .first()
+    )
+    org_name = membership.organization.display_name if membership else "Your organization"
+
+    type_label = document_type.replace("_", " ").title()
+    action_past = {"approve": "approved", "reject": "rejected", "dispute": "disputed"}.get(decision, decision)
+    frontend_url = settings.FRONTEND_URL.rstrip("/")
+
+    subject = f"{type_label} {action_past} by {customer_name} — Bill n' Chill"
+    body = (
+        f"{customer_name} has {action_past} a {type_label.lower()}.\n\n"
+        f"{document_title}\n\n"
+        f"View in {org_name}:\n"
+        f"{frontend_url}{project_url}\n\n"
+        f"— Bill n' Chill"
+    )
+
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception("Failed to send document decision email to %s", user.email)
+        return False
+
+    EmailRecord.record(
+        recipient_email=user.email,
+        email_type=EmailRecord.EmailType.DOCUMENT_DECISION,
+        subject=subject,
+        body_text=body,
+        sent_by_user=user,
+        metadata={
+            "document_type": document_type,
+            "document_title": document_title,
+            "customer_name": customer_name,
+            "decision": decision,
+        },
+    )
+    logger.info("Document decision email sent: %s %s '%s' to %s", type_label, action_past, document_title, user.email)
+    return True

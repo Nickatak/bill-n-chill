@@ -20,6 +20,16 @@ services:
       python manage.py migrate &&
       gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120"
 
+  worker:
+    environment:
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-}
+      MAILGUN_API_KEY: ${MAILGUN_API_KEY:-}
+      MAILGUN_SENDER_DOMAIN: ${MAILGUN_SENDER_DOMAIN:-}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    volumes:
+      - ./logs:/var/log/bnc
+
   frontend:
     ports:
       - "127.0.0.1:3000:3000"

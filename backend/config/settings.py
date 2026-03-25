@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework.authtoken",
+    "django_q",
     "core",
 ]
 
@@ -245,6 +246,15 @@ ANYMAIL = {
 
 # Frontend URL for building verification links in emails.
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+# Django-Q2 async task queue (uses existing MySQL as broker).
+Q_CLUSTER = {
+    "name": "bill-n-chill",
+    "workers": 2,
+    "timeout": 60,
+    "retry": 120,
+    "orm": "default",
+}
 
 # Sentry error monitoring — only active when SENTRY_DSN is set (prod).
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")

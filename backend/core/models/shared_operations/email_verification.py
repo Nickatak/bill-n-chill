@@ -168,6 +168,7 @@ class EmailRecord(ImmutableModelMixin):
         PASSWORD_RESET = "password_reset", "Password Reset"
         OTP = "otp", "OTP"
         DOCUMENT_SENT = "document_sent", "Document Sent"
+        DOCUMENT_DECISION = "document_decision", "Document Decision"
 
     recipient_email = models.EmailField()
     email_type = models.CharField(max_length=32, choices=EmailType.choices)

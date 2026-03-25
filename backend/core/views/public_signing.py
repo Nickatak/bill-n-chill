@@ -14,7 +14,7 @@ from rest_framework.response import Response
 
 from core.models import DocumentAccessSession
 from core.models.shared_operations.document_access_session import SESSION_EXPIRY_MINUTES
-from core.utils.email import send_otp_email
+from django_q.tasks import async_task
 from core.utils.signing import mask_email
 from core.views.public_signing_helpers import (
     _DOCUMENT_TYPE_LABELS,
@@ -92,13 +92,12 @@ def public_request_otp_view(request, document_type, public_token):
     session.save()
 
     document_title = _resolve_document_title(document_type, document)
-    # TODO: send_otp_email blocks the request — move to async task (Celery/background)
-    # so Mailgun latency/failures don't hang the customer's browser.
-    send_otp_email(
-        recipient_email=customer_email,
-        code=session.code,
-        document_type_label=_DOCUMENT_TYPE_LABELS.get(document_type, "Document"),
-        document_title=document_title,
+    async_task(
+        "core.tasks.send_otp_email_task",
+        customer_email,
+        session.code,
+        _DOCUMENT_TYPE_LABELS.get(document_type, "Document"),
+        document_title,
     )
 
     return Response(

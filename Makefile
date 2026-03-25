@@ -2,8 +2,8 @@
 	env-init \
 	local-install local-install-frontend local-install-backend \
 	local-env-local local-env-prod \
-	local-stop-docker-frontend local-stop-docker-backend \
-	local-run-frontend local-run-backend local-check-db \
+	local-stop-docker-frontend local-stop-docker-backend local-stop-docker-worker \
+	local-run-frontend local-run-backend local-run-worker local-check-db \
 	local-makemigrations local-superuser \
 	local-test local-test-backend local-test-frontend local-clean local-kill-ports \
 	lint install-hooks backup \
@@ -33,6 +33,7 @@ help:
 	@echo "  make local-install          Install frontend + backend dependencies"
 	@echo "  make local-run-frontend     Stop docker frontend, run Next.js on host"
 	@echo "  make local-run-backend      Stop docker backend, run Django on host"
+	@echo "  make local-run-worker       Run Q2 task worker on host"
 	@echo "  make local-test             Run backend tests + frontend lint"
 	@echo ""
 	@echo "Core Dev Docker Workflow (.env.local)"
@@ -96,11 +97,17 @@ local-stop-docker-frontend: local-env-local
 local-stop-docker-backend: local-env-local
 	@$(DEV_COMPOSE) stop backend >/dev/null 2>&1 || true
 
+local-stop-docker-worker: local-env-local
+	@$(DEV_COMPOSE) stop worker >/dev/null 2>&1 || true
+
 local-run-frontend: local-stop-docker-frontend
 	set -a && . ./.env && set +a && npm run dev --prefix frontend
 
 local-run-backend: local-stop-docker-backend local-check-db
 	$(BACKEND_MANAGE) runserver
+
+local-run-worker: local-stop-docker-worker local-check-db
+	$(BACKEND_MANAGE) qcluster
 
 local-check-db:
 	@$(BACKEND_PYTHON) scripts/check_db_connection.py

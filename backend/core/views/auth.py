@@ -19,7 +19,7 @@ from core.models import (
 )
 from core.serializers import LoginSerializer, RegisterSerializer
 from core.user_helpers import _ensure_org_membership
-from core.utils.email import send_password_reset_email, send_verification_email
+from django_q.tasks import async_task
 from core.views.auth_helpers import (
     _RESET_ERROR_MAP,
     _VERIFY_ERROR_MAP,
@@ -239,7 +239,7 @@ def register_view(request):
         # Concurrent registration with same email — still anti-enumeration.
         return Response(_CHECK_EMAIL, status=200)
 
-    send_verification_email(user, token_obj)  # Outside atomic — mail failure doesn't roll back user.
+    async_task("core.tasks.send_verification_email_task", user.id, token_obj.id)
     logger.info("User registered (Flow A): %s", email)
     return Response(_CHECK_EMAIL, status=200)
 
@@ -626,7 +626,7 @@ def resend_verification_view(request):
     # Already verified — send a password reset email instead.
     if user.is_active:
         wait_seconds = _send_rate_limited_token_email(
-            user, PasswordResetToken, send_password_reset_email,
+            user, PasswordResetToken, "core.tasks.send_password_reset_email_task",
         )
         if wait_seconds is not None:
             return Response(
@@ -636,7 +636,7 @@ def resend_verification_view(request):
         return Response(_RESEND_OK, status=200)
 
     wait_seconds = _send_rate_limited_token_email(
-        user, EmailVerificationToken, send_verification_email,
+        user, EmailVerificationToken, "core.tasks.send_verification_email_task",
     )
     if wait_seconds is not None:
         return Response(
@@ -693,7 +693,7 @@ def forgot_password_view(request):
     # Unverified users can't reset passwords — send a verification email instead.
     if not user.is_active:
         wait_seconds = _send_rate_limited_token_email(
-            user, EmailVerificationToken, send_verification_email,
+            user, EmailVerificationToken, "core.tasks.send_verification_email_task",
         )
         if wait_seconds is not None:
             return Response(
@@ -703,7 +703,7 @@ def forgot_password_view(request):
         return Response(_FORGOT_OK, status=200)
 
     wait_seconds = _send_rate_limited_token_email(
-        user, PasswordResetToken, send_password_reset_email,
+        user, PasswordResetToken, "core.tasks.send_password_reset_email_task",
     )
     if wait_seconds is not None:
         return Response(

@@ -11,4 +11,5 @@ sqlparse==0.5.5
 google-generativeai==0.8.5
 gunicorn==23.0.0
 pywebpush==2.3.0
+django-q2==1.9.0
 sentry-sdk[django]==2.29.1

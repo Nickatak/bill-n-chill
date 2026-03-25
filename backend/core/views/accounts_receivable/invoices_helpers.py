@@ -25,7 +25,7 @@ from core.models import (
     Project,
 )
 from core.serializers import InvoiceSerializer
-from core.utils.email import send_document_sent_email
+from django_q.tasks import async_task
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.accounts_receivable.invoice_ingress import InvoicePatchIngress
 from core.views.helpers import (
@@ -479,19 +479,22 @@ def _handle_invoice_status_transition(
         if next_status == Invoice.Status.SENT:
             _promote_prospect_to_active(invoice.project)
 
-    # Email notification (outside transaction)
+    # Email notification (outside transaction, async)
     email_sent = False
     if next_status == Invoice.Status.SENT and (
         previous_status != Invoice.Status.SENT or is_resend
     ):
         customer_email = (invoice.customer.email or "").strip()
-        email_sent = send_document_sent_email(
-            document_type="Invoice",
-            document_title=f"Invoice {invoice.invoice_number}",
-            public_url=f"{settings.FRONTEND_URL}/invoice/{invoice.public_ref}",
-            recipient_email=customer_email,
-            sender_user=request.user,
-        )
+        if customer_email:
+            async_task(
+                "core.tasks.send_document_sent_email_task",
+                "Invoice",
+                f"Invoice {invoice.invoice_number}",
+                f"{settings.FRONTEND_URL}/invoice/{invoice.public_ref}",
+                customer_email,
+                request.user.id,
+            )
+            email_sent = True
 
     invoice.refresh_from_db()
     return Response({"data": InvoiceSerializer(invoice).data, "email_sent": email_sent})

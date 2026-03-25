@@ -26,7 +26,7 @@ from core.models import (
     Project,
 )
 from core.serializers import ChangeOrderSerializer
-from core.utils.email import send_document_sent_email
+from django_q.tasks import async_task
 from core.utils.money import MONEY_ZERO, quantize_money
 
 
@@ -397,19 +397,22 @@ def _handle_co_status_transition(
             status=400,
         )
 
-    # Email notification (outside transaction)
+    # Email notification (outside transaction, async)
     email_sent = False
     if next_status == ChangeOrder.Status.SENT and (
         previous_status != ChangeOrder.Status.SENT or is_resend
     ):
         customer_email = (change_order.project.customer.email or "").strip()
-        email_sent = send_document_sent_email(
-            document_type="Change Order",
-            document_title=f"CO-{change_order.family_key}: {change_order.title}",
-            public_url=f"{settings.FRONTEND_URL}/change-order/{change_order.public_ref}",
-            recipient_email=customer_email,
-            sender_user=request.user,
-        )
+        if customer_email:
+            async_task(
+                "core.tasks.send_document_sent_email_task",
+                "Change Order",
+                f"CO-{change_order.family_key}: {change_order.title}",
+                f"{settings.FRONTEND_URL}/change-order/{change_order.public_ref}",
+                customer_email,
+                request.user.id,
+            )
+            email_sent = True
 
     refreshed = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
     return Response({"data": ChangeOrderSerializer(refreshed).data, "email_sent": email_sent})

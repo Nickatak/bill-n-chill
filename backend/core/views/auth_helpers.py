@@ -8,13 +8,13 @@ Contains:
     - Token verification error mappings.
 """
 
-from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
+from django_q.tasks import async_task
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 
@@ -25,7 +25,6 @@ from core.models import (
     PasswordResetToken,
 )
 from core.user_helpers import _resolve_user_capabilities
-from core.utils.email import send_password_reset_email, send_verification_email
 
 
 # ---------------------------------------------------------------------------
@@ -113,10 +112,10 @@ def _lookup_valid_invite(token_str: str) -> tuple[OrganizationInvite | None, Res
 def _send_rate_limited_token_email(
     user: AbstractUser,
     token_model: type[models.Model],
-    send_fn: Callable,
-    **send_kwargs: Any,
+    task_name: str,
+    **task_kwargs: Any,
 ) -> int | None:
-    """Create a token and send an email, respecting a 60-second rate limit.
+    """Create a token and queue an async email, respecting a 60-second rate limit.
 
     Shared pattern used by verification, password reset, and duplicate
     registration flows.  Handles the full lifecycle:
@@ -125,10 +124,10 @@ def _send_rate_limited_token_email(
         2. If created <60s ago, return the remaining wait time (rate-limited).
         3. Delete any unconsumed tokens of this type (so only the latest works).
         4. Create and save a new token.
-        5. Call ``send_fn(user, token_obj, **send_kwargs)``.
+        5. Queue the email via ``async_task(task_name, user.id, token.id, ...)``.
 
     Returns:
-        ``None`` on success (email sent).
+        ``None`` on success (email queued).
         ``int`` (seconds to wait) if rate-limited.
     """
     latest_token = (
@@ -142,7 +141,7 @@ def _send_rate_limited_token_email(
     token_model.objects.filter(user=user, consumed_at__isnull=True).delete()
     token_obj = token_model(user=user, email=user.email)
     token_obj.save()
-    send_fn(user, token_obj, **send_kwargs)
+    async_task(task_name, user.id, token_obj.id, **task_kwargs)
     return None
 
 
@@ -160,12 +159,12 @@ def _send_duplicate_registration_email(user: AbstractUser) -> None:
     try:
         if user.is_active:
             _send_rate_limited_token_email(
-                user, PasswordResetToken, send_password_reset_email,
+                user, PasswordResetToken, "core.tasks.send_password_reset_email_task",
                 is_security_alert=True,
             )
         else:
             _send_rate_limited_token_email(
-                user, EmailVerificationToken, send_verification_email,
+                user, EmailVerificationToken, "core.tasks.send_verification_email_task",
             )
     except Exception:
         pass  # Best-effort — never leak information via error responses.
