@@ -1,0 +1,9 @@
+{% extends "email/_base.txt" %}
+{% block content %}Welcome to Bill n' Chill!
+
+Verify your email address to get started:
+
+{{ verify_url }}
+
+This link expires in 24 hours. If you didn't create this account, you can safely ignore this email.
+{% endblock %}

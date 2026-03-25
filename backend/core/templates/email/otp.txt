@@ -1,0 +1,8 @@
+{% extends "email/_base.txt" %}
+{% block content %}Your verification code: {{ code }}
+
+Enter this code to verify your identity for:
+{{ document_type_label }}: {{ document_title }}
+
+This code expires in 10 minutes. If you didn't request this code, you can safely ignore this email.
+{% endblock %}

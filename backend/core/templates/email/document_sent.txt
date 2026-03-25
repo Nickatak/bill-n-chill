@@ -1,0 +1,10 @@
+{% extends "email/_base.txt" %}
+{% block content %}{{ org_name }} sent you a {{ document_type_lower }}.
+
+{{ document_title }}
+
+View and respond here:
+{{ public_url }}
+
+If you have questions, please contact {{ org_name }} directly.
+{% endblock %}

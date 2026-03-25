@@ -1,0 +1,7 @@
+{% extends "email/_base.html" %}
+{% block title %}{{ type_label }} {{ action_past }} by {{ customer_name }} — Bill n' Chill{% endblock %}
+{% block content %}
+<p style="margin:0 0 8px; color:#18181b; font-size:16px; font-weight:600;">{{ customer_name }} {{ action_past }} a {{ type_label_lower }}</p>
+<p style="margin:0 0 24px; color:#3f3f46; font-size:15px; line-height:1.5;"><strong>{{ document_title }}</strong></p>
+<a href="{{ project_url_full }}" style="display:inline-block; padding:12px 28px; background:#2563eb; color:#ffffff; text-decoration:none; border-radius:6px; font-weight:600; font-size:15px;">View in {{ org_name }}</a>
+{% endblock %}

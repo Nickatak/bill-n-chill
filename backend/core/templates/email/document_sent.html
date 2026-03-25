@@ -1,0 +1,8 @@
+{% extends "email/_base.html" %}
+{% block title %}{{ document_type }} from {{ org_name }} — Bill n' Chill{% endblock %}
+{% block content %}
+<p style="margin:0 0 8px; color:#18181b; font-size:16px; font-weight:600;">{{ org_name }} sent you a {{ document_type_lower }}</p>
+<p style="margin:0 0 24px; color:#3f3f46; font-size:15px; line-height:1.5;"><strong>{{ document_title }}</strong></p>
+<a href="{{ public_url }}" style="display:inline-block; padding:12px 28px; background:#2563eb; color:#ffffff; text-decoration:none; border-radius:6px; font-weight:600; font-size:15px;">View {{ document_type }}</a>
+<p style="margin:24px 0 0; color:#a1a1aa; font-size:13px; line-height:1.5;">If you have questions, please contact {{ org_name }} directly.</p>
+{% endblock %}

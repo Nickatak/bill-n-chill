@@ -1,0 +1,8 @@
+{% extends "email/_base.txt" %}
+{% block content %}{{ customer_name }} {{ action_past }} a {{ type_label_lower }}.
+
+{{ document_title }}
+
+View in {{ org_name }}:
+{{ project_url_full }}
+{% endblock %}

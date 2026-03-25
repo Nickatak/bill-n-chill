@@ -1,13 +1,38 @@
-"""Transactional email helpers with audit logging."""
+"""Transactional email helpers with audit logging.
+
+All emails are rendered from Django templates in core/templates/email/.
+Each function builds a context dict, renders both HTML and plain text,
+and sends via Django's configured EMAIL_BACKEND with an immutable
+EmailRecord audit row.
+"""
 
 import logging
 
 from django.conf import settings
 from django.core.mail import send_mail
+from django.template.loader import render_to_string
 
 from core.models import EmailRecord
 
 logger = logging.getLogger(__name__)
+
+
+def _frontend_url():
+    """Return the frontend base URL with trailing slash stripped."""
+    return settings.FRONTEND_URL.rstrip("/")
+
+
+def _render_email(template_name, context):
+    """Render an email template pair and return (subject, plain_text, html).
+
+    Adds ``frontend_url`` to every context so the base template footer
+    can always link home. Returns stripped strings to avoid leading/trailing
+    whitespace from template blocks.
+    """
+    context.setdefault("frontend_url", _frontend_url())
+    html = render_to_string(f"email/{template_name}.html", context).strip()
+    text = render_to_string(f"email/{template_name}.txt", context).strip()
+    return text, html
 
 
 def send_verification_email(user, token_obj):
@@ -18,21 +43,17 @@ def send_verification_email(user, token_obj):
     Called outside transaction.atomic() so mail failures don't roll back
     user creation.
     """
-    verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token_obj.token}"
+    verify_url = f"{_frontend_url()}/verify-email?token={token_obj.token}"
     subject = "Verify your email — Bill n' Chill"
-    body = (
-        f"Welcome to Bill n' Chill!\n\n"
-        f"Click the link below to verify your email address:\n\n"
-        f"{verify_url}\n\n"
-        f"This link expires in 24 hours.\n\n"
-        f"If you didn't create this account, you can safely ignore this email."
-    )
+    context = {"verify_url": verify_url}
+    body, html = _render_email("verification", context)
 
     send_mail(
         subject=subject,
         message=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[user.email],
+        html_message=html,
         fail_silently=False,
     )
 
@@ -54,32 +75,21 @@ def send_password_reset_email(user, token_obj, *, is_security_alert=False):
     attempted to register with their email address. This variant is sent
     from the registration duplicate handler for verified users.
     """
-    reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token_obj.token}"
-
-    if is_security_alert:
-        subject = "Password reset request — Bill n' Chill"
-        body = (
-            f"Someone tried to create a new account using your email address.\n\n"
-            f"If this was you and you forgot your password, click the link below to reset it:\n\n"
-            f"{reset_url}\n\n"
-            f"This link expires in 1 hour.\n\n"
-            f"If this wasn't you, you can safely ignore this email. Your account is secure."
-        )
-    else:
-        subject = "Reset your password — Bill n' Chill"
-        body = (
-            f"We received a request to reset your password.\n\n"
-            f"Click the link below to choose a new password:\n\n"
-            f"{reset_url}\n\n"
-            f"This link expires in 1 hour.\n\n"
-            f"If you didn't request this, you can safely ignore this email."
-        )
+    reset_url = f"{_frontend_url()}/reset-password?token={token_obj.token}"
+    subject = (
+        "Password reset request — Bill n' Chill"
+        if is_security_alert
+        else "Reset your password — Bill n' Chill"
+    )
+    context = {"reset_url": reset_url, "is_security_alert": is_security_alert}
+    body, html = _render_email("password_reset", context)
 
     send_mail(
         subject=subject,
         message=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[user.email],
+        html_message=html,
         fail_silently=False,
     )
 
@@ -105,13 +115,12 @@ def send_otp_email(recipient_email, code, document_type_label, document_title):
     decision on a public document link. Logs to EmailRecord for audit.
     """
     subject = "Your verification code — Bill n' Chill"
-    body = (
-        f"Your verification code is: {code}\n\n"
-        f"Use this code to verify your identity before signing:\n"
-        f"{document_type_label}: {document_title}\n\n"
-        f"This code expires in 10 minutes.\n\n"
-        f"If you did not request this code, you can safely ignore this email."
-    )
+    context = {
+        "code": code,
+        "document_type_label": document_type_label,
+        "document_title": document_title,
+    }
+    body, html = _render_email("otp", context)
 
     if settings.DEBUG:
         logger.debug("OTP code %s for %s (%s: %s)", code, recipient_email, document_type_label, document_title)
@@ -121,6 +130,7 @@ def send_otp_email(recipient_email, code, document_type_label, document_title):
         message=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[recipient_email],
+        html_message=html,
         fail_silently=False,
     )
 
@@ -157,13 +167,14 @@ def send_document_sent_email(*, document_type, document_title, public_url, recip
     org_name = membership.organization.display_name if membership else "Your contractor"
 
     subject = f"{document_type} from {org_name} — Bill n' Chill"
-    body = (
-        f"{org_name} has sent you a new {document_type.lower()}.\n\n"
-        f"{document_title}\n\n"
-        f"View and respond here:\n"
-        f"{public_url}\n\n"
-        f"If you have questions, please contact {org_name} directly."
-    )
+    context = {
+        "document_type": document_type,
+        "document_type_lower": document_type.lower(),
+        "document_title": document_title,
+        "public_url": public_url,
+        "org_name": org_name,
+    }
+    body, html = _render_email("document_sent", context)
 
     try:
         send_mail(
@@ -171,9 +182,10 @@ def send_document_sent_email(*, document_type, document_title, public_url, recip
             message=body,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[recipient_email.strip()],
+            html_message=html,
             fail_silently=False,
         )
-    except Exception as exc:
+    except Exception:
         logger.exception("Failed to send %s email to %s", document_type, recipient_email)
         return False
 
@@ -232,16 +244,18 @@ def send_document_decision_email(*, user_id, document_type, document_title, cust
 
     type_label = document_type.replace("_", " ").title()
     action_past = {"approve": "approved", "reject": "rejected", "dispute": "disputed"}.get(decision, decision)
-    frontend_url = settings.FRONTEND_URL.rstrip("/")
 
     subject = f"{type_label} {action_past} by {customer_name} — Bill n' Chill"
-    body = (
-        f"{customer_name} has {action_past} a {type_label.lower()}.\n\n"
-        f"{document_title}\n\n"
-        f"View in {org_name}:\n"
-        f"{frontend_url}{project_url}\n\n"
-        f"— Bill n' Chill"
-    )
+    context = {
+        "type_label": type_label,
+        "type_label_lower": type_label.lower(),
+        "action_past": action_past,
+        "document_title": document_title,
+        "customer_name": customer_name,
+        "org_name": org_name,
+        "project_url_full": f"{_frontend_url()}{project_url}",
+    }
+    body, html = _render_email("document_decision", context)
 
     try:
         send_mail(
@@ -249,6 +263,7 @@ def send_document_decision_email(*, user_id, document_type, document_title, cust
             message=body,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[user.email],
+            html_message=html,
             fail_silently=False,
         )
     except Exception:

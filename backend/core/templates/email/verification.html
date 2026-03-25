@@ -1,0 +1,8 @@
+{% extends "email/_base.html" %}
+{% block title %}Verify your email — Bill n' Chill{% endblock %}
+{% block content %}
+<p style="margin:0 0 16px; color:#18181b; font-size:16px; font-weight:600;">Welcome to Bill n' Chill</p>
+<p style="margin:0 0 24px; color:#3f3f46; font-size:15px; line-height:1.5;">Verify your email address to get started.</p>
+<a href="{{ verify_url }}" style="display:inline-block; padding:12px 28px; background:#2563eb; color:#ffffff; text-decoration:none; border-radius:6px; font-weight:600; font-size:15px;">Verify Email</a>
+<p style="margin:24px 0 0; color:#a1a1aa; font-size:13px; line-height:1.5;">This link expires in 24 hours. If you didn't create this account, you can safely ignore this email.</p>
+{% endblock %}
