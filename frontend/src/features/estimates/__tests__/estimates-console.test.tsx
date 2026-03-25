@@ -46,9 +46,9 @@ vi.mock("next/link", () => ({
 vi.mock("../components/estimates-workspace-panel", () => ({
   EstimatesWorkspacePanel: (props: Record<string, unknown>) => (
     <div data-testid="workspace-panel">
-      {props.workspaceBadgeLabel && (
+      {props.workspaceBadgeLabel ? (
         <span>{String(props.workspaceBadgeLabel)}</span>
-      )}
+      ) : null}
       {!props.canMutateEstimates && (
         <p>Role `{String(props.role)}` can view estimates but cannot create or update.</p>
       )}

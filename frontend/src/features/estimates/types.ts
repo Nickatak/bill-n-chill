@@ -5,6 +5,7 @@ export type ProjectRecord = {
   id: number;
   name: string;
   status: string;
+  customer?: number;
   customer_display_name: string;
   customer_billing_address?: string;
   customer_email?: string;

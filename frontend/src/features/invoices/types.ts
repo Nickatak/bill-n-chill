@@ -6,6 +6,7 @@ export type { UserData, OrganizationPublicContext, CostCode } from "@/shared/typ
 export type ProjectRecord = {
   id: number;
   name: string;
+  customer?: number;
   customer_display_name: string;
   customer_email?: string;
   status: string;
