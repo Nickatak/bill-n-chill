@@ -792,7 +792,7 @@ export function ProjectsConsole() {
                     <rect x="2" y="4" width="20" height="16" rx="2" />
                     <path d="M7 15h0M2 9.5h20" />
                   </svg>
-                  <span className={styles.pipelineLabel}>Bills</span>
+                  <span className={styles.pipelineLabel}>Expenses</span>
                   <span className={styles.pipelineCounts}>
                     <span className={`${styles.estimateCountPill} ${styles.billCountReceived}`}>
                       O{billStatusCounts ? billStatusCounts.open : "--"}

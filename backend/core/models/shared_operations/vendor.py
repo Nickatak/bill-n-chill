@@ -1,4 +1,4 @@
-"""Vendor model — B2B payee directory record for accounts payable."""
+"""Vendor model — org-scoped payee record for accounts payable."""
 
 from django.contrib.auth import get_user_model
 from django.db import models
@@ -7,17 +7,17 @@ User = get_user_model()
 
 
 class Vendor(models.Model):
-    """B2B vendor/subcontractor record used for AP bills.
+    """Org-scoped payee record used for AP bills and quick expenses.
 
     Business workflow:
-    - Represents a business relationship: subcontractors, trades, suppliers
-      who send you invoices. Symmetrical to Customer on the AR side.
-    - NOT for retail purchases (Home Depot, Lowe's) — those use quick
-      expenses (VendorBill with null vendor and store_name field).
-    - Maintained internally by the contractor/user.
+    - Unified payee entity: subcontractors, suppliers, retail stores,
+      and any other source of outbound payments.
+    - Only ``name`` is required. All other fields (email, phone,
+      tax_id_last4, notes) are optional — users fill them in when
+      the relationship warrants it.
+    - Auto-created by name via ``get_or_create_by_name()`` in the
+      quick expense flow.
     - Duplicate warnings are handled at application level by name/email.
-    - Duplicate matches are warning-level and allow explicit user override when needed
-      (e.g. two different legitimate Vendors with the same name).
 
     Current policy:
     - Always org-scoped (no system-wide/canonical vendors).
@@ -46,6 +46,24 @@ class Vendor(models.Model):
 
     class Meta:
         ordering = ["name", "id"]
+
+    @classmethod
+    def get_or_create_by_name(cls, organization_id, name, created_by):
+        """Find or create a Vendor by name within an org (case-insensitive).
+
+        Returns the standard ``(instance, created)`` tuple from
+        ``get_or_create``. Matching is case-insensitive; the stored
+        name preserves the casing of the first submission.
+        """
+        return cls.objects.get_or_create(
+            organization_id=organization_id,
+            name__iexact=name,
+            defaults={
+                "name": name,
+                "organization_id": organization_id,
+                "created_by": created_by,
+            },
+        )
 
     def __str__(self) -> str:
         return self.name

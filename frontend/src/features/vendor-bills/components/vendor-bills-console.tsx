@@ -102,7 +102,6 @@ import type {
   ApiResponse,
   ProjectRecord,
   ScanResult,
-  StoreRecord,
   VendorBillLineInput,
   VendorBillPolicyContract,
   VendorBillPayload,
@@ -161,7 +160,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [vendors, setVendors] = useState<VendorRecord[]>([]);
-  const [stores, setStores] = useState<StoreRecord[]>([]);
   const [vendorBills, setVendorBills] = useState<VendorBillRecord[]>([]);
 
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -213,7 +211,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const billForm = useVendorBillForm({
     isEditingMode,
     activeVendors,
-    stores,
   });
 
   const viewer = useVendorBillViewer({
@@ -225,10 +222,10 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   // -------------------------------------------------------------------------
 
   const {
-    formVendorId, formStoreId, formBillNumber, formReceivedDate, formIssueDate, formDueDate,
+    formVendorId, formBillNumber, formReceivedDate, formIssueDate, formDueDate,
     formTaxAmount, formShippingAmount, formNotes, formLineItems,
     computedSubtotal, computedTotal, duplicateCandidates,
-    setFormVendorId, setFormStoreId, setFormBillNumber, setFormReceivedDate,
+    setFormVendorId, setFormBillNumber, setFormReceivedDate,
     setFormIssueDate, setFormDueDate, setFormTaxAmount,
     setFormShippingAmount, setFormNotes,
     updateFormLineItem, removeFormLineItem, addFormLineItem,
@@ -293,55 +290,33 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   // Display helpers
   // -------------------------------------------------------------------------
 
-  // --- Unified "From" combobox (vendors + stores) ---
-  type FromOption =
-    | { kind: "vendor"; id: number; name: string; label: string }
-    | { kind: "store"; id: number; name: string; label: string };
+  // --- Vendor combobox ---
+  type VendorOption = { id: number; name: string; label: string };
 
-  const fromOptions: FromOption[] = useMemo(() => {
-    const vendorItems: FromOption[] = vendorOptions.map((v) => ({
-      kind: "vendor" as const,
+  const vendorComboItems: VendorOption[] = useMemo(() => {
+    return vendorOptions.map((v) => ({
       id: v.id,
       name: v.name,
       label: v.name,
     }));
-    const storeItems: FromOption[] = stores.map((s) => ({
-      kind: "store" as const,
-      id: s.id,
-      name: s.name,
-      label: s.name,
-    }));
-    return [...vendorItems, ...storeItems];
-  }, [vendorOptions, stores]);
+  }, [vendorOptions]);
 
-  const { inputRef: vendorInputRef, menuRef: vendorMenuRef, ...vendorCombobox } = useCombobox<FromOption>({
-    items: fromOptions,
+  const { inputRef: vendorInputRef, menuRef: vendorMenuRef, ...vendorCombobox } = useCombobox<VendorOption>({
+    items: vendorComboItems,
     getLabel: (item) => item.label,
-    onCommit: (item) => commitFrom(item),
+    onCommit: (item) => {
+      setFormVendorId(item ? String(item.id) : "");
+      vendorCombobox.close(item !== null);
+    },
   });
 
-  function commitFrom(item: FromOption | null) {
-    if (!item) {
-      setFormVendorId("");
-      setFormStoreId("");
-    } else if (item.kind === "vendor") {
-      setFormVendorId(String(item.id));
-    } else {
-      setFormStoreId(String(item.id));
-    }
-    vendorCombobox.close(item !== null);
-  }
-
-  /** The currently selected "From" option for display. */
-  const selectedFrom: FromOption | null = useMemo(() => {
+  /** The currently selected vendor option for display. */
+  const selectedVendorOption: VendorOption | null = useMemo(() => {
     if (formVendorId) {
-      return fromOptions.find((o) => o.kind === "vendor" && String(o.id) === formVendorId) ?? null;
-    }
-    if (formStoreId) {
-      return fromOptions.find((o) => o.kind === "store" && String(o.id) === formStoreId) ?? null;
+      return vendorComboItems.find((o) => String(o.id) === formVendorId) ?? null;
     }
     return null;
-  }, [formVendorId, formStoreId, fromOptions]);
+  }, [formVendorId, vendorComboItems]);
 
   /** Returns the display label for a bill status, using policy-provided labels. */
   function statusDisplayLabel(value: VendorBillStatus): string {
@@ -496,7 +471,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
               <div className={styles.detailGrid}>
                 <div>
                   <p className={styles.detailLabel}>Vendor</p>
-                  <p className={styles.detailValue}>{vendorBill.vendor_name || vendorBill.store_name || "Expense"}</p>
+                  <p className={styles.detailValue}>{vendorBill.vendor_name || "Expense"}</p>
                 </div>
                 <div>
                   <p className={styles.detailLabel}>Bill #</p>
@@ -585,21 +560,17 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   /** Loads projects and vendors in parallel on initial mount. */
   async function loadDependencies() {
     try {
-      const [projectsResponse, vendorsResponse, storesResponse] = await Promise.all([
+      const [projectsResponse, vendorsResponse] = await Promise.all([
         fetch(`${apiBaseUrl}/projects/`, {
           headers: buildAuthHeaders(authToken),
         }),
         fetch(`${apiBaseUrl}/vendors/`, {
           headers: buildAuthHeaders(authToken),
         }),
-        fetch(`${apiBaseUrl}/stores/`, {
-          headers: buildAuthHeaders(authToken),
-        }),
       ]);
 
       const projectsPayload: ApiResponse = await projectsResponse.json();
       const vendorsPayload: ApiResponse = await vendorsResponse.json();
-      const storesPayload = storesResponse.ok ? await storesResponse.json() : { data: [] };
       if (!projectsResponse.ok || !vendorsResponse.ok) {
         setFormError("Could not load projects/vendors.");
         return;
@@ -607,11 +578,9 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
       const projectRows = (projectsPayload.data as ProjectRecord[]) ?? [];
       const vendorRows = (vendorsPayload.data as VendorRecord[]) ?? [];
-      const storeRows = (storesPayload.data as StoreRecord[]) ?? [];
       const loadedActiveVendors = vendorRows.filter((row) => row.is_active);
       setProjects(projectRows);
       setVendors(vendorRows);
-      setStores(storeRows);
 
       if (projectRows.length > 0) {
         const preferredProject = preferredProjectId
@@ -693,7 +662,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           vendor: payloadBody.vendor,
-          store: payloadBody.store ?? null,
           bill_number: payloadBody.bill_number,
           issue_date: payloadBody.issue_date,
           due_date: payloadBody.due_date,
@@ -743,23 +711,13 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     clearFormMessage();
     const projectId = Number(selectedProjectId);
     const vendor = Number(billForm.newVendorId);
-    const store = Number(billForm.newStoreId);
-    const isVendorBill = Boolean(vendor);
 
     if (!projectId) {
       setFormError("Select a project first.");
       return;
     }
-    if (!vendor && !store) {
-      setFormError("Select a vendor or store.");
-      return;
-    }
-    if (isVendorBill && !activeVendors.find((row) => row.id === vendor)) {
-      setFormError("Selected vendor is inactive. Pick an active vendor.");
-      return;
-    }
-    if (isVendorBill && !billForm.newBillNumber.trim()) {
-      setFormError("Bill number is required for vendor bills.");
+    if (!vendor) {
+      setFormError("Select a vendor.");
       return;
     }
     if (!billForm.newIssueDate) {
@@ -780,7 +738,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     await createVendorBill({
       projectId,
       vendor: vendor || null,
-      store: store || null,
       bill_number: billForm.newBillNumber,
       received_date: billForm.newReceivedDate || null,
       issue_date: billForm.newIssueDate,
@@ -836,18 +793,12 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     clearFormMessage();
     const vendorBillId = Number(selectedVendorBillId);
     const vendor = Number(billForm.vendorId);
-    const store = Number(billForm.storeId);
-    const isVendorBill = Boolean(vendor);
     if (!vendorBillId) {
       setFormError("Select a vendor bill first.");
       return;
     }
-    if (!vendor && !store) {
-      setFormError("Select a vendor or store.");
-      return;
-    }
-    if (isVendorBill && !billForm.billNumber.trim()) {
-      setFormError("Bill number is required for vendor bills.");
+    if (!vendor) {
+      setFormError("Select a vendor.");
       return;
     }
     if (!billForm.issueDate) {
@@ -864,7 +815,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
         headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
         body: JSON.stringify({
           vendor: vendor || null,
-          store: store || null,
           bill_number: billForm.billNumber,
           received_date: billForm.receivedDate || null,
           issue_date: billForm.issueDate,
@@ -1030,7 +980,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       flashCreator();
 
       const docLabel = scan.document_type === "bill" ? "bill" : "receipt";
-      const name = scan.vendor_name || scan.store_name || "";
+      const name = scan.vendor_name || "";
       setFormSuccess(
         `Scanned ${docLabel}${name ? ` from ${name}` : ""}. Review and submit.`,
       );
@@ -1196,7 +1146,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                   >
                     <div className={styles.billCardTop}>
                       <div className={styles.billCardIdentity}>
-                        <span className={styles.billCardVendor}>{vendorBill.vendor_name || vendorBill.store_name || "Expense"}</span>
+                        <span className={styles.billCardVendor}>{vendorBill.vendor_name || "Expense"}</span>
                         <span className={styles.billCardMeta}>
                           #{vendorBill.id} {vendorBill.bill_number}
                           {vendorBill.due_date ? ` · Due ${formatDateDisplay(vendorBill.due_date)}` : ""}
@@ -1251,7 +1201,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                         <td>
                           <strong>#{vendorBill.id}</strong> {vendorBill.bill_number}
                         </td>
-                        <td>{vendorBill.vendor_name || vendorBill.store_name || "Expense"}</td>
+                        <td>{vendorBill.vendor_name || "Expense"}</td>
                         <td>
                           <span className={`${styles.tableStatusBadge} ${statusBadgeClass(vendorBill.status)}`}>
                             {statusDisplayLabel(vendorBill.status)}
@@ -1370,13 +1320,12 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                       role="combobox"
                       aria-expanded={vendorCombobox.isOpen}
                       aria-controls="vendor-combobox-listbox"
-                      value={vendorCombobox.isOpen ? vendorCombobox.query : (selectedFrom ? selectedFrom.name : "")}
-                      placeholder="Select vendor or store..."
-                      onFocus={() => vendorCombobox.open(selectedFrom ? selectedFrom.name : "")}
+                      value={vendorCombobox.isOpen ? vendorCombobox.query : (selectedVendorOption ? selectedVendorOption.name : "")}
+                      placeholder="Select vendor..."
+                      onFocus={() => vendorCombobox.open(selectedVendorOption ? selectedVendorOption.name : "")}
                       onChange={(e) => {
                         vendorCombobox.handleInput(e.target.value);
                         if (formVendorId) setFormVendorId("");
-                        if (formStoreId) setFormStoreId("");
                       }}
                       onKeyDown={vendorCombobox.handleKeyDown}
                       autoComplete="off"
@@ -1386,18 +1335,19 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                       <button
                         type="button"
                         className={styles.vendorChevron}
-                        aria-label={selectedFrom ? "Clear selection" : "Open list"}
+                        aria-label={selectedVendorOption ? "Clear selection" : "Open list"}
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
-                          if (selectedFrom) {
-                            commitFrom(null);
+                          if (selectedVendorOption) {
+                            setFormVendorId("");
+                            vendorCombobox.close(false);
                           } else {
                             vendorInputRef.current?.focus();
                             vendorCombobox.open("");
                           }
                         }}
                       >
-                        {selectedFrom ? "×" : "▾"}
+                        {selectedVendorOption ? "×" : "▾"}
                       </button>
                     ) : null}
                   </div>
@@ -1410,22 +1360,19 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                     >
                       {vendorCombobox.filteredItems.map((item, i) => (
                         <button
-                          key={`${item.kind}-${item.id}`}
+                          key={item.id}
                           type="button"
                           role="option"
-                          aria-selected={
-                            (item.kind === "vendor" && String(item.id) === formVendorId) ||
-                            (item.kind === "store" && String(item.id) === formStoreId)
-                          }
+                          aria-selected={String(item.id) === formVendorId}
                           className={`${styles.vendorOption} ${vendorCombobox.highlightIndex === i ? styles.vendorOptionActive : ""}`}
                           onMouseDown={(e) => e.preventDefault()}
                           onMouseEnter={() => vendorCombobox.setHighlightIndex(i)}
-                          onClick={() => commitFrom(item)}
+                          onClick={() => {
+                            setFormVendorId(String(item.id));
+                            vendorCombobox.close(true);
+                          }}
                         >
                           {item.name}
-                          <span className={styles.fromKindBadge}>
-                            {item.kind === "vendor" ? "Vendor" : "Store"}
-                          </span>
                         </button>
                       ))}
                       {vendorCombobox.filteredItems.length === 0 && vendorCombobox.query.trim() ? (
@@ -1700,7 +1647,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
               <p><strong>Duplicate candidates:</strong></p>
               {duplicateCandidates.map((candidate) => (
                 <p key={candidate.id}>
-                  #{candidate.id} {candidate.vendor_name || candidate.store_name || "Expense"} / {candidate.bill_number} (
+                  #{candidate.id} {candidate.vendor_name || "Expense"} / {candidate.bill_number} (
                   {statusDisplayLabel(candidate.status)})
                 </p>
               ))}

@@ -77,6 +77,8 @@
   composes: noticeError from "../../../shared/styles/notices.module.css";
 }
 
+/* ── Layout ─────────────────────────────────────────────────── */
+
 .layout {
   display: grid;
   gap: 14px;

@@ -14,8 +14,7 @@ Return ONLY a JSON object with these keys — no markdown, no explanation:
 
 {
   "document_type": "receipt" or "bill" — use "receipt" for retail store receipts, "bill" for vendor invoices/bills,
-  "vendor_name": "the vendor or company name on a bill/invoice, or empty string if not applicable or unreadable",
-  "store_name": "the store or retail business name on a receipt, or empty string if not applicable or unreadable",
+  "vendor_name": "the business, store, or company name on the document — whoever was paid, or empty string if unreadable",
   "bill_number": "any document identifier — invoice number, receipt number, transaction number, order number, confirmation number — or empty string if not found",
   "issue_date": "the document date or invoice date in YYYY-MM-DD format, or empty string if unreadable",
   "due_date": "the due date or payment due date in YYYY-MM-DD format, or empty string if not found",
@@ -72,10 +71,16 @@ def normalize_scan_result(raw: dict) -> dict:
 
     Fills missing string fields with "" and missing line_items with [].
     Sanitises each line item to only include expected keys.
+    Merges ``store_name`` into ``vendor_name`` (vendor is the unified payee entity).
     """
     result = {}
     for key in _STRING_FIELDS:
         result[key] = str(raw.get(key, "") or "").strip()
+
+    # Merge store_name → vendor_name (unified payee model).
+    store_name = str(raw.get("store_name", "") or "").strip()
+    if not result["vendor_name"] and store_name:
+        result["vendor_name"] = store_name
 
     raw_lines = raw.get("line_items") or []
     result["line_items"] = [

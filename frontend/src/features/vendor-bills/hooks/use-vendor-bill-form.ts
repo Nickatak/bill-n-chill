@@ -41,15 +41,13 @@ import {
   VendorBillLineFormRow,
   createEmptyVendorBillLineRow,
 } from "../helpers";
-import type { StoreRecord, VendorBillRecord, VendorRecord, ScanResult } from "../types";
+import type { VendorBillRecord, VendorRecord, ScanResult } from "../types";
 
 type UseVendorBillFormOptions = {
   /** Whether the form is in edit mode (true) or create mode (false). */
   isEditingMode: boolean;
   /** Active vendors, used by resetCreateForm to pre-select the first. */
   activeVendors: VendorRecord[];
-  /** Known stores, used by populateFromScan to match store names. */
-  stores: StoreRecord[];
 };
 
 /**
@@ -62,13 +60,11 @@ type UseVendorBillFormOptions = {
 export function useVendorBillForm({
   isEditingMode,
   activeVendors,
-  stores,
 }: UseVendorBillFormOptions) {
 
   // --- State (create-mode) ---
 
   const [newVendorId, setNewVendorId] = useState("");
-  const [newStoreId, setNewStoreId] = useState("");
   const [newBillNumber, setNewBillNumber] = useState("");
   const [newReceivedDate, setNewReceivedDate] = useState(todayDateInput());
   const [newIssueDate, setNewIssueDate] = useState("");
@@ -83,7 +79,6 @@ export function useVendorBillForm({
   // --- State (edit-mode) ---
 
   const [vendorId, setVendorId] = useState("");
-  const [storeId, setStoreId] = useState("");
   const [billNumber, setBillNumber] = useState("");
   const [receivedDate, setReceivedDate] = useState(todayDateInput());
   const [issueDate, setIssueDate] = useState("");
@@ -103,7 +98,6 @@ export function useVendorBillForm({
   // --- Derived (unified accessors) ---
 
   const formVendorId = isEditingMode ? vendorId : newVendorId;
-  const formStoreId = isEditingMode ? storeId : newStoreId;
   const formBillNumber = isEditingMode ? billNumber : newBillNumber;
   const formReceivedDate = isEditingMode ? receivedDate : newReceivedDate;
   const formIssueDate = isEditingMode ? issueDate : newIssueDate;
@@ -126,14 +120,8 @@ export function useVendorBillForm({
 
   // --- Functions (unified setters) ---
 
-  /** Routes vendor ID changes to the correct create/edit state. Clears store. */
   function setFormVendorId(value: string) {
-    if (isEditingMode) { setVendorId(value); setStoreId(""); } else { setNewVendorId(value); setNewStoreId(""); }
-  }
-
-  /** Routes store ID changes to the correct create/edit state. Clears vendor. */
-  function setFormStoreId(value: string) {
-    if (isEditingMode) { setStoreId(value); setVendorId(""); } else { setNewStoreId(value); setNewVendorId(""); }
+    if (isEditingMode) { setVendorId(value); } else { setNewVendorId(value); }
   }
 
   function setFormBillNumber(value: string) {
@@ -195,7 +183,6 @@ export function useVendorBillForm({
   /** Populates the edit form fields from a vendor bill record. */
   function hydrate(item: VendorBillRecord) {
     setVendorId(item.vendor ? String(item.vendor) : "");
-    setStoreId(item.store ? String(item.store) : "");
     setBillNumber(item.bill_number);
     setReceivedDate(item.received_date ?? "");
     setIssueDate(item.issue_date ?? "");
@@ -218,7 +205,6 @@ export function useVendorBillForm({
     const due = futureDateInput();
     setNewBillNumber("");
     setNewNotes("");
-    setNewStoreId("");
     setNewLineItems([createEmptyVendorBillLineRow()]);
     setDuplicateCandidates([]);
     if (!options?.preserveDates) {
@@ -236,7 +222,6 @@ export function useVendorBillForm({
   /** Copies a bill record into the create-mode fields for a "recreate as new" workflow. */
   function populateCreateFromBill(bill: VendorBillRecord) {
     setNewVendorId(bill.vendor ? String(bill.vendor) : "");
-    setNewStoreId(bill.store ? String(bill.store) : "");
     setNewBillNumber("");
     setNewReceivedDate(bill.received_date ?? "");
     setNewIssueDate(bill.issue_date ?? "");
@@ -257,18 +242,13 @@ export function useVendorBillForm({
 
   /** Prefills the create form from a scan result (receipt or bill). */
   function populateFromScan(scan: ScanResult) {
-    // Match vendor or store name (case-insensitive).
+    // Match vendor name (case-insensitive) — covers both receipts and bills.
     setNewVendorId("");
-    setNewStoreId("");
-
-    if (scan.document_type === "bill" && scan.vendor_name) {
-      const needle = scan.vendor_name.toLowerCase();
+    const vendorName = scan.vendor_name;
+    if (vendorName) {
+      const needle = vendorName.toLowerCase();
       const match = activeVendors.find((v) => v.name.toLowerCase() === needle);
       if (match) setNewVendorId(String(match.id));
-    } else if (scan.store_name) {
-      const needle = scan.store_name.toLowerCase();
-      const match = stores.find((s) => s.name.toLowerCase() === needle);
-      if (match) setNewStoreId(String(match.id));
     }
 
     setNewBillNumber(scan.bill_number || "");
@@ -307,7 +287,6 @@ export function useVendorBillForm({
   return {
     // State (unified read accessors)
     formVendorId,
-    formStoreId,
     formBillNumber,
     formReceivedDate,
     formIssueDate,
@@ -323,7 +302,6 @@ export function useVendorBillForm({
 
     // State (raw — needed by mutation handlers in console)
     newVendorId,
-    newStoreId,
     newBillNumber,
     newReceivedDate,
     newIssueDate,
@@ -333,7 +311,6 @@ export function useVendorBillForm({
     newNotes,
     newLineItems,
     vendorId,
-    storeId,
     billNumber,
     receivedDate,
     issueDate,
@@ -345,7 +322,6 @@ export function useVendorBillForm({
 
     // Setters (unified)
     setFormVendorId,
-    setFormStoreId,
     setFormBillNumber,
     setFormReceivedDate,
     setFormIssueDate,

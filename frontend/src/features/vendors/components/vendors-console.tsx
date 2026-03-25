@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Vendor directory console — root component for the /vendors page.
+ * Vendor management console — root component for the /vendors page.
  *
  * Pure orchestrator — composes hooks for list fetching, form CRUD
  * (with duplicate detection), filtering, and CSV import.
@@ -11,8 +11,6 @@
  * ## Page layout
  *
  * ┌─────────────────────────────────────────────────────┐
- * │ Header (title + stat pills)                         │
- * ├─────────────────────────────────────────────────────┤
  * │ Status banner (conditional)                         │
  * ├──────────────────────┬──────────────────────────────┤
  * │ Existing Vendors     │ Create/Edit Form             │
@@ -24,30 +22,6 @@
  * │       candidates     ├──────────────────────────────┤
  * │       (conditional)  │ CSV Import (collapsible)     │
  * └──────────────────────┴──────────────────────────────┘
- *
- * ## Hook dependency graph
- *
- * useApiList (shared — owns list data, selection, status messaging)
- *   ├── useVendorFilters   (reads vendors)
- *   ├── useVendorForm      (reads + writes vendors, reads selectedId)
- *   └── useVendorCsvImport (calls refreshVendors after apply)
- * usePagination            (reads filteredRows)
- *
- * ## Effect: filter reset
- *
- * Deps: [activityFilter, searchTerm, resetPage]
- *
- * Resets pagination to page 1 when filters change so the user
- * always sees the first matching results.
- *
- * ## Orchestration (in JSX)
- *
- * - useApiList's onSuccess resets page, clears duplicate state and
- *   import results.
- * - Form submit dispatches to form.handleSubmit which internally
- *   routes to create (with 409 handling) or PATCH based on selection.
- * - Duplicate candidates panel with "Create Anyway" button appears
- *   below the list when a 409 is received.
  */
 
 import { canDo } from "@/shared/session/rbac";
@@ -127,17 +101,6 @@ export function VendorsConsole() {
 
   return (
     <section className={styles.console}>
-      <header className={styles.headerRow}>
-        <div className={styles.headerCopy}>
-          <h2 className={styles.headerTitle}>Vendor Directory</h2>
-        </div>
-        <div className={styles.headerStats}>
-          <span className={styles.headerStatPill}>Total {vendors.length}</span>
-          <span className={styles.headerStatPill}>Active {filters.activeCount}</span>
-          <span className={styles.headerStatPill}>Inactive {filters.inactiveCount}</span>
-        </div>
-      </header>
-
       {!authToken ? <p className={styles.authNotice}>{authMessage}</p> : null}
 
       {statusMessage ? (

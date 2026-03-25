@@ -178,7 +178,7 @@ def _prefetch_vendor_bill_qs(queryset: QuerySet) -> QuerySet:
     - prefetch_related: batches separate queries for reverse-FK line items,
       their cost codes, and target payments, mapping results back in Python.
     """
-    return queryset.select_related("project", "vendor", "store").prefetch_related(
+    return queryset.select_related("project", "vendor").prefetch_related(
         "line_items", "line_items__cost_code",
         "target_payments",
     )

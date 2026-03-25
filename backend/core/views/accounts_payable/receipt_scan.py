@@ -48,8 +48,7 @@ def receipt_scan_view(request):
         {
           "data": {
             "document_type": "receipt" | "bill",
-            "vendor_name": "...",
-            "store_name": "...",
+            "vendor_name": "... (merged from store_name for receipts)",
             "bill_number": "...",
             "issue_date": "...",
             "due_date": "...",

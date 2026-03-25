@@ -15,11 +15,6 @@ export type VendorRecord = {
   is_active: boolean;
 };
 
-export type StoreRecord = {
-  id: number;
-  name: string;
-};
-
 export type VendorBillStatus = string;
 export type VendorBillPaymentStatus = "unpaid" | "partial" | "paid";
 
@@ -40,8 +35,6 @@ export type VendorBillRecord = {
   project_name: string;
   vendor: number | null;
   vendor_name: string;
-  store: number | null;
-  store_name: string;
   bill_number: string;
   status: VendorBillStatus;
   payment_status: VendorBillPaymentStatus;
@@ -92,7 +85,6 @@ export type VendorBillLineInput = {
 export type VendorBillPayload = {
   projectId: number;
   vendor: number | null;
-  store?: number | null;
   bill_number: string;
   received_date?: string | null;
   issue_date: string;
@@ -114,7 +106,6 @@ export type ScanResultLineItem = {
 export type ScanResult = {
   document_type: "receipt" | "bill";
   vendor_name: string;
-  store_name: string;
   bill_number: string;
   issue_date: string;
   due_date: string;

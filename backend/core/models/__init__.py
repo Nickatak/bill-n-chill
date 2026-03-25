@@ -1,4 +1,4 @@
-from core.models.accounts_payable import Store, VendorBill, VendorBillLine
+from core.models.accounts_payable import VendorBill, VendorBillLine
 from core.models.accounts_receivable import Invoice, InvoiceLine
 from core.models.change_orders import ChangeOrder, ChangeOrderLine
 from core.models.estimating import Estimate, EstimateLineItem
@@ -66,7 +66,6 @@ __all__ = [
     "OrganizationRecord",
     "PaymentRecord",
     "SigningCeremonyRecord",
-    "Store",
     "VendorBill",
     "VendorBillLine",
     "Payment",

@@ -13,11 +13,10 @@ class VendorBill(StatusTransitionMixin, models.Model):
     """AP bill or quick expense — inbound payable document.
 
     Business workflow:
-    - Two creation paths split by vendor presence:
-      - Full bill (vendor set): B2B vendor relationship, bill_number required,
-        line items required. Unique constraint on project+vendor+bill_number.
-      - Quick expense (vendor null): retail/misc expense with optional
-        store_name, no bill_number or line items required at creation.
+    - All bills reference a Vendor (the unified payee entity).
+      Vendor is optional to allow draft/scan-in-progress states.
+    - bill_number is optional — quick expenses and retail purchases
+      typically have no bill number.
     - Bills track document lifecycle only (open → closed).
       Payment status is derived from PaymentAllocation coverage, not a bill
       status. See ``docs/decisions/ap-model-separation.md``.
@@ -47,13 +46,6 @@ class VendorBill(StatusTransitionMixin, models.Model):
     )
     vendor = models.ForeignKey(
         "Vendor",
-        on_delete=models.PROTECT,
-        related_name="vendor_bills",
-        null=True,
-        blank=True,
-    )
-    store = models.ForeignKey(
-        "Store",
         on_delete=models.PROTECT,
         related_name="vendor_bills",
         null=True,
@@ -105,30 +97,15 @@ class VendorBill(StatusTransitionMixin, models.Model):
 
     def __str__(self) -> str:
         if self.vendor_id:
-            return f"{self.vendor.name} {self.bill_number}"
-        if self.store_id:
-            return self.store.name
+            parts = [self.vendor.name]
+            if self.bill_number:
+                parts.append(self.bill_number)
+            return " ".join(parts)
         return "Expense"
 
     def clean(self):
-        """Validate field requirements and status transitions.
-
-        Two-path validation based on vendor presence:
-        - Vendor set → bill_number required (full bill).
-        - Vendor null → bill_number must be blank (quick expense).
-        """
+        """Validate date constraints and status transitions."""
         errors = {}
-
-        if self.vendor_id:
-            if not self.bill_number:
-                errors.setdefault("bill_number", []).append(
-                    "Bill number is required when vendor is set."
-                )
-        else:
-            if self.bill_number:
-                errors.setdefault("bill_number", []).append(
-                    "Bill number must be blank when no vendor is set."
-                )
 
         if self.due_date and self.issue_date and self.due_date < self.issue_date:
             errors.setdefault("due_date", []).append("Due date must be on or after issue date.")
@@ -149,8 +126,7 @@ class VendorBill(StatusTransitionMixin, models.Model):
                 "id": self.id,
                 "project_id": self.project_id,
                 "vendor_id": self.vendor_id,
-                "store_id": self.store_id,
-                "store_name": self.store.name if self.store_id else "",
+                "vendor_name": self.vendor.name if self.vendor_id else "",
                 "bill_number": self.bill_number,
                 "status": self.status,
                 "received_date": self.received_date.isoformat() if self.received_date else None,

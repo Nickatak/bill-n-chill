@@ -52,7 +52,7 @@ export const workflowRoutes: NavRoute[] = [
  * the main workflow sequence. The dropdown trigger shows the org name.
  */
 export const businessMenuRoutes: NavRoute[] = [
-  { href: "/ops/organization", label: "Organization", exact: ["/ops/organization"], section: "Settings" },
+  { href: "/ops/organization", label: "Org Settings", exact: ["/ops/organization"], section: "Settings" },
   { href: "/cost-codes", label: "Cost Codes", exact: ["/cost-codes"], section: "Settings" },
   { href: "/vendors", label: "Vendors", exact: ["/vendors"], section: "Settings" },
   { href: "/onboarding", label: "Get Started", exact: ["/onboarding"], section: "Support" },

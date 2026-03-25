@@ -367,7 +367,7 @@ export function BillsTab({
     if (searchNeedle) {
       result = result.filter(
         (b) =>
-          (b.vendor_name || b.store_name || "").toLowerCase().includes(searchNeedle) ||
+          (b.vendor_name || "").toLowerCase().includes(searchNeedle) ||
           b.bill_number.toLowerCase().includes(searchNeedle) ||
           b.project_name.toLowerCase().includes(searchNeedle) ||
           b.total.includes(searchNeedle),
@@ -605,7 +605,7 @@ export function BillsTab({
           <div className={styles.documentIdentity}>
             <div className={styles.documentPrimary}>
               <span className={BILL_STATUS_CLASS[b.status] ?? ""}>{b.status}</span>
-              <span>{b.vendor_name || b.store_name || "Expense"}</span>
+              <span>{b.vendor_name || "Expense"}</span>
               {b.bill_number ? <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}>#{b.bill_number}</span> : null}
             </div>
             <div className={styles.documentSecondary}>
@@ -661,7 +661,7 @@ export function BillsTab({
         >
           <div className={styles.mobileCardTop}>
             <div className={styles.mobileCardIdentity}>
-              <span className={styles.mobileCardVendor}>{b.vendor_name || b.store_name || "Expense"}</span>
+              <span className={styles.mobileCardVendor}>{b.vendor_name || "Expense"}</span>
               <span className={styles.mobileCardProject}>{b.project_name}</span>
             </div>
             <div className={styles.mobileCardAmountBlock}>

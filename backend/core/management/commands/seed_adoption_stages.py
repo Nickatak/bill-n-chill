@@ -32,7 +32,6 @@ from core.models import (
     Payment,
     Project,
     RoleTemplate,
-    Store,
     Vendor,
     VendorBill,
     VendorBillLine,
@@ -415,18 +414,18 @@ class Command(BaseCommand):
         return p
 
     def _make_quick_expense(self, user, project, store_name, total, **kwargs):
-        """Create a VendorBill with null vendor (quick expense)."""
+        """Create a VendorBill for a quick expense (vendor auto-created by name)."""
         today = date.today()
         org = project.organization
-        store = None
+        vendor = None
         if store_name:
-            store, _ = Store.objects.get_or_create(
+            vendor, _ = Vendor.objects.get_or_create(
                 organization=org, name__iexact=store_name,
                 defaults={"name": store_name, "organization": org, "created_by": user},
             )
         balance_due = kwargs.get("balance_due", total)
         vb, _ = VendorBill.objects.get_or_create(
-            project=project, vendor=None, store=store, total=total,
+            project=project, vendor=vendor, total=total,
             defaults={
                 "bill_number": "",
                 "status": VendorBill.Status.OPEN,
