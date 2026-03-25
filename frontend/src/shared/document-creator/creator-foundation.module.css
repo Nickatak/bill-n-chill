@@ -451,6 +451,25 @@
   min-width: 760px;
 }
 
+.lineHeaderSimple {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px 100px 100px 64px;
+  gap: var(--space-sm);
+  align-items: stretch;
+  padding: 10px var(--space-md);
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.lineHeaderSimpleReadOnly {
+  composes: lineHeaderSimple;
+  grid-template-columns: minmax(0, 1fr) 70px 100px 100px;
+}
+
 .lineHeaderCell {
   position: relative;
   min-width: 0;
@@ -516,6 +535,25 @@
 .lineRowNoMarkup {
   grid-template-columns: 70px 1.5fr 170px 90px 130px 120px;
   min-width: 760px;
+}
+
+.lineRowSimple {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px 100px 100px 64px;
+  gap: var(--space-sm);
+  align-items: stretch;
+  padding: var(--space-sm) var(--space-md);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.lineRowSimple:nth-child(even) {
+  background: var(--table-row-alt);
+}
+
+.lineRowSimpleReadOnly {
+  composes: lineRowSimple;
+  grid-template-columns: minmax(0, 1fr) 70px 100px 100px;
 }
 
 .lineRow:nth-child(even) {
@@ -1388,6 +1426,30 @@
 
   .lineRowNoMarkup {
     grid-template-columns: 42px 1.6fr 1fr 48px 78px 76px;
+    min-width: 0;
+    break-inside: avoid;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+    gap: 4px;
+    padding: 6px 10px;
+  }
+
+  .lineHeaderSimple,
+  .lineHeaderSimpleReadOnly {
+    grid-template-columns: 1fr 48px 78px 76px;
+    min-width: 0;
+    background: #f3f4f6;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+    letter-spacing: 0.02em;
+    font-size: 0.6rem;
+    gap: 4px;
+    padding: 8px 10px;
+  }
+
+  .lineRowSimple,
+  .lineRowSimpleReadOnly {
+    grid-template-columns: 1fr 48px 78px 76px;
     min-width: 0;
     break-inside: avoid;
     color: #000000;

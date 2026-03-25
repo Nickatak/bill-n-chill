@@ -1489,8 +1489,8 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                 ))}
               </div>
             ) : (
-              <div className={creatorStyles.lineTable}>
-                <div className={`${styles.billLineHeader} ${workspaceIsLocked ? styles.billLineHeaderReadOnly : ""}`}>
+              <div className={`${creatorStyles.lineTable} ${styles.billLineTable}`}>
+                <div className={workspaceIsLocked ? creatorStyles.lineHeaderSimpleReadOnly : creatorStyles.lineHeaderSimple}>
                   <div className={creatorStyles.lineHeaderCell}><span>Description</span></div>
                   <div className={creatorStyles.lineHeaderCell}><span>Qty</span></div>
                   <div className={creatorStyles.lineHeaderCell}><span>Unit Price</span></div>
@@ -1500,7 +1500,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                 {formLineItems.map((row, index) => (
                   <div
                     key={`line-${index}`}
-                    className={`${styles.billLineRow} ${workspaceIsLocked ? styles.billLineRowReadOnly : ""}`}
+                    className={workspaceIsLocked ? creatorStyles.lineRowSimpleReadOnly : creatorStyles.lineRowSimple}
                   >
                     <div className={creatorStyles.lineCell}>
                       <input

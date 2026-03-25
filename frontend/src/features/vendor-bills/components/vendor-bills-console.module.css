@@ -585,40 +585,8 @@
   align-items: center;
 }
 
-/* ── Bill line item grid columns ──────────────────────────────── */
-
-.billLineHeader,
-.billLineRow {
-  display: grid;
-  grid-template-columns: 1fr 80px 120px 120px 60px;
-  gap: var(--space-sm);
-  align-items: stretch;
-  padding: var(--space-sm) var(--space-md);
-  min-width: 520px;
-}
-
-.billLineHeader {
-  background: var(--table-header-bg);
-  color: var(--table-header-text);
-  font-size: var(--font-sm);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.billLineRow {
-  border-top: 1px solid var(--border);
-  background: var(--surface);
-}
-
-.billLineRow:nth-child(even) {
-  background: var(--table-row-alt);
-}
-
-.billLineHeaderReadOnly,
-.billLineRowReadOnly {
-  grid-template-columns: 1fr 80px 120px 120px;
-  min-width: 440px;
+.billLineTable {
+  overflow-x: hidden;
 }
 
 .billSummaryDollarInput {
@@ -968,12 +936,6 @@
   .allocationLineHeader,
   .allocationLineRow {
     min-width: 400px;
-  }
-
-  /* Bill line grid: collapse min-width on mobile (cards handle rendering) */
-  .billLineHeader,
-  .billLineRow {
-    min-width: 0;
   }
 
   /* Workspace toolbar: stack context + actions */
