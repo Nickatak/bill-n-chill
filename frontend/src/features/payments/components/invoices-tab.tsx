@@ -58,8 +58,8 @@ type InvoiceListRecord = {
 const INVOICE_STATUS_CLASS: Record<string, string> = {
   draft: styles.statusDraft,
   sent: styles.statusSent,
-  partially_paid: styles.statusPartiallyPaid,
-  paid: styles.statusPaid,
+  outstanding: styles.statusOutstanding,
+  closed: styles.statusClosed,
   void: styles.statusVoid,
   disputed: styles.statusDisputed,
 };
@@ -388,7 +388,7 @@ export function InvoicesTab({
       result = result.filter((inv) => inv.status !== "void");
     }
     if (filterUnpaid) {
-      result = result.filter((inv) => inv.status !== "paid");
+      result = result.filter((inv) => inv.status !== "closed");
     }
     const searchNeedle = search.trim().toLowerCase();
     if (searchNeedle) {
@@ -406,7 +406,7 @@ export function InvoicesTab({
   const summary = useMemo(() => {
     const noDrafts = invoices.filter((inv) => inv.status !== "draft");
     const visible = hideVoided ? noDrafts.filter((inv) => inv.status !== "void") : noDrafts;
-    const unpaid = visible.filter((inv) => inv.status !== "paid");
+    const unpaid = visible.filter((inv) => inv.status !== "closed");
     const totalOutstanding = unpaid.reduce((sum, inv) => sum + Number(inv.balance_due), 0);
     return { unpaidCount: unpaid.length, totalOutstanding };
   }, [invoices, hideVoided]);

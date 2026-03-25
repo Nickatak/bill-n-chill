@@ -90,8 +90,8 @@ describe("invoiceStatusLabel", () => {
   it("returns label for known statuses", () => {
     expect(invoiceStatusLabel("draft")).toBe("Draft");
     expect(invoiceStatusLabel("sent")).toBe("Sent");
-    expect(invoiceStatusLabel("partially_paid")).toBe("Partially Paid");
-    expect(invoiceStatusLabel("paid")).toBe("Paid");
+    expect(invoiceStatusLabel("outstanding")).toBe("Outstanding");
+    expect(invoiceStatusLabel("closed")).toBe("Closed");
     expect(invoiceStatusLabel("void")).toBe("Void");
   });
 
@@ -131,12 +131,12 @@ describe("invoiceNextActionHint", () => {
     expect(invoiceNextActionHint("sent")).toContain("payments");
   });
 
-  it("returns hint for partially_paid", () => {
-    expect(invoiceNextActionHint("partially_paid")).toContain("remaining");
+  it("returns hint for outstanding", () => {
+    expect(invoiceNextActionHint("outstanding")).toContain("Close");
   });
 
-  it("returns settled message for paid", () => {
-    expect(invoiceNextActionHint("paid")).toContain("settled");
+  it("returns closed message for closed", () => {
+    expect(invoiceNextActionHint("closed")).toContain("closed");
   });
 
   it("returns void message for void", () => {

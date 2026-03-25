@@ -300,20 +300,20 @@ function ICWorkflow() {
             <li>User adds line items (description, qty, unit price, optional cost code).</li>
             <li>User sends &rarr; org identity frozen (name, address, logo, terms). Email sent to customer.</li>
             <li>Customer receives email (or Copy Link), opens public preview.</li>
-            <li>Customer approves via OTP ceremony &rarr; invoice transitions to paid.</li>
+            <li>Customer approves via OTP ceremony &rarr; audit event recorded (no status change).</li>
           </ol>
 
           <h4 style={{ margin: "0 0 0.5rem" }}>B. Partial Payment Flow</h4>
           <ol style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
             <li>Payment allocated against sent invoice (via accounting page or Quick Payment).</li>
-            <li>If applied amount &lt; total &rarr; status transitions to partially_paid.</li>
+            <li>First payment recorded &rarr; status auto-transitions to outstanding.</li>
             <li>Balance recalculated: <code>total - sum(settled allocations)</code>.</li>
-            <li>Additional payments applied until balance = $0 &rarr; paid.</li>
+            <li>User closes invoice when satisfied (outstanding &rarr; closed).</li>
           </ol>
 
           <h4 style={{ margin: "0 0 0.5rem" }}>C. Customer Dispute</h4>
           <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>Customer can dispute from public preview (sent or partially_paid).</li>
+            <li>Customer can dispute from public preview (sent or outstanding).</li>
             <li>Status stays the same &mdash; dispute is recorded as a note in the audit trail.</li>
             <li>User sees dispute note in status events and can follow up.</li>
           </ul>
@@ -331,7 +331,7 @@ function ICWorkflow() {
             <li><strong>Identity freeze:</strong> Sender name/address/logo/terms backfilled from org on leaving draft.</li>
             <li><strong>Balance tracking:</strong> <code>balance_due = total - sum(settled allocations)</code>. Clamped to 0.</li>
             <li><strong>Auto-activation:</strong> Creating first invoice on a prospect project auto-transitions project to active.</li>
-            <li><strong>Billable statuses:</strong> Only sent, partially_paid, paid count toward project &quot;billed&quot; totals.</li>
+            <li><strong>Billable statuses:</strong> Only sent, outstanding, closed count toward project &quot;billed&quot; totals.</li>
           </ul>
 
           <h4 style={{ margin: "0 0 0.5rem" }}>Audit</h4>
@@ -357,7 +357,7 @@ function ICWorkflow() {
             <li>Optionally selects an invoice to allocate against (amount pre-filled with balance_due).</li>
             <li><code>POST /projects/&lt;id&gt;/payments/</code> creates the payment (settled by default).</li>
             <li>If allocation target selected &rarr; immediately <code>POST /payments/&lt;id&gt;/allocate/</code>.</li>
-            <li>Invoice balance_due recalculated. Status auto-transitions: partially_paid or paid.</li>
+            <li>Invoice balance_due recalculated. Status auto-transitions to outstanding on first payment.</li>
           </ol>
 
           <h4 style={{ margin: "0 0 0.5rem" }}>B. Separate Allocation (two-step, Accounting page)</h4>
@@ -371,7 +371,7 @@ function ICWorkflow() {
           <h4 style={{ margin: "0 0 0.5rem" }}>C. Void Payment</h4>
           <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
             <li>User voids a settled payment &rarr; all linked invoice balances recalculated.</li>
-            <li>Invoice auto-reverts: paid &rarr; sent, partially_paid &rarr; sent (if no other settled allocations remain).</li>
+            <li>Invoice auto-reverts: outstanding &rarr; sent when all payments voided (if no other settled allocations remain).</li>
             <li>System-driven status revert bypasses normal transition validation.</li>
           </ul>
 
@@ -723,20 +723,20 @@ function GCWorkflow() {
             <li>User adds line items (description, qty, unit price, optional cost code).</li>
             <li>User sends &rarr; org identity frozen. Email sent to customer.</li>
             <li>Customer receives email (or Copy Link), opens public preview.</li>
-            <li>Customer approves via OTP ceremony &rarr; invoice transitions to paid.</li>
+            <li>Customer approves via OTP ceremony &rarr; audit event recorded (no status change).</li>
           </ol>
 
           <h4 style={{ margin: "0 0 0.5rem" }}>B. Partial Payment Flow</h4>
           <ol style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
             <li>Payment allocated against sent invoice (via accounting page or Quick Payment).</li>
-            <li>If applied amount &lt; total &rarr; status transitions to partially_paid.</li>
+            <li>First payment recorded &rarr; status auto-transitions to outstanding.</li>
             <li>Balance recalculated: <code>total - sum(settled allocations)</code>.</li>
-            <li>Additional payments applied until balance = $0 &rarr; paid.</li>
+            <li>User closes invoice when satisfied (outstanding &rarr; closed).</li>
           </ol>
 
           <h4 style={{ margin: "0 0 0.5rem" }}>C. Customer Dispute</h4>
           <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>Customer can dispute from public preview (sent or partially_paid).</li>
+            <li>Customer can dispute from public preview (sent or outstanding).</li>
             <li>Status stays the same &mdash; dispute is recorded as a note in the audit trail.</li>
           </ul>
 
@@ -777,7 +777,7 @@ function GCWorkflow() {
             <li>Fills in: method, amount, date, reference, notes.</li>
             <li>Optionally selects an invoice to allocate against (amount pre-filled with balance_due).</li>
             <li>Creates payment (settled by default), then allocates if target selected.</li>
-            <li>Invoice balance_due recalculated. Status auto-transitions: partially_paid or paid.</li>
+            <li>Invoice balance_due recalculated. Status auto-transitions to outstanding on first payment.</li>
           </ol>
 
           <h4 style={{ margin: "0 0 0.5rem" }}>B. Separate Allocation (two-step, Accounting page)</h4>
@@ -790,7 +790,7 @@ function GCWorkflow() {
           <h4 style={{ margin: "0 0 0.5rem" }}>C. Void Payment</h4>
           <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
             <li>User voids a settled payment &rarr; all linked invoice balances recalculated.</li>
-            <li>Invoice auto-reverts: paid &rarr; sent, partially_paid &rarr; sent.</li>
+            <li>Invoice auto-reverts: outstanding &rarr; sent when all payments voided.</li>
           </ul>
 
           <h4 style={{ margin: "0 0 0.5rem" }}>Key Mechanics</h4>

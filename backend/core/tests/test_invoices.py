@@ -162,12 +162,12 @@ class InvoiceTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         payload = response.json()["data"]
-        self.assertEqual(payload["status"], Invoice.Status.PAID)
-        self.assertEqual(payload["balance_due"], "0.00")
+        # Customer approval records an audit event but does not change
+        # the invoice status — payment status is derived from allocations.
+        self.assertEqual(payload["status"], Invoice.Status.SENT)
 
         invoice.refresh_from_db()
-        self.assertEqual(invoice.status, Invoice.Status.PAID)
-        self.assertEqual(str(invoice.balance_due), "0.00")
+        self.assertEqual(invoice.status, Invoice.Status.SENT)
 
     def test_public_invoice_decision_view_dispute_adds_status_note_event(self):
         invoice_id = self._create_invoice()
@@ -227,7 +227,7 @@ class InvoiceTests(TestCase):
         self.assertEqual(payload["status_labels"], expected_labels)
         self.assertEqual(payload["allowed_status_transitions"], expected_transitions)
         self.assertEqual(payload["default_create_status"], Invoice.Status.DRAFT)
-        self.assertTrue(str(payload["policy_version"]).startswith("2026-03-01.invoices."))
+        self.assertTrue(str(payload["policy_version"]).startswith("2026-03-25.invoices."))
 
     def test_invoice_create_calculates_totals_and_lines(self):
         response = self.client.post(
@@ -482,12 +482,13 @@ class InvoiceTests(TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["project"], self.project.id)
 
-    def test_invoice_status_transition_validation_and_paid_balance(self):
+    def test_invoice_status_transition_validation_and_closed(self):
         invoice_id = self._create_invoice()
 
+        # draft → closed is not allowed (must send first)
         invalid = self.client.patch(
             f"/api/v1/invoices/{invoice_id}/",
-            data={"status": "paid"},
+            data={"status": "closed"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -503,19 +504,18 @@ class InvoiceTests(TestCase):
         self.assertEqual(to_sent.status_code, 200)
         self.assertEqual(to_sent.json()["data"]["status"], "sent")
 
-        to_paid = self.client.patch(
+        to_closed = self.client.patch(
             f"/api/v1/invoices/{invoice_id}/",
-            data={"status": "paid"},
+            data={"status": "closed"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(to_paid.status_code, 200)
-        self.assertEqual(to_paid.json()["data"]["status"], "paid")
-        self.assertEqual(to_paid.json()["data"]["balance_due"], "0.00")
+        self.assertEqual(to_closed.status_code, 200)
+        self.assertEqual(to_closed.json()["data"]["status"], "closed")
         history = list(
             InvoiceStatusEvent.objects.filter(invoice_id=invoice_id).values_list("to_status", flat=True)
         )
-        self.assertEqual(history, [Invoice.Status.PAID, Invoice.Status.SENT, Invoice.Status.DRAFT])
+        self.assertEqual(history, [Invoice.Status.CLOSED, Invoice.Status.SENT, Invoice.Status.DRAFT])
 
     def test_invoice_send_endpoint_moves_draft_to_sent(self):
         invoice_id = self._create_invoice()
@@ -616,7 +616,7 @@ class InvoiceTests(TestCase):
     def test_invoice_model_blocks_invalid_status_transition_on_direct_save(self):
         invoice_id = self._create_invoice()
         invoice = Invoice.objects.get(id=invoice_id)
-        invoice.status = Invoice.Status.PAID
+        invoice.status = Invoice.Status.CLOSED
         with self.assertRaises(ValidationError):
             invoice.save()
 
@@ -636,39 +636,46 @@ class InvoiceTests(TestCase):
                 created_by=self.user,
             )
 
-    def test_invoice_model_paid_status_sets_zero_balance_due(self):
+    def test_invoice_closed_cannot_transition_to_void(self):
+        """Closed is a terminal state — voiding a closed invoice is not allowed."""
         invoice_id = self._create_invoice()
-
-        sent = self.client.patch(
+        self.client.patch(
             f"/api/v1/invoices/{invoice_id}/",
             data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(sent.status_code, 200)
+        self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "closed"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        response = self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "void"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("transition", response.json()["error"]["message"].lower())
 
+    def test_invoice_outstanding_cannot_void(self):
+        """Outstanding invoices cannot be voided — void payments first."""
+        invoice_id = self._create_invoice()
+        self.client.patch(
+            f"/api/v1/invoices/{invoice_id}/",
+            data={"status": "sent"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        # System-transition to outstanding (simulates payment recording)
         invoice = Invoice.objects.get(id=invoice_id)
-        invoice.status = Invoice.Status.PAID
-        invoice.balance_due = "999.99"
-        invoice.save()
-        invoice.refresh_from_db()
-        self.assertEqual(str(invoice.balance_due), "0.00")
+        invoice.status = Invoice.Status.OUTSTANDING
+        invoice._skip_transition_validation = True
+        invoice.save(update_fields=["status", "updated_at"])
+        invoice._skip_transition_validation = False
 
-    def test_invoice_paid_cannot_transition_to_void(self):
-        """Paid is a terminal state — voiding a paid invoice is not allowed."""
-        invoice_id = self._create_invoice()
-        self.client.patch(
-            f"/api/v1/invoices/{invoice_id}/",
-            data={"status": "sent"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.client.patch(
-            f"/api/v1/invoices/{invoice_id}/",
-            data={"status": "paid"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
         response = self.client.patch(
             f"/api/v1/invoices/{invoice_id}/",
             data={"status": "void"},
@@ -677,54 +684,6 @@ class InvoiceTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("transition", response.json()["error"]["message"].lower())
-
-    def test_invoice_partially_paid_cannot_transition_to_void(self):
-        """Partially paid is a terminal state — voiding is not allowed."""
-        invoice_id = self._create_invoice()
-        self.client.patch(
-            f"/api/v1/invoices/{invoice_id}/",
-            data={"status": "sent"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.client.patch(
-            f"/api/v1/invoices/{invoice_id}/",
-            data={"status": "partially_paid"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        response = self.client.patch(
-            f"/api/v1/invoices/{invoice_id}/",
-            data={"status": "void"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("transition", response.json()["error"]["message"].lower())
-
-    def test_invoice_partially_paid_can_revert_to_sent(self):
-        """partially_paid -> sent is allowed for payment void reversal."""
-        invoice_id = self._create_invoice()
-        self.client.patch(
-            f"/api/v1/invoices/{invoice_id}/",
-            data={"status": "sent"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.client.patch(
-            f"/api/v1/invoices/{invoice_id}/",
-            data={"status": "partially_paid"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        # partially_paid -> sent is allowed (e.g. payment void reversal)
-        response = self.client.patch(
-            f"/api/v1/invoices/{invoice_id}/",
-            data={"status": "sent"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(response.status_code, 200)
 
     def test_invoice_overdue_is_not_a_valid_status(self):
         """Overdue was removed from the status enum — it is now a computed condition."""

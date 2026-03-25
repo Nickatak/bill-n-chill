@@ -180,7 +180,7 @@ def public_invoice_decision_view(request, public_token: str):
     current_status = invoice.status
     if current_status not in {
         Invoice.Status.SENT,
-        Invoice.Status.PARTIALLY_PAID,
+        Invoice.Status.OUTSTANDING,
     }:
         return Response(
             {
@@ -231,40 +231,18 @@ def public_invoice_decision_view(request, public_token: str):
     client_ip = get_client_ip(request)
     user_agent = request.META.get("HTTP_USER_AGENT", "")
     with transaction.atomic():
-        previous_status = invoice.status
-        if decision_type == "approve":
-            if not Invoice.is_transition_allowed(previous_status, Invoice.Status.PAID):
-                return Response(
-                    {
-                        "error": {
-                            "code": "validation_error",
-                            "message": f"Invalid invoice status transition: {previous_status} -> paid.",
-                            "fields": {"status": ["This transition is not allowed."]},
-                        }
-                    },
-                    status=400,
-                )
-            invoice.status = Invoice.Status.PAID
-            invoice.save(update_fields=["status", "updated_at"])
-            InvoiceStatusEvent.record(
-                invoice=invoice,
-                from_status=previous_status,
-                to_status=invoice.status,
-                note=public_note,
-                changed_by=invoice.created_by,
-                ip_address=client_ip,
-                user_agent=user_agent,
-            )
-        else:
-            InvoiceStatusEvent.record(
-                invoice=invoice,
-                from_status=previous_status,
-                to_status=previous_status,
-                note=public_note,
-                changed_by=invoice.created_by,
-                ip_address=client_ip,
-                user_agent=user_agent,
-            )
+        # Customer decisions (approve/dispute) record an audit event but
+        # do not change the invoice status.  Payment status is derived from
+        # actual payment allocations, not customer acknowledgement.
+        InvoiceStatusEvent.record(
+            invoice=invoice,
+            from_status=current_status,
+            to_status=current_status,
+            note=public_note,
+            changed_by=invoice.created_by,
+            ip_address=client_ip,
+            user_agent=user_agent,
+        )
 
         content_hash = compute_document_content_hash("invoice", InvoiceSerializer(invoice).data)
         SigningCeremonyRecord.record(

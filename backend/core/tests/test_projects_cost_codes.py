@@ -881,7 +881,7 @@ class ReportingPackTests(TestCase):
             project=self.project,
             customer=self.project.customer,
             invoice_number="INV-RPT-2",
-            status=Invoice.Status.PAID,
+            status=Invoice.Status.CLOSED,
             issue_date="2026-02-01",
             due_date="2026-03-01",
             subtotal="600.00",

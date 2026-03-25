@@ -102,26 +102,26 @@ import { InvoicesWorkspacePanel } from "./invoices-workspace-panel";
 // Constants
 // ---------------------------------------------------------------------------
 
-const INVOICE_STATUSES_FALLBACK = ["draft", "sent", "partially_paid", "paid", "void"];
+const INVOICE_STATUSES_FALLBACK = ["draft", "sent", "outstanding", "closed", "void"];
 
 const INVOICE_STATUS_LABELS_FALLBACK: Record<string, string> = {
   draft: "Draft",
   sent: "Sent",
-  partially_paid: "Partially Paid",
-  paid: "Paid",
+  outstanding: "Outstanding",
+  closed: "Closed",
   void: "Void",
 };
 
 const INVOICE_ALLOWED_STATUS_TRANSITIONS_FALLBACK: Record<string, string[]> = {
   draft: ["sent", "void"],
-  sent: ["partially_paid", "paid", "void"],
-  partially_paid: ["paid"],
-  paid: [],
+  sent: ["closed", "void"],
+  outstanding: ["closed"],
+  closed: [],
   void: [],
 };
 
-const INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK = ["draft", "sent", "partially_paid"];
-const INVOICE_TERMINAL_STATUSES_FALLBACK = ["paid", "partially_paid", "void"];
+const INVOICE_DEFAULT_STATUS_FILTERS_FALLBACK = ["draft", "sent", "outstanding"];
+const INVOICE_TERMINAL_STATUSES_FALLBACK = ["closed", "void"];
 const INVOICE_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
 
 // Most display helpers moved to invoices-viewer-panel.tsx. Only invoiceStatusClass
@@ -131,8 +131,8 @@ const INVOICE_MIN_LINE_ITEMS_ERROR = "At least one line item is required.";
 function invoiceStatusClass(status: string): string {
   if (status === "draft") return styles.statusDraft;
   if (status === "sent") return styles.statusSent;
-  if (status === "partially_paid") return styles.statusPartial;
-  if (status === "paid") return styles.statusPaid;
+  if (status === "outstanding") return styles.statusOutstanding;
+  if (status === "closed") return styles.statusClosed;
   if (status === "void") return styles.statusVoid;
   return "";
 }

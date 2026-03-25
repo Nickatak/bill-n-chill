@@ -51,8 +51,8 @@ def _prefetch_invoice_qs(queryset: QuerySet) -> QuerySet:
 
 BILLABLE_INVOICE_STATUSES = {
     Invoice.Status.SENT,
-    Invoice.Status.PARTIALLY_PAID,
-    Invoice.Status.PAID,
+    Invoice.Status.OUTSTANDING,
+    Invoice.Status.CLOSED,
 }
 
 
@@ -461,8 +461,6 @@ def _handle_invoice_status_transition(
             quantize_money(Decimal(str(invoice.total)) - applied_total),
             Decimal("0"),
         )
-        if invoice.status == Invoice.Status.PAID:
-            invoice.balance_due = Decimal("0")
         invoice.save(update_fields=["balance_due", "updated_at"])
 
         # Audit event

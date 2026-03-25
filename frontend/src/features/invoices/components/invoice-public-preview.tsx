@@ -66,7 +66,7 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
     return organizationTerms || "No terms specified.";
   }, [invoice?.organization_context, invoice?.terms_text]);
   const canDecide =
-    invoice?.status === "sent" || invoice?.status === "partially_paid";
+    invoice?.status === "sent" || invoice?.status === "outstanding";
 
   // Clear stale decision feedback when the invoice is no longer actionable.
   useEffect(() => {

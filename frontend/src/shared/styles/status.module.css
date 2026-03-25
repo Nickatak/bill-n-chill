@@ -6,9 +6,9 @@
  *   green   — approved, active
  *   red     — rejected, cancelled
  *   gray    — void, completed, archived, inactive, closed
- *   emerald — paid
+ *   emerald — paid, closed (invoices)
  *   orange  — overdue, disputed
- *   violet  — partially_paid
+ *   violet  — outstanding (invoices)
  */
 
 .badge {

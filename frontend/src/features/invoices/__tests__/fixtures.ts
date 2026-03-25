@@ -11,22 +11,22 @@ import type { InvoiceStatusEvent } from "../document-adapter";
 
 export const policyContract: InvoicePolicyContract = {
   policy_version: "1",
-  statuses: ["draft", "sent", "partially_paid", "paid", "void"],
+  statuses: ["draft", "sent", "outstanding", "closed", "void"],
   status_labels: {
     draft: "Draft",
     sent: "Sent",
-    partially_paid: "Partially Paid",
-    paid: "Paid",
+    outstanding: "Outstanding",
+    closed: "Closed",
     void: "Void",
   },
   default_create_status: "draft",
-  default_status_filters: ["draft", "sent", "partially_paid"],
+  default_status_filters: ["draft", "sent", "outstanding"],
   allowed_status_transitions: {
     draft: ["sent", "void"],
-    sent: ["partially_paid", "paid", "void"],
-    partially_paid: ["paid"],
+    sent: ["closed", "void"],
+    outstanding: ["closed"],
   },
-  terminal_statuses: ["paid", "void"],
+  terminal_statuses: ["closed", "void"],
 };
 
 // ---------------------------------------------------------------------------

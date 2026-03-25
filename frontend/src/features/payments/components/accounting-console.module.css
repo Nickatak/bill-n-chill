@@ -164,14 +164,14 @@
   color: var(--status-amber-text);
 }
 
-.statusPartiallyPaid {
+.statusOutstanding {
   composes: badge from "../../../shared/styles/status.module.css";
   background: var(--status-violet-bg);
   border-color: var(--status-violet-border);
   color: var(--status-violet-text);
 }
 
-.statusPaid {
+.statusClosed {
   composes: badge from "../../../shared/styles/status.module.css";
   background: var(--status-emerald-bg);
   border-color: var(--status-emerald-border);

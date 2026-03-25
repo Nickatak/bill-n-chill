@@ -18,9 +18,9 @@ describe("toInvoiceStatusPolicy", () => {
     expect(result.statuses).toEqual(policyContract.statuses);
     expect(result.statusLabels).toEqual(policyContract.status_labels);
     expect(result.defaultCreateStatus).toBe("draft");
-    expect(result.defaultStatusFilters).toEqual(["draft", "sent", "partially_paid"]);
+    expect(result.defaultStatusFilters).toEqual(["draft", "sent", "outstanding"]);
     expect(result.allowedTransitions).toEqual(policyContract.allowed_status_transitions);
-    expect(result.terminalStatuses).toEqual(["paid", "void"]);
+    expect(result.terminalStatuses).toEqual(["closed", "void"]);
   });
 });
 

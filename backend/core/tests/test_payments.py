@@ -214,7 +214,7 @@ class PaymentTests(TestCase):
         )
         invoice.refresh_from_db()
         self.assertEqual(str(invoice.balance_due), "200.00")
-        self.assertEqual(invoice.status, Invoice.Status.PARTIALLY_PAID)
+        self.assertEqual(invoice.status, Invoice.Status.OUTSTANDING)
 
         payment = Payment.objects.get(id=payment_id)
         self.assertEqual(payment.target_type, Payment.TargetType.INVOICE)
@@ -434,15 +434,15 @@ class PaymentTests(TestCase):
 
     # ── Payment void reversal: system-driven status transitions ──
 
-    def test_void_payment_reopens_fully_paid_invoice(self):
-        """Voiding a payment that fully paid an invoice should revert the invoice to sent."""
+    def test_void_payment_reopens_outstanding_invoice_to_sent(self):
+        """Voiding the only payment on an outstanding invoice should revert to sent."""
         invoice = self._create_invoice(total="500.00")
         payment_id = self._create_payment(
             status="settled", amount="500.00", direction="inbound",
             target_type="invoice", target_id=invoice.id,
         )
         invoice.refresh_from_db()
-        self.assertEqual(invoice.status, Invoice.Status.PAID)
+        self.assertEqual(invoice.status, Invoice.Status.OUTSTANDING)
         self.assertEqual(str(invoice.balance_due), "0.00")
 
         void_resp = self.client.patch(
@@ -456,8 +456,8 @@ class PaymentTests(TestCase):
         self.assertEqual(invoice.status, Invoice.Status.SENT)
         self.assertEqual(str(invoice.balance_due), "500.00")
 
-    def test_void_one_of_two_payments_reverts_paid_invoice_to_partially_paid(self):
-        """Voiding one of two payments on a fully paid invoice should revert to partially_paid."""
+    def test_void_one_of_two_payments_keeps_invoice_outstanding(self):
+        """Voiding one of two payments on an outstanding invoice should keep it outstanding."""
         invoice = self._create_invoice(total="500.00")
         payment_a_id = self._create_payment(
             status="settled", amount="300.00", direction="inbound",
@@ -468,7 +468,7 @@ class PaymentTests(TestCase):
             target_type="invoice", target_id=invoice.id,
         )
         invoice.refresh_from_db()
-        self.assertEqual(invoice.status, Invoice.Status.PAID)
+        self.assertEqual(invoice.status, Invoice.Status.OUTSTANDING)
         self.assertEqual(str(invoice.balance_due), "0.00")
 
         void_resp = self.client.patch(
@@ -479,7 +479,7 @@ class PaymentTests(TestCase):
         )
         self.assertEqual(void_resp.status_code, 200)
         invoice.refresh_from_db()
-        self.assertEqual(invoice.status, Invoice.Status.PARTIALLY_PAID)
+        self.assertEqual(invoice.status, Invoice.Status.OUTSTANDING)
         self.assertEqual(str(invoice.balance_due), "300.00")
 
     def test_void_payment_restores_vendor_bill_balance(self):
@@ -504,12 +504,13 @@ class PaymentTests(TestCase):
         self.assertEqual(bill.status, VendorBill.Status.OPEN)
         self.assertEqual(str(bill.balance_due), "1000.00")
 
-    def test_user_cannot_manually_transition_paid_invoice_to_sent(self):
-        """The paid → sent transition should only be allowed by the system, not by user API calls."""
+    def test_user_cannot_manually_transition_outstanding_invoice_to_sent(self):
+        """The outstanding → sent transition should only be allowed by the system, not by user API calls."""
         invoice = self._create_invoice(total="500.00", status="sent")
-        invoice.status = Invoice.Status.PAID
-        invoice.balance_due = 0
-        invoice.save(update_fields=["status", "balance_due", "updated_at"])
+        invoice.status = Invoice.Status.OUTSTANDING
+        invoice._skip_transition_validation = True
+        invoice.save(update_fields=["status", "updated_at"])
+        invoice._skip_transition_validation = False
 
         resp = self.client.patch(
             f"/api/v1/invoices/{invoice.id}/",

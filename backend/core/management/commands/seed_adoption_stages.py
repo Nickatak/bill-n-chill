@@ -596,10 +596,10 @@ class Command(BaseCommand):
             Invoice.Status.SENT, Decimal("8000.00"), Decimal("8000.00"),
             cost_code=code2)
         self._make_invoice(user, p_active1, mid_customers[1], "INV-003",
-            Invoice.Status.PARTIALLY_PAID, Decimal("5000.00"), Decimal("2000.00"),
+            Invoice.Status.OUTSTANDING, Decimal("5000.00"), Decimal("2000.00"),
             cost_code=code1)
         inv_paid = self._make_invoice(user, p_completed, mid_customers[4], "INV-004",
-            Invoice.Status.PAID, Decimal("16000.00"), Decimal("0.00"),
+            Invoice.Status.CLOSED, Decimal("16000.00"), Decimal("0.00"),
             cost_code=code2)
         self._make_invoice(user, p_cancelled, mid_customers[5], "INV-005",
             Invoice.Status.VOID, Decimal("5000.00"), Decimal("0.00"),
@@ -848,14 +848,14 @@ class Command(BaseCommand):
             p = late_projects[p_idx]
             c = late_customers[p_idx]
             inv = self._make_invoice(user, p, c, f"INV-{inv_num:03d}",
-                Invoice.Status.PAID, Decimal("12000.00"), Decimal("0.00"),
+                Invoice.Status.CLOSED, Decimal("12000.00"), Decimal("0.00"),
                 cost_code=code1)
             paid_invoices.append(inv)
             inv_num += 1
 
-        # One partially paid
+        # One outstanding (partial payment)
         self._make_invoice(user, late_projects[3], late_customers[3], f"INV-{inv_num:03d}",
-            Invoice.Status.PARTIALLY_PAID, Decimal("10000.00"), Decimal("4000.00"),
+            Invoice.Status.OUTSTANDING, Decimal("10000.00"), Decimal("4000.00"),
             cost_code=code2)
         inv_num += 1
 
@@ -932,10 +932,10 @@ class Command(BaseCommand):
                 vb.total, vendor_bill=vb)
             pay_num += 1
 
-        # Partially paid invoice — two payments covering $6000 of $10000
+        # Outstanding invoice — two payments covering $6000 of $10000
         inv_partial = Invoice.objects.filter(
             project=late_projects[3],
-            status=Invoice.Status.PARTIALLY_PAID,
+            status=Invoice.Status.OUTSTANDING,
         ).first()
         if inv_partial:
             self._make_payment(user, late_projects[3], Payment.Direction.INBOUND,

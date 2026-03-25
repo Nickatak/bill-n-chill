@@ -28,8 +28,8 @@ class Invoice(StatusTransitionMixin, models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
         SENT = "sent", "Sent"
-        PARTIALLY_PAID = "partially_paid", "Partially Paid"
-        PAID = "paid", "Paid"
+        OUTSTANDING = "outstanding", "Outstanding"
+        CLOSED = "closed", "Closed"
         VOID = "void", "Void"
 
     # Transition-map format:
@@ -37,16 +37,16 @@ class Invoice(StatusTransitionMixin, models.Model):
     # Example: `draft -> sent` is allowed because
     # `Status.SENT` is in `ALLOWED_STATUS_TRANSITIONS[Status.DRAFT]`.
     #
-    # Terminal states: paid, void (no outbound transitions).
-    # partially_paid can advance to paid, or revert to sent when all
-    # allocations are removed (e.g. payment voided).
+    # Terminal states: closed, void (no outbound transitions).
+    # SENT → OUTSTANDING is system-only (auto on first payment).
+    # OUTSTANDING → SENT is system-only (auto when all payments voided).
     _status_label = "invoice"
 
     ALLOWED_STATUS_TRANSITIONS = {
         Status.DRAFT: {Status.SENT, Status.VOID},
-        Status.SENT: {Status.PARTIALLY_PAID, Status.PAID, Status.VOID},
-        Status.PARTIALLY_PAID: {Status.PAID, Status.SENT},
-        Status.PAID: set(),
+        Status.SENT: {Status.CLOSED, Status.VOID},
+        Status.OUTSTANDING: {Status.CLOSED},
+        Status.CLOSED: set(),
         Status.VOID: set(),
     }
 
@@ -109,10 +109,6 @@ class Invoice(StatusTransitionMixin, models.Model):
                 condition=Q(balance_due__gte=0),
                 name="invoice_balance_due_non_negative",
             ),
-            models.CheckConstraint(
-                condition=Q(status="paid", balance_due=0) | ~Q(status="paid"),
-                name="invoice_paid_requires_zero_balance_due",
-            ),
         ]
 
     def __str__(self) -> str:
@@ -147,7 +143,7 @@ class Invoice(StatusTransitionMixin, models.Model):
             )
 
         # Standard Django pattern: system-controlled status changes (e.g.
-        # payment allocation setting paid/partially_paid) set this flag to
+        # payment allocation setting outstanding/sent) set this flag to
         # bypass user-facing transition rules.  See payments_helpers.py.
         if not getattr(self, "_skip_transition_validation", False):
             self.validate_status_transition(errors)
@@ -156,7 +152,7 @@ class Invoice(StatusTransitionMixin, models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
-        """Auto-generate public token, zero balance on paid status, then validate and persist."""
+        """Auto-generate public token, then validate and persist."""
         update_fields = kwargs.get("update_fields")
         if not self.public_token:
             # 24-char token space makes collisions near-impossible; bounded
@@ -171,13 +167,6 @@ class Invoice(StatusTransitionMixin, models.Model):
             if update_fields is not None:
                 update_fields_set = set(update_fields)
                 update_fields_set.add("public_token")
-                kwargs["update_fields"] = list(update_fields_set)
-                update_fields = kwargs["update_fields"]
-        if self.status == self.Status.PAID:
-            self.balance_due = 0
-            if update_fields is not None:
-                update_fields_set = set(update_fields)
-                update_fields_set.add("balance_due")
                 kwargs["update_fields"] = list(update_fields_set)
         self.full_clean()
         return super().save(*args, **kwargs)

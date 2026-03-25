@@ -88,7 +88,7 @@ class PortfolioSnapshotTests(ReportingTestBase):
             invoice_number="INV-002",
             issue_date=today - timedelta(days=30),
             due_date=today - timedelta(days=1),
-            status=Invoice.Status.PAID,
+            status=Invoice.Status.CLOSED,
             created_by=self.user,
         )
         response = self.client.get("/api/v1/reports/portfolio/", **self._auth())

@@ -35,7 +35,7 @@ def _set_invoice_balance_from_payments(invoice: Invoice, *, changed_by: "User") 
     """Recompute an invoice's balance_due and status from its settled payments.
 
     Sums all settled payments linked to the invoice, updates balance_due,
-    and transitions status (paid/partially_paid/sent) as needed.  Bypasses
+    and auto-transitions between sent/outstanding as needed.  Bypasses
     model transition validation since balance-driven status changes are
     system-initiated.  Records an audit event when status changes.
     """
@@ -57,18 +57,17 @@ def _set_invoice_balance_from_payments(invoice: Invoice, *, changed_by: "User") 
     update_fields = ["balance_due", "updated_at"]
     invoice.balance_due = next_balance
 
-    if invoice.status != Invoice.Status.VOID:
-        if next_balance == MONEY_ZERO:
-            invoice.status = Invoice.Status.PAID
+    # Auto-transition SENT ↔ OUTSTANDING based on payment activity.
+    # CLOSED and VOID are terminal — never touched by payment logic.
+    if invoice.status not in {Invoice.Status.VOID, Invoice.Status.CLOSED}:
+        if applied_total > MONEY_ZERO and invoice.status == Invoice.Status.SENT:
+            invoice.status = Invoice.Status.OUTSTANDING
             update_fields.append("status")
-        elif next_balance < Decimal(str(invoice.total)):
-            invoice.status = Invoice.Status.PARTIALLY_PAID
-            update_fields.append("status")
-        elif invoice.status in {Invoice.Status.PAID, Invoice.Status.PARTIALLY_PAID}:
+        elif applied_total <= MONEY_ZERO and invoice.status == Invoice.Status.OUTSTANDING:
             invoice.status = Invoice.Status.SENT
             update_fields.append("status")
 
-    # System-driven status reversals (e.g. paid → sent after payment void)
+    # System-driven status changes (e.g. sent → outstanding on first payment)
     # bypass the model's transition validation since these are not user-initiated.
     invoice._skip_transition_validation = True
     try:
@@ -81,10 +80,8 @@ def _set_invoice_balance_from_payments(invoice: Invoice, *, changed_by: "User") 
         balance_restored = next_balance - previous_balance
         if balance_restored > MONEY_ZERO:
             note = f"Payment voided — ${balance_restored:,.2f} balance restored."
-        elif invoice.status == Invoice.Status.PAID:
-            note = "Payment settled — invoice fully paid."
         else:
-            note = "Payment applied — invoice partially paid."
+            note = "Payment recorded — invoice outstanding."
 
         InvoiceStatusEvent.record(
             invoice=invoice,

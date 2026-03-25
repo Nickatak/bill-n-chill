@@ -176,10 +176,10 @@ describe("InvoicesTab", () => {
     expect(screen.getByText("#INV-VOID")).toBeInTheDocument();
   });
 
-  it("filters to unpaid only by default, shows paid when toggled", async () => {
+  it("filters to unpaid only by default, shows closed when toggled", async () => {
     setupFetch([
       makeInvoice({ id: 1, status: "sent", invoice_number: "INV-UNPAID", balance_due: "5000.00" }),
-      makeInvoice({ id: 2, status: "paid", invoice_number: "INV-PAID", balance_due: "0.00" }),
+      makeInvoice({ id: 2, status: "closed", invoice_number: "INV-CLOSED", balance_due: "0.00" }),
     ]);
     renderTab();
 
@@ -187,13 +187,13 @@ describe("InvoicesTab", () => {
       expect(screen.getByText("#INV-UNPAID")).toBeInTheDocument();
     });
 
-    // Paid hidden by default
-    expect(screen.queryByText("#INV-PAID")).not.toBeInTheDocument();
+    // Closed hidden by default
+    expect(screen.queryByText("#INV-CLOSED")).not.toBeInTheDocument();
 
     // Toggle "Unpaid only" off
     fireEvent.click(screen.getByRole("button", { name: "Unpaid only" }));
 
-    expect(screen.getByText("#INV-PAID")).toBeInTheDocument();
+    expect(screen.getByText("#INV-CLOSED")).toBeInTheDocument();
   });
 
   it("search filters by customer name", async () => {

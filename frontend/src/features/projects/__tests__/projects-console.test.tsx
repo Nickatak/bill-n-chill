@@ -636,7 +636,7 @@ describe("ProjectsConsole", () => {
         { id: 1, status: "draft", balance_due: "5000.00" },
         { id: 2, status: "sent", balance_due: "10000.00" },
         { id: 3, status: "sent", balance_due: "8000.00" },
-        { id: 4, status: "partially_paid", balance_due: "3000.00" },
+        { id: 4, status: "outstanding", balance_due: "3000.00" },
       ],
     });
     render(<ProjectsConsole />);
@@ -649,11 +649,11 @@ describe("ProjectsConsole", () => {
     const billsLink = screen.getByRole("link", { name: /Expenses/ });
     expect(within(billsLink).getByText("D1")).toBeInTheDocument();
 
-    // Invoice badges: D{draft} S{sent} P{partially_paid}
+    // Invoice badges: D{draft} S{sent} O{outstanding}
     const invoicesLink = screen.getByRole("link", { name: /Invoices/ });
     expect(within(invoicesLink).getByText("D1")).toBeInTheDocument();
     expect(within(invoicesLink).getByText("S2")).toBeInTheDocument();
-    expect(within(invoicesLink).getByText("P1")).toBeInTheDocument();
+    expect(within(invoicesLink).getByText("O1")).toBeInTheDocument();
   });
 
   // ---------------------------------------------------------------------------

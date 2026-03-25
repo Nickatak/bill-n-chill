@@ -20,8 +20,8 @@ import type {
 const INVOICE_STATUS_LABELS_FALLBACK: Record<string, string> = {
   draft: "Draft",
   sent: "Sent",
-  partially_paid: "Partially Paid",
-  paid: "Paid",
+  outstanding: "Outstanding",
+  closed: "Closed",
   void: "Void",
 };
 
@@ -88,13 +88,13 @@ export function invoiceNextActionHint(status: string): string {
     return "Next: send the invoice to move it into billable AR tracking.";
   }
   if (status === "sent") {
-    return "Next: record payments to move invoice to partially paid or paid.";
+    return "Next: record payments or close the invoice when complete.";
   }
-  if (status === "partially_paid") {
-    return "Next: allocate remaining payment and close the outstanding balance.";
+  if (status === "outstanding") {
+    return "Payments recorded. Close the invoice when fully settled.";
   }
-  if (status === "paid") {
-    return "Invoice is fully settled.";
+  if (status === "closed") {
+    return "Invoice is closed.";
   }
   if (status === "void") {
     return "Invoice is void and no longer billable.";

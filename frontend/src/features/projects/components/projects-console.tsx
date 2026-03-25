@@ -109,7 +109,7 @@ export function ProjectsConsole() {
   const [invoiceStatusCounts, setInvoiceStatusCounts] = useState<{
     draft: number;
     sent: number;
-    partially_paid: number;
+    outstanding: number;
   } | null>(null);
   const [acceptedEstimateTotal, setAcceptedEstimateTotal] = useState("--");
   const [invoiceAllocationTargets, setInvoiceAllocationTargets] = useState<AllocationTarget[]>([]);
@@ -396,17 +396,17 @@ export function ProjectsConsole() {
       const rows = (payload.data as Array<{ status?: string }>) ?? [];
       let draft = 0;
       let sent = 0;
-      let partially_paid = 0;
+      let outstanding = 0;
       for (const invoice of rows) {
         if (invoice.status === "draft") {
           draft += 1;
         } else if (invoice.status === "sent") {
           sent += 1;
-        } else if (invoice.status === "partially_paid") {
-          partially_paid += 1;
+        } else if (invoice.status === "outstanding") {
+          outstanding += 1;
         }
       }
-      setInvoiceStatusCounts({ draft, sent, partially_paid });
+      setInvoiceStatusCounts({ draft, sent, outstanding });
     } catch {
       setInvoiceStatusCounts(null);
     }
@@ -775,7 +775,7 @@ export function ProjectsConsole() {
                       S{invoiceStatusCounts ? invoiceStatusCounts.sent : "--"}
                     </span>
                     <span className={`${styles.estimateCountPill} ${styles.invoiceCountPartial}`}>
-                      P{invoiceStatusCounts ? invoiceStatusCounts.partially_paid : "--"}
+                      O{invoiceStatusCounts ? invoiceStatusCounts.outstanding : "--"}
                     </span>
                   </span>
                 </Link>

@@ -9,8 +9,8 @@ User = get_user_model()
 INVOICE_STATUS_CHOICES = [
     ("draft", "Draft"),
     ("sent", "Sent"),
-    ("partially_paid", "Partially Paid"),
-    ("paid", "Paid"),
+    ("outstanding", "Outstanding"),
+    ("closed", "Closed"),
     ("void", "Void"),
 ]
 

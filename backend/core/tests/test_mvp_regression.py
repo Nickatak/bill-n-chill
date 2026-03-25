@@ -221,7 +221,7 @@ class MvpRegressionMoneyLoopTests(TestCase):
 
         invoice = Invoice.objects.get(id=invoice_id)
         vendor_bill = VendorBill.objects.get(id=vendor_bill_id)
-        self.assertEqual(invoice.status, Invoice.Status.PAID)
+        self.assertEqual(invoice.status, Invoice.Status.OUTSTANDING)
         self.assertEqual(str(invoice.balance_due), "0.00")
         self.assertEqual(vendor_bill.status, VendorBill.Status.OPEN)
         self.assertEqual(str(vendor_bill.balance_due), "0.00")

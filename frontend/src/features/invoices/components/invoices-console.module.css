@@ -161,14 +161,14 @@
   background: linear-gradient(180deg, color-mix(in srgb, var(--status-amber-bg) 60%, transparent), var(--surface));
 }
 
-.invoiceCardStatusPartial {
+.invoiceCardStatusOutstanding {
   border-color: var(--status-violet-border);
   background: linear-gradient(180deg, color-mix(in srgb, var(--status-violet-bg) 60%, transparent), var(--surface));
 }
 
-.invoiceCardStatusPaid {
-  border-color: var(--status-green-border);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--status-green-bg) 60%, transparent), var(--surface));
+.invoiceCardStatusClosed {
+  border-color: var(--status-emerald-border);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--status-emerald-bg) 60%, transparent), var(--surface));
 }
 
 .invoiceCardStatusVoid {
@@ -322,16 +322,16 @@
   border-color: var(--status-amber-border);
 }
 
-.statusTonePartial {
+.statusToneOutstanding {
   background: var(--status-violet-bg);
   color: var(--status-violet-text);
   border-color: var(--status-violet-border);
 }
 
-.statusTonePaid {
-  background: var(--status-green-bg);
-  color: var(--status-green-text);
-  border-color: var(--status-green-border);
+.statusToneClosed {
+  background: var(--status-emerald-bg);
+  color: var(--status-emerald-text);
+  border-color: var(--status-emerald-border);
 }
 
 .statusToneVoid {
@@ -365,14 +365,17 @@
   composes: sent from '../../../shared/styles/status.module.css';
 }
 
-.statusPartial {
+.statusOutstanding {
   background: var(--status-violet-bg);
   color: var(--status-violet-text);
   border-color: var(--status-violet-border);
 }
 
-.statusPaid {
-  composes: paid from '../../../shared/styles/status.module.css';
+.statusClosed {
+  composes: badge from '../../../shared/styles/status.module.css';
+  background: var(--status-emerald-bg);
+  border-color: var(--status-emerald-border);
+  color: var(--status-emerald-text);
 }
 
 .statusVoid {
@@ -538,24 +541,14 @@
   border-color: var(--status-amber-solid-text);
 }
 
-.actionButtonPartial {
-  background: var(--status-violet-solid, var(--status-violet-bg));
-  border-color: var(--status-violet-border);
-  color: var(--status-violet-solid-text, var(--status-violet-text));
+.actionButtonClosed {
+  background: var(--status-emerald-solid, var(--status-emerald-bg));
+  border-color: var(--status-emerald-border);
+  color: var(--status-emerald-solid-text, var(--status-emerald-text));
 }
 
-.actionButtonPartial:hover {
-  border-color: var(--status-violet-solid-text, var(--status-violet-text));
-}
-
-.actionButtonPaid {
-  background: var(--status-green-solid);
-  border-color: var(--status-green-solid);
-  color: var(--status-green-solid-text);
-}
-
-.actionButtonPaid:hover {
-  border-color: var(--status-green-solid-text);
+.actionButtonClosed:hover {
+  border-color: var(--status-emerald-solid-text, var(--status-emerald-text));
 }
 
 .actionButtonVoid {

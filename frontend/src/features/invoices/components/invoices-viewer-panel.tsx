@@ -36,8 +36,8 @@ import styles from "./invoices-console.module.css";
 function invoiceStatusClass(status: string): string {
   if (status === "draft") return styles.statusDraft;
   if (status === "sent") return styles.statusSent;
-  if (status === "partially_paid") return styles.statusPartial;
-  if (status === "paid") return styles.statusPaid;
+  if (status === "outstanding") return styles.statusOutstanding;
+  if (status === "closed") return styles.statusClosed;
   if (status === "void") return styles.statusVoid;
   return "";
 }
@@ -46,8 +46,8 @@ function invoiceStatusClass(status: string): string {
 function invoiceStatusToneClass(status: string): string {
   if (status === "draft") return styles.statusToneDraft;
   if (status === "sent") return styles.statusToneSent;
-  if (status === "partially_paid") return styles.statusTonePartial;
-  if (status === "paid") return styles.statusTonePaid;
+  if (status === "outstanding") return styles.statusToneOutstanding;
+  if (status === "closed") return styles.statusToneClosed;
   if (status === "void") return styles.statusToneVoid;
   return "";
 }
@@ -56,8 +56,8 @@ function invoiceStatusToneClass(status: string): string {
 function invoiceCardStatusClass(status: string): string {
   if (status === "draft") return styles.invoiceCardStatusDraft;
   if (status === "sent") return styles.invoiceCardStatusSent;
-  if (status === "partially_paid") return styles.invoiceCardStatusPartial;
-  if (status === "paid") return styles.invoiceCardStatusPaid;
+  if (status === "outstanding") return styles.invoiceCardStatusOutstanding;
+  if (status === "closed") return styles.invoiceCardStatusClosed;
   if (status === "void") return styles.invoiceCardStatusVoid;
   return "";
 }
@@ -79,8 +79,7 @@ function invoiceEventBadgeClass(event: InvoiceStatusEventRecord): string {
 function invoiceActionButtonColorClass(status: string): string {
   switch (status) {
     case "sent": return styles.actionButtonSent;
-    case "partially_paid": return styles.actionButtonPartial;
-    case "paid": return styles.actionButtonPaid;
+    case "closed": return styles.actionButtonClosed;
     case "void": return styles.actionButtonVoid;
     default: return "";
   }
@@ -88,8 +87,7 @@ function invoiceActionButtonColorClass(status: string): string {
 
 function invoiceActionLabel(statusValue: string, currentStatus?: string): string {
   if (statusValue === "sent") return currentStatus === "sent" ? "Re-send" : "Send to Customer";
-  if (statusValue === "partially_paid") return "Mark Partially Paid";
-  if (statusValue === "paid") return "Mark Paid";
+  if (statusValue === "closed") return "Close Invoice";
   if (statusValue === "void") return "Void Invoice";
   return statusValue;
 }
@@ -103,8 +101,7 @@ function invoiceConfirmationMessage(
   const label = `invoice ${invoice.invoice_number}`;
   const isResend = statusValue === "sent" && currentStatus === "sent";
   if (statusValue === "sent") return `${isResend ? "Re-send" : "Send"} ${label} to ${customerName || "customer"}.`;
-  if (statusValue === "partially_paid") return `Mark ${label} as partially paid.`;
-  if (statusValue === "paid") return `Mark ${label} as paid.`;
+  if (statusValue === "closed") return `Close ${label}.`;
   if (statusValue === "void") return `Void ${label}.`;
   return `Transition ${label} to ${statusValue}.`;
 }

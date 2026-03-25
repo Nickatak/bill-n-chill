@@ -3,7 +3,7 @@
 from core.models import Invoice
 from core.policies._base import _build_base_policy_contract
 
-INVOICE_POLICY_VERSION = "2026-03-01.invoices.v3"
+INVOICE_POLICY_VERSION = "2026-03-25.invoices.v4"
 
 
 def get_invoice_policy_contract() -> dict:
@@ -16,13 +16,13 @@ def get_invoice_policy_contract() -> dict:
             "default_status_filters": [
                 Invoice.Status.DRAFT,
                 Invoice.Status.SENT,
-                Invoice.Status.PARTIALLY_PAID,
+                Invoice.Status.OUTSTANDING,
             ],
             "scope_guard_rules": {
                 "billable_statuses": [
                     Invoice.Status.SENT,
-                    Invoice.Status.PARTIALLY_PAID,
-                    Invoice.Status.PAID,
+                    Invoice.Status.OUTSTANDING,
+                    Invoice.Status.CLOSED,
                 ],
                 "scope_override_event_required_for_out_of_scope_billable": True,
             },
