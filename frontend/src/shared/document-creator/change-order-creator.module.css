@@ -1,5 +1,4 @@
 .workflowSheet {
-  margin: 14px 0;
   border-radius: var(--radius-xl);
 }
 
@@ -252,10 +251,6 @@
   .coLineSectionIntro p,
   .coLineIssue {
     display: none !important;
-  }
-
-  .workflowSheet {
-    margin: 0;
   }
 
   .createSheet,

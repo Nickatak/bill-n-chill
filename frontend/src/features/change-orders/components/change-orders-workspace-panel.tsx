@@ -339,7 +339,7 @@ export function ChangeOrdersWorkspacePanel({
 
       {/* Create form */}
       {!selectedChangeOrder ? (
-        <div ref={createCreatorRef}>
+        <div ref={createCreatorRef} style={{ margin: "14px 0" }}>
           <DocumentCreator
           adapter={changeOrderCreatorAdapter}
           document={null}
@@ -678,7 +678,7 @@ export function ChangeOrdersWorkspacePanel({
 
       {/* Edit form */}
       {selectedChangeOrder ? (
-        <div ref={editCreatorRef}>
+        <div ref={editCreatorRef} style={{ margin: "14px 0" }}>
         <DocumentCreator
           adapter={changeOrderCreatorAdapter}
           document={selectedChangeOrder}
