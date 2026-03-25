@@ -1,4 +1,4 @@
-"""Receipt image scanning — best-effort field extraction via Gemini Vision."""
+"""Bill/receipt image scanning — best-effort field extraction via Gemini Vision."""
 
 import logging
 import os
@@ -14,6 +14,7 @@ from core.views.accounts_payable.receipt_scan_helpers import (
     EXTRACTION_PROMPT,
     MAX_IMAGE_BYTES,
     _parse_gemini_response,
+    normalize_scan_result,
 )
 from core.views.helpers import _capability_gate
 
@@ -24,11 +25,11 @@ logger = logging.getLogger(__name__)
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser])
 def receipt_scan_view(request):
-    """Accept a receipt image and return best-effort extracted fields.
+    """Accept a bill or receipt image and return best-effort extracted fields.
 
     Sends the image to Gemini Vision for OCR extraction. Does NOT create
     any records — only returns suggested values for the frontend to
-    prefill the receipt form.
+    prefill the bill form.
 
     Flow:
         1. Validate org membership and ``vendor_bills.create`` capability.
@@ -36,20 +37,36 @@ def receipt_scan_view(request):
         3. Validate the uploaded image (presence, content type, size).
         4. Send the image + extraction prompt to Gemini Vision.
         5. Parse the response (stripping markdown fences if present).
-        6. Return extracted fields, with empty strings for anything unreadable.
-           On Gemini failure, gracefully return all-empty fields.
+        6. Return extracted fields with safe defaults for anything unreadable.
 
-    URL: ``POST /api/v1/receipts/scan/``
+    URL: ``POST /api/v1/vendor-bills/scan/``
 
     Request body: multipart form data with an ``image`` file field.
 
     Success 200::
 
-        { "data": { "store_name": "...", "amount": "...", "receipt_date": "..." } }
+        {
+          "data": {
+            "document_type": "receipt" | "bill",
+            "vendor_name": "...",
+            "store_name": "...",
+            "bill_number": "...",
+            "issue_date": "...",
+            "due_date": "...",
+            "subtotal": "...",
+            "tax_amount": "...",
+            "shipping_amount": "...",
+            "total": "...",
+            "line_items": [
+              {"description": "...", "quantity": "...", "unit_price": "..."}
+            ]
+          }
+        }
 
     Errors:
         - 400: No image provided, unsupported type, or exceeds 5 MB.
         - 403: No active membership or missing ``vendor_bills.create`` capability.
+        - 502: Gemini API call failed.
         - 503: Gemini API key not configured.
     """
     membership = _ensure_org_membership(request.user)
@@ -63,7 +80,7 @@ def receipt_scan_view(request):
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
         return Response(
-            {"error": {"code": "service_unavailable", "message": "Receipt scanning is not configured."}},
+            {"error": {"code": "service_unavailable", "message": "Document scanning is not configured."}},
             status=503,
         )
 
@@ -104,15 +121,10 @@ def receipt_scan_view(request):
 
         extracted = _parse_gemini_response(response.text or "")
     except Exception:
-        logger.exception("Gemini receipt scan failed")
+        logger.exception("Gemini document scan failed")
         return Response(
-            {"data": {"store_name": "", "amount": "", "receipt_date": ""}},
+            {"error": {"code": "scan_failed", "message": "Document scanning service is temporarily unavailable."}},
+            status=502,
         )
 
-    return Response({
-        "data": {
-            "store_name": str(extracted.get("store_name", "") or "").strip(),
-            "amount": str(extracted.get("amount", "") or "").strip(),
-            "receipt_date": str(extracted.get("receipt_date", "") or "").strip(),
-        }
-    })
+    return Response({"data": normalize_scan_result(extracted)})

@@ -154,6 +154,12 @@ function setupDefaultFetch(overrides: {
         json: () => Promise.resolve({ data: overrides.vendorBills ?? [makeVendorBill()] }),
       });
     }
+    if (url.includes("/stores")) {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: [] }),
+      });
+    }
     if (url.includes("/vendors")) {
       return Promise.resolve({
         ok: true,

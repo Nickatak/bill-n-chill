@@ -714,6 +714,9 @@
 }
 
 .vendorOption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
   width: 100%;
   border: 0;
   border-top: 1px solid var(--table-border);
@@ -736,6 +739,14 @@
 .vendorInactiveBadge {
   color: var(--text-secondary);
   font-size: var(--font-xs);
+}
+
+.fromKindBadge {
+  margin-left: auto;
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .vendorNoResults {
@@ -1193,6 +1204,20 @@
   gap: var(--space-sm);
   grid-column: 2;
   grid-row: 1 / span 2;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+@keyframes scanPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.scanningPulse {
+  animation: scanPulse 1.5s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .toolbarActionButton {

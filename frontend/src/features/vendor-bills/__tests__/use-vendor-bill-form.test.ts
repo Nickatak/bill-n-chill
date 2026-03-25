@@ -65,6 +65,7 @@ describe("useVendorBillForm", () => {
   const defaultOptions = {
     isEditingMode: false,
     activeVendors: [makeVendor()],
+    stores: [],
   };
 
   it("starts with one empty line item in create mode", () => {
@@ -138,7 +139,7 @@ describe("useVendorBillForm", () => {
   it("hydrate populates edit-mode fields from a VendorBillRecord", () => {
     const { result, rerender } = renderHook(
       (props) => useVendorBillForm(props),
-      { initialProps: { isEditingMode: true, activeVendors: [makeVendor()] } },
+      { initialProps: { isEditingMode: true, activeVendors: [makeVendor()], stores: [] } },
     );
 
     const bill = makeVendorBill();
@@ -147,7 +148,7 @@ describe("useVendorBillForm", () => {
     });
 
     // Rerender so derived values recalculate with isEditingMode=true
-    rerender({ isEditingMode: true, activeVendors: [makeVendor()] });
+    rerender({ isEditingMode: true, activeVendors: [makeVendor()], stores: [] });
 
     expect(result.current.formVendorId).toBe("1");
     expect(result.current.formBillNumber).toBe("INV-001");
@@ -231,7 +232,7 @@ describe("useVendorBillForm", () => {
 
   it("unified setters route to edit-mode fields when editing", () => {
     const { result } = renderHook(() =>
-      useVendorBillForm({ isEditingMode: true, activeVendors: [makeVendor()] }),
+      useVendorBillForm({ isEditingMode: true, activeVendors: [makeVendor()], stores: [] }),
     );
 
     act(() => {
