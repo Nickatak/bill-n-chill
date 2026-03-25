@@ -240,15 +240,23 @@ export function useVendorBillForm({
     setDuplicateCandidates([]);
   }
 
-  /** Prefills the create form from a scan result (receipt or bill). */
-  function populateFromScan(scan: ScanResult) {
+  /** Prefills the create form from a scan result (receipt or bill).
+   *  Returns the unmatched vendor name if no existing vendor was found,
+   *  so the caller can pre-fill the combobox query for free-text creation.
+   */
+  function populateFromScan(scan: ScanResult): string {
     // Match vendor name (case-insensitive) — covers both receipts and bills.
     setNewVendorId("");
+    let unmatchedVendorName = "";
     const vendorName = scan.vendor_name;
     if (vendorName) {
       const needle = vendorName.toLowerCase();
       const match = activeVendors.find((v) => v.name.toLowerCase() === needle);
-      if (match) setNewVendorId(String(match.id));
+      if (match) {
+        setNewVendorId(String(match.id));
+      } else {
+        unmatchedVendorName = vendorName;
+      }
     }
 
     setNewBillNumber(scan.bill_number || "");
@@ -268,6 +276,8 @@ export function useVendorBillForm({
     setNewLineItems(
       scannedLines.length > 0 ? scannedLines : [createEmptyVendorBillLineRow()],
     );
+
+    return unmatchedVendorName;
   }
 
   /** Ensures date fields have sensible defaults (called once on mount). */

@@ -60,7 +60,7 @@ def _parse_gemini_response(text: str) -> dict:
 
 # Keys that should always be present in the response with string defaults.
 _STRING_FIELDS = (
-    "document_type", "vendor_name", "store_name", "bill_number",
+    "document_type", "vendor_name", "bill_number",
     "issue_date", "due_date", "subtotal", "tax_amount",
     "shipping_amount", "total",
 )
@@ -71,16 +71,10 @@ def normalize_scan_result(raw: dict) -> dict:
 
     Fills missing string fields with "" and missing line_items with [].
     Sanitises each line item to only include expected keys.
-    Merges ``store_name`` into ``vendor_name`` (vendor is the unified payee entity).
     """
     result = {}
     for key in _STRING_FIELDS:
         result[key] = str(raw.get(key, "") or "").strip()
-
-    # Merge store_name → vendor_name (unified payee model).
-    store_name = str(raw.get("store_name", "") or "").strip()
-    if not result["vendor_name"] and store_name:
-        result["vendor_name"] = store_name
 
     raw_lines = raw.get("line_items") or []
     result["line_items"] = [

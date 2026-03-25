@@ -975,7 +975,11 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       const scan = payload.data as ScanResult;
       // Switch to create mode and prefill from scan.
       setSelectedVendorBillId("");
-      billForm.populateFromScan(scan);
+      const unmatchedName = billForm.populateFromScan(scan);
+      // Pre-fill combobox with scanned name so user can create a new vendor.
+      if (unmatchedName) {
+        vendorCombobox.setQuery(unmatchedName);
+      }
       setIsWorkspaceExpanded(true);
       flashCreator();
 
@@ -1302,12 +1306,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           {/* ── WYSIWYG Bill Document Form ───────────────────────────── */}
           <form ref={billFormRef} className={styles.billDocument} onSubmit={handleSubmitVendorBillForm}>
 
-            {vendorOptions.length === 0 ? (
-              <p className={styles.formInlineHint}>No vendors available. Add a vendor first.</p>
-            ) : !isEditingMode && activeVendors.length === 0 ? (
-              <p className={styles.formInlineHint}>No active vendors. Reactivate one or create a new vendor.</p>
-            ) : null}
-
             {/* Header: vendor (letterhead) + bill number */}
             <div className={styles.billDocHeader}>
               <div className={styles.billDocFrom}>
@@ -1320,7 +1318,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                       role="combobox"
                       aria-expanded={vendorCombobox.isOpen}
                       aria-controls="vendor-combobox-listbox"
-                      value={vendorCombobox.isOpen ? vendorCombobox.query : (selectedVendorOption ? selectedVendorOption.name : "")}
+                      value={vendorCombobox.isOpen ? vendorCombobox.query : (selectedVendorOption ? selectedVendorOption.name : vendorCombobox.query)}
                       placeholder="Select vendor..."
                       onFocus={() => vendorCombobox.open(selectedVendorOption ? selectedVendorOption.name : "")}
                       onChange={(e) => {
