@@ -131,9 +131,14 @@ function coConfirmationMessage(
   return `Transition ${label} to ${statusValue}.`;
 }
 
-function coEmailNotice(customerEmail: string): string {
+function coEmailNotice(customerEmail: string, customerId?: number | null) {
   if (customerEmail) return `Email notification will be sent to ${customerEmail}.`;
-  return "No email on file — customer won't be notified automatically.";
+  return (
+    <>
+      No email on file — customer won&apos;t be notified automatically.{" "}
+      {customerId ? <Link href={`/customers?customer=${customerId}`}>Edit customer to add email &rarr;</Link> : null}
+    </>
+  );
 }
 
 /** Action confirmation panel for change orders. */
@@ -141,6 +146,7 @@ function ChangeOrderActionPanel({
   selectedViewerChangeOrder,
   quickStatusOptions,
   selectedProjectCustomerEmail,
+  selectedProjectCustomerId,
   selectedProjectName,
   quickStatus,
   setQuickStatus,
@@ -156,6 +162,7 @@ function ChangeOrderActionPanel({
   selectedViewerChangeOrder: ChangeOrderRecord;
   quickStatusOptions: string[];
   selectedProjectCustomerEmail: string;
+  selectedProjectCustomerId: number | null;
   selectedProjectName: string;
   quickStatus: string;
   setQuickStatus: (status: string) => void;
@@ -272,7 +279,7 @@ function ChangeOrderActionPanel({
           </label>
           {pendingAction === "sent" ? (
             <p className={styles.actionConfirmDetail}>
-              {coEmailNotice(customerEmail)}
+              {coEmailNotice(customerEmail, selectedProjectCustomerId)}
             </p>
           ) : null}
           <div className={styles.actionConfirmActions}>
@@ -348,6 +355,7 @@ export type ChangeOrdersViewerPanelProps = {
   selectedProjectId: string;
   selectedProjectName: string;
   selectedProjectCustomerEmail: string;
+  selectedProjectCustomerId: number | null;
 
   // Estimate rail
   projectEstimates: OriginEstimateRecord[];
@@ -402,6 +410,7 @@ export function ChangeOrdersViewerPanel({
   selectedProjectId,
   selectedProjectName,
   selectedProjectCustomerEmail,
+  selectedProjectCustomerId,
   projectEstimates,
   selectedViewerEstimateId,
   changeOrders,
@@ -551,6 +560,7 @@ export function ChangeOrdersViewerPanel({
                         selectedViewerChangeOrder={selectedViewerChangeOrder}
                         quickStatusOptions={quickStatusOptions}
                         selectedProjectCustomerEmail={selectedProjectCustomerEmail}
+                        selectedProjectCustomerId={selectedProjectCustomerId}
                         selectedProjectName={selectedProjectName}
                         quickStatus={quickStatus}
                         setQuickStatus={setQuickStatus}

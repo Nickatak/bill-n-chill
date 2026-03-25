@@ -109,9 +109,14 @@ function invoiceConfirmationMessage(
   return `Transition ${label} to ${statusValue}.`;
 }
 
-function invoiceEmailNotice(customerEmail: string): string {
+function invoiceEmailNotice(customerEmail: string, customerId?: number) {
   if (customerEmail) return `Email notification will be sent to ${customerEmail}.`;
-  return "No email on file — customer won't be notified automatically.";
+  return (
+    <>
+      No email on file — customer won&apos;t be notified automatically.{" "}
+      {customerId ? <Link href={`/customers?customer=${customerId}`}>Edit customer to add email &rarr;</Link> : null}
+    </>
+  );
 }
 
 /** Action confirmation panel for invoices — owns its own expanded/collapsed state. */
@@ -254,7 +259,7 @@ function InvoiceActionPanel({
           </label>
           {pendingAction === "sent" ? (
             <p className={styles.actionConfirmDetail}>
-              {invoiceEmailNotice(customerEmail)}
+              {invoiceEmailNotice(customerEmail, selectedProject?.customer)}
             </p>
           ) : null}
           <div className={styles.actionConfirmActions}>

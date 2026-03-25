@@ -664,6 +664,7 @@ export function ChangeOrdersConsole({
         selectedProjectId={projectData.selectedProjectId}
         selectedProjectName={projectData.selectedProjectName}
         selectedProjectCustomerEmail={projectData.selectedProjectCustomerEmail}
+        selectedProjectCustomerId={projectData.selectedProjectCustomerId}
         projectEstimates={projectData.projectEstimates}
         selectedViewerEstimateId={projectData.selectedViewerEstimateId}
         changeOrders={projectData.changeOrders}

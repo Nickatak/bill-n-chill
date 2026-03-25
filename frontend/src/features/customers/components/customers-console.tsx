@@ -54,7 +54,8 @@
 import { canDo } from "@/shared/session/rbac";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { useCustomerListFetch } from "../hooks/use-customer-list-fetch";
 import { useCustomerFilters } from "../hooks/use-customer-filters";
@@ -110,6 +111,21 @@ export function CustomersConsole() {
     filters.setActivityFilter("all");
     setHighlightedCustomerId(id);
   }, [listFetch, filters]);
+
+  // URL deep-link: ?customer=<id> searches and highlights the customer row.
+  const searchParams = useSearchParams();
+  const urlFocusHandledRef = useRef(false);
+
+  useEffect(() => {
+    if (urlFocusHandledRef.current) return;
+    const param = searchParams.get("customer");
+    if (!param || !/^\d+$/.test(param)) return;
+    const match = listFetch.customerRows.find((r) => r.id === Number(param));
+    if (match) {
+      handleFocusCustomer(match.id, match.display_name);
+      urlFocusHandledRef.current = true;
+    }
+  }, [listFetch.customerRows, searchParams, handleFocusCustomer]);
 
   function refreshAll() {
     listFetch.refresh();

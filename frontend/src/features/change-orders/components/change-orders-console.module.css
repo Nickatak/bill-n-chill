@@ -670,6 +670,16 @@
   color: var(--text-secondary);
 }
 
+.actionConfirmDetail a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.actionConfirmDetail a:hover {
+  text-decoration: underline;
+}
+
 .actionConfirmActions {
   display: flex;
   gap: 10px;
