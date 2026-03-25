@@ -8,7 +8,7 @@
  * Parent: CustomersConsole
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import type { ProjectRecord } from "@/features/projects/types";
@@ -22,6 +22,7 @@ type CustomersListProps = {
   filteredRows: CustomerRow[];
   query: string;
   projectsByCustomer: Record<number, ProjectRecord[]>;
+  highlightedCustomerId?: number | null;
   onEdit: (id: string) => void;
   onCreateProject: (customer: CustomerRow) => void;
 };
@@ -64,10 +65,19 @@ export function CustomersList({
   filteredRows,
   query,
   projectsByCustomer,
+  highlightedCustomerId,
   onEdit,
   onCreateProject,
 }: CustomersListProps) {
   const [openCustomerId, setOpenCustomerId] = useState<number | null>(null);
+  const highlightRef = useRef<HTMLDivElement>(null);
+
+  // Scroll highlighted row into view once it appears in the filtered list.
+  useEffect(() => {
+    if (highlightedCustomerId == null) return;
+    if (!highlightRef.current) return;
+    highlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightedCustomerId, filteredRows]);
   const [projectStatusFiltersByCustomer, setProjectStatusFiltersByCustomer] = useState<
     Record<number, ProjectStatusFilterState>
   >({});
@@ -120,10 +130,13 @@ export function CustomersList({
             (status) => !customerStatusFilters[status],
           );
 
+          const isHighlighted = row.id === highlightedCustomerId;
+
           return (
             <div
               key={row.id}
-              className={`${styles.gridRow} ${isInactive ? styles.gridRowInactive : ""}`}
+              ref={isHighlighted ? highlightRef : undefined}
+              className={`${styles.gridRow} ${isInactive ? styles.gridRowInactive : ""} ${isHighlighted ? styles.gridRowHighlight : ""}`}
             >
               {/* Customer info cell */}
               <div className={styles.gridCellCustomer}>

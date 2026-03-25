@@ -5,7 +5,7 @@
  *
  * Pure orchestrator — owns no domain state itself. Composes single-purpose
  * hooks, wires their outputs into child components, and handles cross-hook
- * coordination (modal mutual exclusion, combined refresh, deep-link routing).
+ * coordination (modal mutual exclusion, combined refresh, post-creation focus).
  *
  * Parent: app/customers/page.tsx
  *
@@ -42,14 +42,6 @@
  *     Calls listFetch.refresh() + projectIndex.refresh(). Passed to
  *     QuickAddConsole so both data sources reload after a new customer.
  *
- * ## Effect: scoped customer deep-link
- *
- * Deps: [listFetch.customerRows, searchParams, editor]
- *
- * On initial load, if the URL has ?customer=<id> and a matching row
- * exists, opens the editor for that customer. Fires once — a ref
- * prevents re-triggering on subsequent row updates.
- *
  * ## Orchestration (in JSX)
  *
  * - Modal mutual exclusion: opening the editor closes the project
@@ -62,8 +54,7 @@
 import { canDo } from "@/shared/session/rbac";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 
-import { useEffect, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
 import { useCustomerListFetch } from "../hooks/use-customer-list-fetch";
 import { useCustomerFilters } from "../hooks/use-customer-filters";
@@ -104,20 +95,21 @@ export function CustomersConsole() {
     setStatusMessage: listFetch.setStatusMessage,
   });
 
-  // Deep-link: ?customer=id opens the editor on initial load.
-  const searchParams = useSearchParams();
-  const scopedHandledRef = useRef(false);
+  // Highlight a customer row after creation — auto-clears after animation.
+  const [highlightedCustomerId, setHighlightedCustomerId] = useState<number | null>(null);
 
   useEffect(() => {
-    if (scopedHandledRef.current) return;
-    const param = searchParams.get("customer");
-    if (!param || !/^\d+$/.test(param)) return;
-    const match = listFetch.customerRows.find((r) => r.id === Number(param));
-    if (match) {
-      editor.open(String(match.id));
-      scopedHandledRef.current = true;
-    }
-  }, [listFetch.customerRows, searchParams, editor]);
+    if (highlightedCustomerId == null) return;
+    const timer = setTimeout(() => setHighlightedCustomerId(null), 3000);
+    return () => clearTimeout(timer);
+  }, [highlightedCustomerId]);
+
+  const handleFocusCustomer = useCallback((id: number, name: string) => {
+    listFetch.setQuery(name);
+    listFetch.setPage(1);
+    filters.setActivityFilter("all");
+    setHighlightedCustomerId(id);
+  }, [listFetch, filters]);
 
   function refreshAll() {
     listFetch.refresh();
@@ -138,6 +130,7 @@ export function CustomersConsole() {
             listFetch.setPage(1);
             filters.setActivityFilter("all");
           }}
+          onFocusCustomer={handleFocusCustomer}
         />
       </div>
 
@@ -164,6 +157,7 @@ export function CustomersConsole() {
           filteredRows={filters.filteredRows}
           query={listFetch.query}
           projectsByCustomer={projectIndex.projectsByCustomer}
+          highlightedCustomerId={highlightedCustomerId}
           onEdit={(id) => {
             projectCreator.close();
             editor.open(id);

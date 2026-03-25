@@ -20,10 +20,11 @@ import styles from "./quick-add-console.module.css";
 type QuickAddConsoleProps = {
   onCustomerCreated?: () => void;
   onBrowseCustomer?: (searchTerm: string) => void;
+  onFocusCustomer?: (id: number, name: string) => void;
 };
 
 /** Orchestrates the quick-add customer workflow, combining auth, form, and duplicate resolution. */
-export function QuickAddConsole({ onCustomerCreated, onBrowseCustomer }: QuickAddConsoleProps) {
+export function QuickAddConsole({ onCustomerCreated, onBrowseCustomer, onFocusCustomer }: QuickAddConsoleProps) {
   // Composition owner: bridges shared-session auth into the controller before child workflows run.
   const { token: authToken, authMessage: baseAuthMessage } = useSharedSessionAuth();
   const controllerApi = useQuickAddController({ authToken, baseAuthMessage, onCustomerCreated });
@@ -47,16 +48,22 @@ export function QuickAddConsole({ onCustomerCreated, onBrowseCustomer }: QuickAd
       <>
         <span>{statusMessage}</span>
         {hasCustomerLink ? (
-          <Link
+          <button
+            type="button"
             className={styles.formStatusLink}
-            href={`/customers?customer=${controllerApi.lastConvertedCustomerId}`}
+            onClick={() =>
+              onFocusCustomer?.(
+                controllerApi.lastConvertedCustomerId!,
+                controllerApi.lastConvertedCustomerName ?? "",
+              )
+            }
           >
             Customer #{controllerApi.lastConvertedCustomerId}
             {controllerApi.lastConvertedCustomerName
               ? ` (${controllerApi.lastConvertedCustomerName})`
               : ""}{" "}
             &rarr;
-          </Link>
+          </button>
         ) : null}
         {hasProjectLink ? (
           <Link

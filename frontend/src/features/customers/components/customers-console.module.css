@@ -143,6 +143,19 @@
   box-shadow: inset 3px 0 0 var(--tone-error-border);
 }
 
+.gridRowHighlight {
+  animation: rowHighlight 2.5s ease-out forwards;
+}
+
+@keyframes rowHighlight {
+  0%, 50% {
+    box-shadow: inset 4px 0 0 var(--status-green-border);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
 .mobileContact {
   display: none;
   margin: 3px 0 0;
