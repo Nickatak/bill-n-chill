@@ -3,44 +3,30 @@
 /**
  * Vendor management console — root component for the /vendors page.
  *
- * Pure orchestrator — composes hooks for list fetching, form CRUD
- * (with duplicate detection), filtering, and CSV import.
+ * Simple name input for quick-add at top. Full edit form appears only
+ * when a vendor is selected from the list. Search + paginated table.
  *
  * Parent: app/vendors/page.tsx
- *
- * ## Page layout
- *
- * ┌─────────────────────────────────────────────────────┐
- * │ Status banner (conditional)                         │
- * ├──────────────────────┬──────────────────────────────┤
- * │ Existing Vendors     │ Create/Edit Form             │
- * │   ├── Search input   │   ├── Name, Email, Phone     │
- * │   ├── Activity pills │   ├── Tax ID, Notes          │
- * │   ├── Vendor table   │   ├── Active status (edit)   │
- * │   ├── Pagination     │   ├── Duplicate override     │
- * │   └── Duplicate      │   └── Submit / Reset         │
- * │       candidates     ├──────────────────────────────┤
- * │       (conditional)  │ CSV Import (collapsible)     │
- * └──────────────────────┴──────────────────────────────┘
  */
 
 import { canDo } from "@/shared/session/rbac";
 import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { useApiList } from "@/shared/hooks/use-api-list";
 import { usePagination } from "@/shared/hooks/use-pagination";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { useVendorForm } from "../hooks/use-vendor-form";
 import { useVendorFilters } from "../hooks/use-vendor-filters";
 import { useVendorCsvImport } from "../hooks/use-vendor-csv-import";
 import type { VendorRecord } from "../types";
-import segmented from "../../../shared/styles/segmented.module.css";
 import styles from "./vendors-console.module.css";
 
 /** Full CRUD console for vendor records with search, pagination, and CSV import. */
 export function VendorsConsole() {
   const { token: authToken, authMessage, capabilities } = useSharedSessionAuth();
   const canMutateVendors = canDo(capabilities, "vendors", "create");
+
+  const [quickAddName, setQuickAddName] = useState("");
 
   const {
     items: vendors,
@@ -94,10 +80,9 @@ export function VendorsConsole() {
     refreshVendors,
   });
 
-  /** Effect: filter reset — resets pagination when filters change. */
   useEffect(() => {
     resetPage();
-  }, [filters.activityFilter, filters.searchTerm, resetPage]);
+  }, [filters.searchTerm, resetPage]);
 
   return (
     <section className={styles.console}>
@@ -120,12 +105,33 @@ export function VendorsConsole() {
       {authToken ? (
         <div className={styles.layout}>
           <section className={`${styles.panel} ${styles.existingPanel}`}>
-            <div className={styles.panelHeader}>
-              <h3 className={styles.panelTitle}>Existing Vendors</h3>
-              <span className={styles.countBadge}>
-                {filters.filteredRows.length}/{vendors.length}
-              </span>
-            </div>
+            {/* Quick add */}
+            <form
+              className={styles.quickAddRow}
+              onSubmit={(e) => {
+                e.preventDefault();
+                const trimmed = quickAddName.trim();
+                if (!trimmed) return;
+                void form.createVendor(trimmed).then(() => setQuickAddName(""));
+              }}
+            >
+              <input
+                className={styles.searchInput}
+                value={quickAddName}
+                onChange={(e) => setQuickAddName(e.target.value)}
+                placeholder="New vendor name"
+                aria-label="New vendor name"
+              />
+              <button
+                type="submit"
+                className={styles.primaryButton}
+                disabled={!canMutateVendors || !quickAddName.trim()}
+              >
+                Add
+              </button>
+            </form>
+
+            {/* Search + count */}
             <div className={styles.filterRow}>
               <input
                 className={styles.searchInput}
@@ -134,24 +140,12 @@ export function VendorsConsole() {
                 placeholder="Search by name, email, phone, or tax ID"
                 aria-label="Search vendors"
               />
-              <div className={segmented.group} role="group" aria-label="Vendor activity filter">
-                <button
-                  type="button"
-                  className={`${segmented.option} ${filters.activityFilter === "active" ? segmented.optionActive : ""}`}
-                  onClick={() => filters.setActivityFilter("active")}
-                >
-                  Active
-                </button>
-                <button
-                  type="button"
-                  className={`${segmented.option} ${filters.activityFilter === "all" ? segmented.optionActive : ""}`}
-                  onClick={() => filters.setActivityFilter("all")}
-                >
-                  All
-                </button>
-              </div>
+              <span className={styles.countBadge}>
+                {filters.filteredRows.length}/{vendors.length}
+              </span>
             </div>
 
+            {/* Table */}
             {filters.filteredRows.length > 0 ? (
               <>
                 <div className={styles.tableWrap}>
@@ -160,7 +154,6 @@ export function VendorsConsole() {
                       <tr>
                         <th>Vendor</th>
                         <th>Contact</th>
-                        <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -173,25 +166,14 @@ export function VendorsConsole() {
                             onClick={() => form.handleSelect(String(row.id))}
                           >
                             <td>
-                              <span className={styles.rowPrimary}>
-                                #{row.id} {row.name}
-                              </span>
-                              <span className={styles.rowSecondary}>
-                                Tax ID: {row.tax_id_last4 ? `••••${row.tax_id_last4}` : "n/a"}
-                              </span>
+                              <span className={styles.rowPrimary}>{row.name}</span>
+                              {row.tax_id_last4 ? (
+                                <span className={styles.rowSecondary}>Tax ID: ••••{row.tax_id_last4}</span>
+                              ) : null}
                             </td>
                             <td>
-                              <span className={styles.rowPrimary}>{row.email || "no-email"}</span>
-                              <span className={styles.rowSecondary}>{row.phone || "no-phone"}</span>
-                            </td>
-                            <td>
-                              <span
-                                className={`${styles.inlinePill} ${
-                                  row.is_active ? styles.inlinePillActive : styles.inlinePillInactive
-                                }`}
-                              >
-                                {row.is_active ? "Active" : "Inactive"}
-                              </span>
+                              <span className={styles.rowPrimary}>{row.email || "—"}</span>
+                              {row.phone ? <span className={styles.rowSecondary}>{row.phone}</span> : null}
                             </td>
                           </tr>
                         );
@@ -224,7 +206,7 @@ export function VendorsConsole() {
             ) : vendors.length > 0 ? (
               <p className={styles.emptyState}>No vendors match the current filter.</p>
             ) : (
-              <p className={styles.emptyState}>No vendors yet. Create one using the form, or import via CSV.</p>
+              <p className={styles.emptyState}>No vendors yet. Add one above, or import via CSV.</p>
             )}
 
             {form.duplicateCandidates.length > 0 ? (
@@ -241,83 +223,68 @@ export function VendorsConsole() {
             ) : null}
           </section>
 
+          {/* Edit form — only shown when a vendor is selected */}
           <div className={styles.layoutRight}>
-            <form
-              className={styles.panel}
-              onSubmit={form.handleSubmit}
-            >
-              <div className={styles.panelHeader}>
-                <h3 className={styles.panelTitle}>
-                  {form.selectedVendor ? `Edit: ${form.selectedVendor.name}` : "New Vendor"}
-                </h3>
-                {form.selectedVendor ? (
-                  <button type="button" className={styles.newButton} onClick={form.startCreateMode}>
-                    + New
+            {form.selectedVendor ? (
+              <form
+                className={styles.panel}
+                onSubmit={form.handleSubmit}
+              >
+                <div className={styles.panelHeader}>
+                  <h3 className={styles.panelTitle}>Edit: {form.selectedVendor.name}</h3>
+                  <button type="button" className={styles.ghostButton} onClick={form.startCreateMode}>
+                    Deselect
                   </button>
-                ) : null}
-              </div>
-              <label className={styles.field}>
-                <span>Name</span>
-                <input
-                  value={form.name}
-                  onChange={(event) => form.setName(event.target.value)}
-                  required
-                />
-              </label>
-              <label className={styles.field}>
-                <span>Email</span>
-                <input
-                  value={form.vendorEmail}
-                  onChange={(event) => form.setVendorEmail(event.target.value)}
-                />
-              </label>
-              <label className={styles.field}>
-                <span>Phone</span>
-                <input
-                  value={form.phone}
-                  onChange={(event) => form.setPhone(event.target.value)}
-                />
-              </label>
-              <label className={styles.field}>
-                <span>Tax ID (last 4)</span>
-                <input
-                  value={form.taxIdLast4}
-                  onChange={(event) => form.setTaxIdLast4(event.target.value)}
-                  inputMode="numeric"
-                  maxLength={4}
-                />
-              </label>
-              <label className={styles.field}>
-                <span>Notes</span>
-                <textarea
-                  value={form.notes}
-                  onChange={(event) => form.setNotes(event.target.value)}
-                  rows={4}
-                />
-              </label>
-              {form.selectedVendor ? (
+                </div>
                 <label className={styles.field}>
-                  <span>Active status</span>
-                  <select
-                    value={form.isActive ? "true" : "false"}
-                    onChange={(event) => form.setIsActive(event.target.value === "true")}
-                  >
-                    <option value="true">Active</option>
-                    <option value="false">Inactive</option>
-                  </select>
+                  <span>Name</span>
+                  <input
+                    value={form.name}
+                    onChange={(event) => form.setName(event.target.value)}
+                    required
+                  />
                 </label>
-              ) : null}
-              <div className={styles.formActions}>
-                <button type="submit" className={styles.primaryButton} disabled={!canMutateVendors}>
-                  {form.selectedVendor ? "Save Vendor" : "Create Vendor"}
-                </button>
-                {form.selectedVendor ? (
-                  <button type="button" className={styles.ghostButton} onClick={() => form.hydrate(form.selectedVendor!)}>
-                    Reset Fields
+                <label className={styles.field}>
+                  <span>Email</span>
+                  <input
+                    value={form.vendorEmail}
+                    onChange={(event) => form.setVendorEmail(event.target.value)}
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Phone</span>
+                  <input
+                    value={form.phone}
+                    onChange={(event) => form.setPhone(event.target.value)}
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Tax ID (last 4)</span>
+                  <input
+                    value={form.taxIdLast4}
+                    onChange={(event) => form.setTaxIdLast4(event.target.value)}
+                    inputMode="numeric"
+                    maxLength={4}
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Notes</span>
+                  <textarea
+                    value={form.notes}
+                    onChange={(event) => form.setNotes(event.target.value)}
+                    rows={3}
+                  />
+                </label>
+                <div className={styles.formActions}>
+                  <button type="submit" className={styles.primaryButton} disabled={!canMutateVendors}>
+                    Save
                   </button>
-                ) : null}
-              </div>
-            </form>
+                  <button type="button" className={styles.ghostButton} onClick={() => form.hydrate(form.selectedVendor!)}>
+                    Reset
+                  </button>
+                </div>
+              </form>
+            ) : null}
 
             <section className={styles.panel}>
               <button

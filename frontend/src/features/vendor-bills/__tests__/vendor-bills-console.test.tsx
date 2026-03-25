@@ -126,7 +126,6 @@ function makeVendor(overrides: Record<string, unknown> = {}) {
     id: 1,
     name: "Acme Lumber",
     email: "acme@example.com",
-    is_active: true,
     ...overrides,
   };
 }

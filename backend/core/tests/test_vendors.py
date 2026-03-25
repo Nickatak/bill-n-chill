@@ -233,7 +233,6 @@ class VendorTests(TestCase):
                 "phone": "555-2020",
                 "tax_id_last4": "5678",
                 "notes": "Updated note",
-                "is_active": False,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -245,22 +244,6 @@ class VendorTests(TestCase):
         self.assertEqual(vendor.phone, "555-2020")
         self.assertEqual(vendor.tax_id_last4, "5678")
         self.assertEqual(vendor.notes, "Updated note")
-        self.assertFalse(vendor.is_active)
-
-    def test_vendor_create_rejects_inactive_state(self):
-        create = self.client.post(
-            "/api/v1/vendors/",
-            data={
-                "name": "Inactive Vendor",
-                "is_active": False,
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(create.status_code, 400)
-        payload = create.json()["error"]
-        self.assertEqual(payload["code"], "validation_error")
-        self.assertIn("is_active", payload["fields"])
 
     def test_vendor_create_assigns_active_organization(self):
         membership = OrganizationMembership.objects.update_or_create(

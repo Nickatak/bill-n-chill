@@ -1,9 +1,9 @@
 /**
  * Vendor create/edit form state, CRUD handlers, and duplicate detection.
  *
- * Owns the form fields (name, email, phone, taxIdLast4, notes, isActive)
- * and the duplicate-candidate state surfaced by 409 responses. Duplicate
- * vendor names are blocked outright — there is no override path.
+ * Owns the form fields (name, email, phone, taxIdLast4, notes) and the
+ * duplicate-candidate state surfaced by 409 responses. Duplicate vendor
+ * names are blocked outright — there is no override path.
  *
  * Consumer: VendorsConsole (composed alongside useVendorFilters
  * and useVendorCsvImport).
@@ -56,7 +56,6 @@ export function useVendorForm({
   const [phone, setPhone] = useState("");
   const [taxIdLast4, setTaxIdLast4] = useState("");
   const [notes, setNotes] = useState("");
-  const [isActive, setIsActive] = useState(true);
 
   const [duplicateCandidates, setDuplicateCandidates] = useState<VendorRecord[]>([]);
 
@@ -73,7 +72,6 @@ export function useVendorForm({
     setPhone(vendor.phone);
     setTaxIdLast4(vendor.tax_id_last4);
     setNotes(vendor.notes);
-    setIsActive(vendor.is_active);
   }
 
   /** Clear fields, deselect the list, and reset duplicate state. */
@@ -84,7 +82,6 @@ export function useVendorForm({
     setPhone("");
     setTaxIdLast4("");
     setNotes("");
-    setIsActive(true);
     setDuplicateCandidates([]);
   }
 
@@ -97,12 +94,12 @@ export function useVendorForm({
     setDuplicateCandidates([]);
   }
 
-  /** POST a new vendor. Surfaces 409 duplicate candidates — no override path. */
-  async function createVendor(payloadBody: VendorPayload) {
+  /** POST a new vendor (name only). Surfaces 409 duplicate candidates. */
+  async function createVendor(vendorName: string) {
     const response = await fetch(`${apiBaseUrl}/vendors/`, {
       method: "POST",
       headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
-      body: JSON.stringify(payloadBody),
+      body: JSON.stringify({ name: vendorName }),
     });
     const payload: ApiResponse = await response.json();
 
@@ -127,30 +124,25 @@ export function useVendorForm({
     setSelectedId(String(created.id));
     hydrate(created);
     setDuplicateCandidates([]);
-    status.setSuccess(`Created vendor #${created.id}.`);
+    status.setSuccess(`Created vendor "${created.name}".`);
   }
 
-  /** Unified form submit: POSTs new vendors (with 409 handling) or PATCHes existing. */
+  /** Save edits to an existing vendor via PATCH. */
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canMutate) {
       status.setError("Your role is read-only for vendor mutations.");
       return;
     }
+    if (!selectedVendor) return;
+
     const payloadBody: VendorPayload = {
       name: name.trim(),
       email: vendorEmail.trim(),
       phone: phone.trim(),
       tax_id_last4: taxIdLast4.trim(),
       notes: notes.trim(),
-      is_active: selectedVendor ? isActive : true,
     };
-
-    if (!selectedVendor) {
-      status.setNeutral("Creating vendor...");
-      await createVendor(payloadBody);
-      return;
-    }
 
     status.setNeutral("Saving vendor...");
     try {
@@ -188,7 +180,6 @@ export function useVendorForm({
     phone,
     taxIdLast4,
     notes,
-    isActive,
     duplicateCandidates,
     selectedVendor,
 
@@ -198,12 +189,12 @@ export function useVendorForm({
     setPhone,
     setTaxIdLast4,
     setNotes,
-    setIsActive,
 
     // Helpers
     hydrate,
     startCreateMode,
     handleSelect,
     handleSubmit,
+    createVendor,
   };
 }

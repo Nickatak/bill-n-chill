@@ -8,7 +8,6 @@ export type VendorRecord = {
   phone: string;
   tax_id_last4: string;
   notes: string;
-  is_active: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -19,7 +18,6 @@ export type VendorPayload = {
   phone: string;
   tax_id_last4: string;
   notes: string;
-  is_active: boolean;
 };
 
 export type VendorCsvImportResult = {

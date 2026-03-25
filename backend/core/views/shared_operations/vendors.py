@@ -100,18 +100,6 @@ def vendors_list_create_view(request):
                 status=400,
             )
 
-        if data.get("is_active") is False:
-            return Response(
-                {
-                    "error": {
-                        "code": "validation_error",
-                        "message": "New vendors must be active on creation.",
-                        "fields": {"is_active": ["New vendors must be active on creation."]},
-                    }
-                },
-                status=400,
-            )
-
         duplicates = _find_duplicate_vendors(request.user, name=data["name"])
         if duplicates:
             return Response(
@@ -139,7 +127,6 @@ def vendors_list_create_view(request):
             phone=data.get("phone", ""),
             tax_id_last4=data.get("tax_id_last4", ""),
             notes=data.get("notes", ""),
-            is_active=True,
             created_by=request.user,
         )
         return Response(
@@ -245,10 +232,6 @@ def vendor_detail_view(request, vendor_id):
         if "notes" in data:
             vendor.notes = data["notes"]
             update_fields.append("notes")
-        if "is_active" in data:
-            vendor.is_active = data["is_active"]
-            update_fields.append("is_active")
-
         if len(update_fields) > 1:
             vendor.save(update_fields=update_fields)
 
@@ -311,7 +294,6 @@ def vendors_import_csv_view(request):
             phone=row.get("phone", ""),
             tax_id_last4=row.get("tax_id_last4", ""),
             notes=row.get("notes", ""),
-            is_active=True,
         )
 
     def update_vendor(existing, row):

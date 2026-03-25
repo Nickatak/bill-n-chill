@@ -30,7 +30,6 @@ class Vendor(models.Model):
     phone = models.CharField(max_length=50, blank=True)
     tax_id_last4 = models.CharField(max_length=4, blank=True)
     notes = models.TextField(blank=True)
-    is_active = models.BooleanField(default=True)
     organization = models.ForeignKey(
         "Organization",
         on_delete=models.PROTECT,

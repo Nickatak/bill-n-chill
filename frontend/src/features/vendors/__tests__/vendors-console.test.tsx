@@ -34,7 +34,6 @@ function makeVendor(overrides: Record<string, unknown> = {}) {
     phone: "5551234567",
     tax_id_last4: "1234",
     notes: "",
-    is_active: true,
     created_at: "2026-01-15T10:00:00Z",
     updated_at: "2026-01-15T10:00:00Z",
     ...overrides,
@@ -70,22 +69,18 @@ describe("VendorsConsole", () => {
     cleanup();
   });
 
-  it("renders header with title and stats", async () => {
+  it("renders vendor count badge", async () => {
     setupDefaultFetch({
       vendors: [
         makeVendor(),
-        makeVendor({ id: 2, name: "Inactive Corp", is_active: false }),
+        makeVendor({ id: 2, name: "BuildMart" }),
       ],
     });
     render(<VendorsConsole />);
 
     await waitFor(() => {
-      expect(screen.getByText("Vendor Directory")).toBeInTheDocument();
+      expect(screen.getByText("2/2")).toBeInTheDocument();
     });
-
-    expect(screen.getByText("Total 2")).toBeInTheDocument();
-    expect(screen.getByText("Active 1")).toBeInTheDocument();
-    expect(screen.getByText("Inactive 1")).toBeInTheDocument();
   });
 
   it("loads and displays vendors from API", async () => {
@@ -138,31 +133,18 @@ describe("VendorsConsole", () => {
     });
   });
 
-  it("filters by activity status (active vs all)", async () => {
+  it("shows all vendors without activity filtering", async () => {
     setupDefaultFetch({
       vendors: [
-        makeVendor({ id: 1, name: "Active Vendor" }),
-        makeVendor({ id: 2, name: "Inactive Vendor", is_active: false }),
+        makeVendor({ id: 1, name: "Vendor A" }),
+        makeVendor({ id: 2, name: "Vendor B" }),
       ],
     });
     render(<VendorsConsole />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Active Vendor/)).toBeInTheDocument();
-    });
-
-    // Default is "Active" — inactive should be hidden
-    expect(screen.queryByText(/Inactive Vendor/)).not.toBeInTheDocument();
-
-    // Switch to "All"
-    const allButtons = screen.getAllByRole("button", { name: "All" });
-    const filterButton = allButtons.find(
-      (btn) => btn.closest("[role='group']")?.getAttribute("aria-label") === "Vendor activity filter",
-    )!;
-    fireEvent.click(filterButton);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Inactive Vendor/)).toBeInTheDocument();
+      expect(screen.getByText(/Vendor A/)).toBeInTheDocument();
+      expect(screen.getByText(/Vendor B/)).toBeInTheDocument();
     });
   });
 

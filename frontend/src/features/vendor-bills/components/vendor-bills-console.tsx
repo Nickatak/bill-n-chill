@@ -200,7 +200,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   // Derived values
   // -------------------------------------------------------------------------
 
-  const activeVendors = vendors.filter((vendor) => vendor.is_active);
   const canMutateVendorBills = canDo(capabilities, "vendor_bills", "create");
   const isEditingMode = Boolean(selectedVendorBillId);
 
@@ -210,7 +209,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const billForm = useVendorBillForm({
     isEditingMode,
-    activeVendors,
+    activeVendors: vendors,
   });
 
   const viewer = useVendorBillViewer({
@@ -578,7 +577,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
       const projectRows = (projectsPayload.data as ProjectRecord[]) ?? [];
       const vendorRows = (vendorsPayload.data as VendorRecord[]) ?? [];
-      const loadedActiveVendors = vendorRows.filter((row) => row.is_active);
       setProjects(projectRows);
       setVendors(vendorRows);
 
@@ -598,9 +596,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
           setSelectedProjectId(String(projectRows[0].id));
         }
       }
-      if (loadedActiveVendors[0]) {
-        billForm.setNewVendorId(String(loadedActiveVendors[0].id));
-      } else if (vendorRows[0]) {
+      if (vendorRows[0]) {
         billForm.setNewVendorId(String(vendorRows[0].id));
       }
     } catch {

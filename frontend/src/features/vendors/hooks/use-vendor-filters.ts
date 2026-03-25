@@ -1,49 +1,28 @@
 /**
- * Client-side vendor search and activity filtering.
+ * Client-side vendor search filtering.
  *
- * Sorts vendors alphabetically by name, then applies a text search
- * and an active/all activity filter. Pure derived state — no API calls,
- * no effects.
+ * Sorts vendors alphabetically by name, then applies a text search.
+ * Pure derived state — no API calls, no effects.
  *
  * Consumer: VendorsConsole (composed alongside useVendorForm
  * and useVendorCsvImport).
- *
- * ## State (useState)
- *
- * - searchTerm      — live text input for filtering by name/email/phone/taxId
- * - activityFilter  — "active" | "all"; defaults to "active"
- *
- * ## Memos
- *
- * - orderedRows
- *     Deps: [vendors]
- *     Alphabetical sort by name, tiebreak by id.
- *
- * - filteredRows
- *     Deps: [activityFilter, orderedRows, searchTerm]
- *     Applies activity + text search on top of the sorted list.
  */
 
 import { useMemo, useState } from "react";
 
 import type { VendorRecord } from "../types";
 
-type ActivityFilter = "active" | "all";
-
-export type { ActivityFilter };
-
 /**
- * Filter and sort vendors by search text and activity status.
+ * Filter and sort vendors by search text.
  *
  * @param vendors - The full vendor list from the server (unsorted, unfiltered).
- * @returns Filter state, setters, sorted/filtered rows, and derived counts.
+ * @returns Filter state, setters, and sorted/filtered rows.
  */
 export function useVendorFilters(vendors: VendorRecord[]) {
 
   // --- State ---
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("active");
 
   // --- Memos ---
 
@@ -60,35 +39,18 @@ export function useVendorFilters(vendors: VendorRecord[]) {
 
   const filteredRows = useMemo(() => {
     const needle = searchTerm.trim().toLowerCase();
+    if (!needle) return orderedRows;
     return orderedRows.filter((row) => {
-      if (activityFilter === "active" && !row.is_active) {
-        return false;
-      }
-      if (!needle) {
-        return true;
-      }
       const haystack = `${row.id} ${row.name} ${row.email} ${row.phone} ${row.tax_id_last4}`.toLowerCase();
       return haystack.includes(needle);
     });
-  }, [activityFilter, orderedRows, searchTerm]);
-
-  // --- Derived ---
-
-  const activeCount = useMemo(() => vendors.filter((row) => row.is_active).length, [vendors]);
-  const inactiveCount = vendors.length - activeCount;
+  }, [orderedRows, searchTerm]);
 
   // --- Return bag ---
 
   return {
-    // State
     searchTerm,
-    activityFilter,
     filteredRows,
-    activeCount,
-    inactiveCount,
-
-    // Setters
     setSearchTerm,
-    setActivityFilter,
   };
 }

@@ -12,7 +12,6 @@ export type VendorRecord = {
   id: number;
   name: string;
   email: string;
-  is_active: boolean;
 };
 
 export type VendorBillStatus = string;
