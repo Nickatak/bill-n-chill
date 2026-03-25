@@ -18,6 +18,7 @@ services:
       MAILGUN_SENDER_DOMAIN: ${MAILGUN_SENDER_DOMAIN:-}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-}
       SENTRY_DSN: ${SENTRY_DSN:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
