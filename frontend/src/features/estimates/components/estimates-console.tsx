@@ -435,11 +435,13 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
   /** Pre-fill the create form from an existing estimate (duplicate-as-new). */
   function handleDuplicateAsNew(sourceEstimate: EstimateRecord) {
-    formFields.populateCreateFromEstimate(sourceEstimate);
+    const sourceKey = normalizeFamilyTitle(sourceEstimate.title);
+    const familyIsTerminal = estimates.some(
+      (e) => normalizeFamilyTitle(e.title) === sourceKey && e.status === "approved",
+    );
+    formFields.populateCreateFromEstimate(sourceEstimate, familyIsTerminal);
     setSelectedEstimateId("");
     selectedEstimateIdRef.current = "";
-    setActionMessage(`Copied "${sourceEstimate.title}" into create form.`);
-    setActionTone("success");
     flashCreator();
   }
 
@@ -1206,6 +1208,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         actionMessage={actionMessage}
         actionTone={actionTone}
         titleLocked={formFields.titleLocked}
+        duplicateHint={formFields.duplicateHint}
         selectedProject={selectedProject}
         familyCollisionPrompt={formFields.familyCollisionPrompt}
         estimateTitle={formFields.estimateTitle}

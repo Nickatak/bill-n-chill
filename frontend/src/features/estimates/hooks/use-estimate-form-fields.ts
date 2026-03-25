@@ -114,6 +114,7 @@ export function useEstimateFormFields({
     useState<EstimateFamilyCollisionPrompt | null>(null);
   const [confirmedFamilyTitleKey, setConfirmedFamilyTitleKey] = useState("");
   const [titleLocked, setTitleLocked] = useState(false);
+  const [duplicateHint, setDuplicateHint] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitGuard = useRef(false);
 
@@ -135,11 +136,28 @@ export function useEstimateFormFields({
     }
   }, [organizationDefaults?.estimate_terms_and_conditions, setLineItems, setNextLineId]);
 
-  /** Pre-fill the create form from an existing estimate (duplicate-as-new). Title is locked. */
-  const populateCreateFromEstimate = useCallback((estimate: EstimateRecord) => {
+  /**
+   * Pre-fill the create form from an existing estimate (duplicate-as-new).
+   *
+   * When the source family is non-terminal, the title is locked so the new
+   * estimate joins the same family. When the source family is terminal
+   * (has an approved member), the title gets a "(Copy)" suffix and remains
+   * editable so the user starts a new family.
+   */
+  const populateCreateFromEstimate = useCallback((estimate: EstimateRecord, familyIsTerminal = false) => {
     const estimateTerms = (estimate.terms_text || "").trim();
-    setEstimateTitle(estimate.title || "Untitled");
-    setTitleLocked(true);
+    if (familyIsTerminal) {
+      setEstimateTitle(`${estimate.title || "Untitled"} (Copy)`);
+      setTitleLocked(false);
+      setDuplicateHint(
+        "The original estimate was approved and can\u2019t be revised. "
+        + "This will start a new estimate \u2014 give it a distinct title.",
+      );
+    } else {
+      setEstimateTitle(estimate.title || "Untitled");
+      setTitleLocked(true);
+      setDuplicateHint("");
+    }
     setTermsText(estimateTerms || organizationDefaults?.estimate_terms_and_conditions || "");
     setTaxPercent(String(estimate.tax_percent ?? "0"));
     setValidThrough(estimate.valid_through ?? "");
@@ -161,6 +179,7 @@ export function useEstimateFormFields({
     );
     setEstimateTitle("");
     setTitleLocked(false);
+    setDuplicateHint("");
     setFamilyCollisionPrompt(null);
     setConfirmedFamilyTitleKey("");
     setTermsText(organizationDefaults?.estimate_terms_and_conditions || "");
@@ -217,6 +236,7 @@ export function useEstimateFormFields({
     familyCollisionPrompt,
     confirmedFamilyTitleKey,
     titleLocked,
+    duplicateHint,
     isSubmitting,
     submitGuard,
 

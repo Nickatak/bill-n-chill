@@ -1621,7 +1621,10 @@
 
 @media (max-width: 700px) {
   /* ── Containment: every grid/flex ancestor must allow shrinking ── */
-  .console,
+  .console {
+    min-width: 0;
+  }
+
   .lifecycle,
   .versionTree,
   .versionFilters,

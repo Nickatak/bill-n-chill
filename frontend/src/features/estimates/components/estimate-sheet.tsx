@@ -54,6 +54,7 @@ type EstimateSheetProps = {
   isEditingDraft: boolean;
   readOnly: boolean;
   titleLocked?: boolean;
+  duplicateHint?: string;
   formErrorMessage?: string;
   formSuccessMessage?: string;
   lineValidation?: LineValidationResult;
@@ -123,6 +124,7 @@ export function EstimateSheet({
   isEditingDraft,
   readOnly,
   titleLocked = false,
+  duplicateHint = "",
   formErrorMessage = "",
   formSuccessMessage = "",
   lineValidation,
@@ -297,6 +299,9 @@ export function EstimateSheet({
                         />
                       )}
                     </label>
+                    {duplicateHint ? (
+                      <p className={creatorStyles.duplicateHint}>{duplicateHint}</p>
+                    ) : null}
                   </>
                 ) : null}
                 <div className={creatorStyles.metaLine}>

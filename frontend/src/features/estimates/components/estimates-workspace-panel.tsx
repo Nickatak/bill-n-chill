@@ -53,6 +53,7 @@ export type EstimatesWorkspacePanelProps = {
 
   // Title lock (from duplicate-as-new)
   titleLocked: boolean;
+  duplicateHint: string;
   selectedProject: ProjectRecord | null;
 
   // Family collision prompt
@@ -116,6 +117,7 @@ export function EstimatesWorkspacePanel({
   actionMessage,
   actionTone,
   titleLocked,
+  duplicateHint,
   selectedProject,
   familyCollisionPrompt,
   estimateTitle,
@@ -188,9 +190,6 @@ export function EstimatesWorkspacePanel({
             ) : null}
           </div>
         </div>
-        {actionMessage && actionTone === "success" && /^Copied\b/i.test(actionMessage) ? (
-          <p className={creatorStyles.actionSuccess}>{actionMessage}</p>
-        ) : null}
         {actionMessage && actionTone !== "success" ? <p className={`${styles.actionError} ${styles.composerPrepMessage}`}>{actionMessage}</p> : null}
         {familyCollisionPrompt ? (
           <div className={`${styles.duplicatePanel} ${styles.composerPrepPanel}`}>
@@ -250,6 +249,7 @@ export function EstimatesWorkspacePanel({
           isEditingDraft={isEditingDraft}
           readOnly={readOnly}
           titleLocked={titleLocked}
+          duplicateHint={duplicateHint}
           formErrorMessage={formErrorMessage}
           formSuccessMessage={formSuccessMessage}
           lineValidation={lineValidation}

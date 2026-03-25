@@ -14,6 +14,8 @@
   border-radius: 18px;
 }
 
+
+
 .sheet {
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -170,6 +172,17 @@
   gap: 6px;
   font-size: 0.85rem;
   color: var(--text-secondary);
+}
+
+.duplicateHint {
+  margin: 0;
+  font-size: var(--font-sm);
+  color: var(--accent-text);
+  background: var(--accent-lighter);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  line-height: 1.4;
 }
 
 .staticFieldValue {
@@ -1098,6 +1111,10 @@
     gap: var(--space-lg);
   }
 
+  .sheetFlash {
+    border-radius: 14px;
+  }
+
   .sheetSection {
     gap: var(--space-lg);
   }
@@ -1155,6 +1172,10 @@
 @media (max-width: 640px) {
   .sheet {
     padding: var(--space-md);
+    border-radius: 10px;
+  }
+
+  .sheetFlash {
     border-radius: 10px;
   }
 
