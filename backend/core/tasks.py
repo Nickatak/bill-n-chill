@@ -5,15 +5,31 @@ All functions in this module are designed to be called via
 They must accept only serializable arguments (no model instances).
 """
 
+import functools
 import logging
 
+import sentry_sdk
+
 logger = logging.getLogger(__name__)
+
+
+def _report_to_sentry(func):
+    """Capture task exceptions in Sentry before Q2 marks the task as failed."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception:
+            sentry_sdk.capture_exception()
+            raise
+    return wrapper
 
 
 # ---------------------------------------------------------------------------
 # Auth emails
 # ---------------------------------------------------------------------------
 
+@_report_to_sentry
 def send_verification_email_task(user_id, token_id):
     """Send email verification link. Queued from registration and resend flows."""
     from django.contrib.auth import get_user_model
@@ -25,6 +41,7 @@ def send_verification_email_task(user_id, token_id):
     send_verification_email(user, token_obj)
 
 
+@_report_to_sentry
 def send_password_reset_email_task(user_id, token_id, is_security_alert=False):
     """Send password reset link. Queued from forgot-password and resend flows."""
     from django.contrib.auth import get_user_model
@@ -40,6 +57,7 @@ def send_password_reset_email_task(user_id, token_id, is_security_alert=False):
 # Public document emails
 # ---------------------------------------------------------------------------
 
+@_report_to_sentry
 def send_otp_email_task(recipient_email, code, document_type_label, document_title):
     """Send OTP code for public document verification ceremony."""
     from core.utils.email import send_otp_email
@@ -47,6 +65,7 @@ def send_otp_email_task(recipient_email, code, document_type_label, document_tit
     send_otp_email(recipient_email, code, document_type_label, document_title)
 
 
+@_report_to_sentry
 def send_document_sent_email_task(document_type, document_title, public_url, recipient_email, sender_user_id):
     """Send notification when a document is sent to a customer."""
     from django.contrib.auth import get_user_model
@@ -66,6 +85,7 @@ def send_document_sent_email_task(document_type, document_title, public_url, rec
 # Document decision notifications (push + email)
 # ---------------------------------------------------------------------------
 
+@_report_to_sentry
 def send_document_decision_notification(user_id, document_type, document_title, customer_name, decision, project_url):
     """Send push + email notification to document owner after a customer decision.
 
