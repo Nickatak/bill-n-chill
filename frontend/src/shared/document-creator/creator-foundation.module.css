@@ -715,6 +715,7 @@
 .summary {
   max-width: 320px;
   margin-left: auto;
+  padding-top: var(--space-sm);
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -1153,10 +1154,6 @@
 
   .lineActions {
     margin-top: 0;
-  }
-
-  .lineActions .secondaryButton {
-    width: 100%;
   }
 
   /* Lifecycle panel: tighter padding */

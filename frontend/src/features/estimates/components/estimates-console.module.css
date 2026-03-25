@@ -1804,13 +1804,13 @@
   }
 
   .workspaceContext {
-    order: 1;
+    order: 0;
   }
 
   .workspaceToolbarActions {
     display: grid;
     gap: 8px;
-    order: 0;
+    order: 1;
     align-self: stretch;
     width: 100%;
   }
@@ -1819,7 +1819,6 @@
     justify-content: stretch;
   }
 
-  .secondaryButton,
   .toolbarPrimaryButton,
   .toolbarSecondaryButton {
     min-height: 44px;

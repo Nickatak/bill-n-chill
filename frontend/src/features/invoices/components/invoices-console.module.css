@@ -404,11 +404,11 @@
     grid-column: 1;
     grid-row: auto;
     justify-content: stretch;
-    order: 0;
+    order: 1;
   }
 
   .workspaceContext {
-    order: 1;
+    order: 0;
   }
 
   .invoiceMetaGrid {

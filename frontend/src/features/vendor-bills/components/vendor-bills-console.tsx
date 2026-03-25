@@ -15,7 +15,7 @@
  * │  │  bill table (desktop) / card list (mob) │ │
  * │  │    └─ expandedSections (inline viewer)  │ │
  * │  └────────────────────────────────────────┘  │
- * │  Workspace Panel (collapsible)               │
+ * │  Workspace Panel                              │
  * │  ┌─ workspaceToolbar (context + actions) ─┐  │
  * │  │  billDocument form (WYSIWYG)           │  │
  * │  │    header → dates → lines → summary    │  │
@@ -282,7 +282,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     : [];
 
   // Workspace visibility + flash animation
-  const [isWorkspaceExpanded, setIsWorkspaceExpanded] = useState(true);
+  const [isViewerExpanded, setIsViewerExpanded] = useState(true);
   const { ref: billFormRef, flash: flashCreator } = useCreatorFlash<HTMLFormElement>();
 
   // -------------------------------------------------------------------------
@@ -940,7 +940,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
     setSelectedVendorBillId("");
     setFormSuccess(`Copied bill #${selected.id} into create form. Enter a new bill number.`);
     flashCreator();
-    setIsWorkspaceExpanded(true);
   }
 
   // -------------------------------------------------------------------------
@@ -976,7 +975,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       if (unmatchedName) {
         vendorCombobox.setQuery(unmatchedName);
       }
-      setIsWorkspaceExpanded(true);
       flashCreator();
 
       const docLabel = scan.document_type === "bill" ? "bill" : "receipt";
@@ -1070,19 +1068,21 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       <div className={styles.viewerPanel}>
         <div className={styles.panelHeader}>
           <h3>{selectedProject ? `Bills for: ${selectedProject.name}` : "Bills"}</h3>
-          <div className={styles.panelHeaderActions}>
+          {!isMobile ? (
             <button
               type="button"
               className={collapseButtonStyles.collapseButton}
               style={{ background: "var(--surface)" }}
-              onClick={() => setIsWorkspaceExpanded((current) => !current)}
-              aria-expanded={isWorkspaceExpanded}
+              onClick={() => setIsViewerExpanded((current) => !current)}
+              aria-expanded={isViewerExpanded}
             >
-              {isWorkspaceExpanded ? "Hide Form" : "Show Form"}
+              {isViewerExpanded ? "Collapse" : "Expand"}
             </button>
-          </div>
+          ) : null}
         </div>
 
+        {(isMobile || isViewerExpanded) ? (
+        <>
         <div className={styles.statusFilters}>
           <div className={styles.statusFilterButtons}>
             {billStatuses.map((statusValue) => {
@@ -1231,11 +1231,12 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
             </table>
           </div>
         )}
+        </>
+        ) : null}
       </div>
 
       {/* ── Workspace Panel: bill form (create/edit) ─────────────── */}
-      {isWorkspaceExpanded ? (
-        <div className={styles.workspace}>
+      <div className={styles.workspace}>
           <div className={styles.workspaceToolbar}>
             <div className={styles.workspaceContext}>
               <span className={styles.workspaceContextLabel}>
@@ -1292,7 +1293,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                     onClick={() => scanInputRef.current?.click()}
                     disabled={isScanning || !selectedProjectId}
                   >
-                    {isScanning ? "Scanning…" : "Scan Document"}
+                    {isScanning ? "Scanning…" : "Scan Bill/Receipt"}
                   </button>
                 </>
               ) : null}
@@ -1563,7 +1564,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                   className={creatorStyles.secondaryButton}
                   onClick={addFormLineItem}
                 >
-                  + Add line item
+                  Add Line Item
                 </button>
               </div>
             ) : null}
@@ -1649,7 +1650,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
             </div>
           ) : null}
         </div>
-      ) : null}
 
       {!canMutateVendorBills ? <p className={styles.inlineHint}>Role `{role}` can view bills but cannot create or update.</p> : null}
     </section>

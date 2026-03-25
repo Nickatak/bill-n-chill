@@ -300,7 +300,7 @@ export function ChangeOrdersWorkspacePanel({
   }
 
   return (
-    <>
+    <div className={styles.workspaceWrap}>
       <div className={styles.formToolbar}>
         <div className={styles.formContext}>
           <span className={styles.formContextLabel}>
@@ -339,7 +339,7 @@ export function ChangeOrdersWorkspacePanel({
 
       {/* Create form */}
       {!selectedChangeOrder ? (
-        <div ref={createCreatorRef} style={{ margin: "14px 0" }}>
+        <div ref={createCreatorRef}>
           <DocumentCreator
           adapter={changeOrderCreatorAdapter}
           document={null}
@@ -1049,6 +1049,6 @@ export function ChangeOrdersWorkspacePanel({
         ) : null}
         </div>
       ) : null}
-    </>
+    </div>
   );
 }

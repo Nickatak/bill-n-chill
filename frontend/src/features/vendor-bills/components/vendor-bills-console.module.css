@@ -632,7 +632,7 @@
   gap: var(--space-lg);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--surface);
+  background: var(--surface-secondary);
   padding: var(--space-xl) var(--space-xl) var(--space-lg);
 }
 
@@ -664,7 +664,7 @@
   width: 100%;
   border: 1px solid var(--input-border);
   border-radius: var(--radius-lg);
-  background: var(--surface);
+  background: var(--input-bg);
   color: var(--text-primary);
   padding: 8px 36px 8px var(--space-md);
   font-size: var(--font-md);
@@ -766,7 +766,7 @@
   width: 100%;
   border: 1px solid var(--input-border);
   border-radius: var(--radius-lg);
-  background: var(--surface);
+  background: var(--input-bg);
   color: var(--text-primary);
   padding: 8px var(--space-md);
   font-size: var(--font-base);
@@ -781,11 +781,11 @@
 }
 
 .billDocFieldLabel {
-  font-size: var(--font-xs);
-  letter-spacing: 0.08em;
+  font-size: 1rem;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  font-weight: 700;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: var(--accent);
 }
 
 /* Dates row */
@@ -801,17 +801,17 @@
   display: grid;
   gap: 5px;
   flex: 1 1 140px;
-  font-size: var(--font-xs);
-  letter-spacing: 0.08em;
+  font-size: 1rem;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  font-weight: 700;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: var(--accent);
 }
 
 .billDocDateField > input {
   border: 1px solid var(--input-border);
   border-radius: var(--radius-lg);
-  background: var(--surface);
+  background: var(--input-bg);
   color: var(--text-primary);
   padding: 8px var(--space-md);
   font-size: var(--font-base);
@@ -838,7 +838,7 @@
   width: 100%;
   border: 1px solid var(--input-border);
   border-radius: var(--radius-lg);
-  background: var(--surface);
+  background: var(--input-bg);
   color: var(--text-primary);
   padding: 10px var(--space-md);
   font-size: var(--font-base);
@@ -1242,10 +1242,6 @@
   .panelHeaderActions,
   .workspaceToolbarActions {
     flex-wrap: wrap;
-  }
-
-  .secondaryButton {
-    width: 100%;
   }
 
   .workspaceToolbar {

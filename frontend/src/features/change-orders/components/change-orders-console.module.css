@@ -8,20 +8,22 @@
   composes: toolbarPrimaryButton from "../../../shared/document-creator/creator-foundation.module.css";
 }
 
+.workspaceWrap {
+  display: grid;
+  gap: 10px;
+}
+
 .formToolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  margin: 2px 0 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: start;
 }
 
 .formToolbarActions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: var(--space-sm);
-  flex-shrink: 0;
 }
 
 .formContext {
@@ -69,7 +71,7 @@
 }
 
 .viewer {
-  margin: 16px 0;
+  margin: 16px 0 0;
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 14px;
@@ -917,31 +919,17 @@
   }
 
   .formToolbar {
-    display: grid;
     grid-template-columns: 1fr;
-    gap: var(--space-sm);
   }
 
   .formContext {
-    order: 1;
-  }
-
-  .formToolbarActions {
     order: 0;
-    display: grid;
-    gap: 8px;
-    width: 100%;
-  }
-
-  /* ── Form toolbar: stacked column ── */
-  .formToolbar {
-    flex-direction: column;
-    align-items: stretch;
   }
 
   .formToolbarActions {
-    justify-content: stretch;
+    order: 1;
     flex-direction: column;
+    width: 100%;
   }
 
   .formToolbarActions .primaryCreateButton,
