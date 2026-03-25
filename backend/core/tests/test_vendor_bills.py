@@ -1,5 +1,4 @@
 
-from decimal import Decimal
 
 from core.tests.common import *
 

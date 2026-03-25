@@ -508,7 +508,6 @@ class Command(BaseCommand):
         """~8 months in. One of each status for every entity type."""
         user, token, membership = self._get_or_create_user("mid@test.com")
         code1, code2 = self._cost_codes(user)
-        today = date.today()
 
         # 12 customers (1 archived)
         customers_data = [
@@ -711,7 +710,6 @@ class Command(BaseCommand):
         """~2 years in. Full portfolio with history across all domains."""
         user, token, membership = self._get_or_create_user("late@test.com")
         code1, code2 = self._cost_codes(user)
-        today = date.today()
 
         # 35 customers (3 archived)
         late_customer_names = [

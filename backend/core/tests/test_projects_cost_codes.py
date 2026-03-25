@@ -71,7 +71,6 @@ class ProjectProfileTests(TestCase):
     def test_projects_list_includes_rows_created_by_other_user_in_same_org(self):
         """Projects in the same org are visible regardless of who created them."""
         # Move the other user's project and customer into the same org
-        other_customer = self.project.customer  # just need the other project's customer
         other_project = Project.objects.filter(name="Other Project").first()
         other_project.organization = self.org
         other_project.save(update_fields=["organization_id"])

@@ -44,6 +44,9 @@ jobs:
             FLUSH PRIVILEGES;
           "
 
+      - name: Lint Python
+        run: pip install ruff && ruff check backend/
+
       - name: Audit Python dependencies
         run: pip install pip-audit && pip-audit -r backend/requirements.txt
 

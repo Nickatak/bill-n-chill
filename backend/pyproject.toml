@@ -1,0 +1,15 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = [
+    "E402",  # module-level import not at top — Django views split imports after docstrings
+    "F403",  # star import used — test files import from core.tests.common
+    "F405",  # undefined name from star import — consequence of F403
+    "E501",  # line too long — enforced at 120 but not worth blocking CI
+]
+
+[tool.ruff.lint.per-file-ignores]
+"core/tests/**" = ["E501"]

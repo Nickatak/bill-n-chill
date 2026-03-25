@@ -137,6 +137,7 @@ local-clean:
 	@echo "Clean complete."
 
 lint:
+	ruff check backend/
 	npm run lint --prefix frontend
 
 install-hooks:

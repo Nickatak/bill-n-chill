@@ -7,7 +7,6 @@ from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes

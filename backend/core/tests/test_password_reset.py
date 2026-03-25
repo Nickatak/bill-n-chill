@@ -5,7 +5,6 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
-from rest_framework.authtoken.models import Token
 
 from core.models import (
     EmailRecord,
@@ -332,7 +331,7 @@ class RegisterDuplicateEmailTests(TestCase):
 
     def test_duplicate_registration_respects_rate_limit(self):
         """Re-registration email sending respects the 60s rate limit."""
-        user = _bootstrap_user(email="verified@test.com")
+        _bootstrap_user(email="verified@test.com")
         # First attempt sends email
         self.client.post(
             "/api/v1/auth/register/",

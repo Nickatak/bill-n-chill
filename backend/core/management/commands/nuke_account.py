@@ -53,9 +53,6 @@ class Command(BaseCommand):
         vendor_bill_ids_sub = f"(SELECT id FROM core_vendorbill WHERE project_id IN {project_ids_sub})"
         payment_ids_sub = f"(SELECT id FROM core_payment WHERE project_id IN {project_ids_sub})"
         change_order_ids_sub = f"(SELECT id FROM core_changeorder WHERE project_id IN {project_ids_sub})"
-        payment_alloc_ids_sub = f"(SELECT id FROM core_paymentallocation WHERE payment_id IN {payment_ids_sub})"
-        cost_code_ids_sub = f"(SELECT id FROM core_costcode WHERE organization_id = {org_id})"
-        membership_ids_sub = f"(SELECT id FROM core_organizationmembership WHERE organization_id = {org_id})"
 
         # Deletion order: deepest children first, working up to org and user.
         # Each tuple: (description, SQL)

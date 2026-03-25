@@ -596,7 +596,6 @@ def change_order_detail_view(request, change_order_id):
                 if permission_error:
                     return Response(permission_error, status=403)
 
-        incoming_line_items = data.get("line_items", None)
         content_fields = {"title", "reason", "amount_delta", "days_delta", "origin_estimate", "line_items"}
         attempted_content_fields = sorted(field for field in content_fields if field in data)
 

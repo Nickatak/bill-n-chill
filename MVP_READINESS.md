@@ -8,16 +8,16 @@ Core product is solid. Auth, money handling, org scoping, and the estimate->CO->
 
 ## Tier 1 — Fix before launch
 
-- [ ] **Add `tsc --noEmit` to CI** — TypeScript errors can slip to prod undetected. ESLint catches some, not all. ~30 min.
-- [ ] **Receipt scan returns 200 on Gemini failure** — `backend/core/views/accounts_payable/receipt_scan.py:104-110` — frontend can't distinguish "scan found nothing" from "API is down." Should return 502/503 on exception, 200 only on successful-but-empty extraction.
-- [ ] **Docker resource limits in prod** — No `deploy.resources.limits` on any container. On a 16GB VPS, one runaway process can OOM everything.
+- [x] **Add `tsc --noEmit` to CI** — TypeScript errors can slip to prod undetected. ESLint catches some, not all. ~30 min.
+- [x] **Receipt scan returns 200 on Gemini failure** — `backend/core/views/accounts_payable/receipt_scan.py:104-110` — frontend can't distinguish "scan found nothing" from "API is down." Should return 502/503 on exception, 200 only on successful-but-empty extraction.
+- [x] **Docker resource limits in prod** — No `deploy.resources.limits` on any container. On a 16GB VPS, one runaway process can OOM everything.
 
 ## Tier 2 — Should do soon, not blocking
 
 - [ ] **Create `restore-db.sh`** — Backup script is solid but no documented restore procedure. Untested backups aren't backups.
-- [ ] **Add Python linting to CI + pre-commit** — No ruff/flake8 configured anywhere. Frontend has ESLint; backend has nothing.
+- [x] **Add Python linting to CI + pre-commit** — No ruff/flake8 configured anywhere. Frontend has ESLint; backend has nothing.
 - [ ] **15 untested endpoints** — Push (3), impersonate (3), org management (7), stores (1), receipt scan (1). All functional, just no test coverage. Org management is the most important gap — invite flows, role changes, logo upload.
-- [ ] **Pre-commit hook only runs frontend lint** — Backend changes get zero local validation before commit. Extend to include Python lint + `tsc --noEmit`.
+- [x] **Pre-commit hook only runs frontend lint** — Backend changes get zero local validation before commit. Extend to include Python lint + `tsc --noEmit`.
 
 ## Tier 3 — Track, don't block
 

@@ -1,6 +1,5 @@
 """Vendor bill serializers for read, write, and line item representations."""
 
-from django.db.models import Sum
 from rest_framework import serializers
 
 from core.models import Payment, VendorBill, VendorBillLine, VendorBillSnapshot

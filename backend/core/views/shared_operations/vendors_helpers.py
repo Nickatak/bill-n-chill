@@ -1,7 +1,6 @@
 """Domain-specific helpers for vendor views."""
 
 from django.contrib.auth.models import AbstractUser
-from django.db.models import Q
 
 from core.models import Vendor
 from core.views.helpers import _org_scope_filter  # noqa: F401 — re-exported for vendors.py

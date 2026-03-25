@@ -4,7 +4,13 @@
 
 set -euo pipefail
 
+echo "pre-commit: running Python lint..."
+ruff check backend/
+
 echo "pre-commit: running frontend lint..."
 npm run lint --prefix frontend
+
+echo "pre-commit: running TypeScript type check..."
+(cd frontend && npx tsc --noEmit)
 
 echo "pre-commit: passed."
