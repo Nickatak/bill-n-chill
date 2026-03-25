@@ -178,7 +178,7 @@ export function InvoicesWorkspacePanel({
               className={styles.toolbarPrimaryButton}
               onClick={onStartNewDraft}
             >
-              {workspaceSourceInvoice ? "Create New Invoice" : "Reset"}
+              {workspaceSourceInvoice ? "New Invoice" : "Reset"}
             </button>
             {workspaceSourceInvoice ? (
               <button
@@ -186,7 +186,7 @@ export function InvoicesWorkspacePanel({
                 className={styles.toolbarSecondaryButton}
                 onClick={onDuplicateIntoDraft}
               >
-                Duplicate as New Invoice
+                Duplicate Invoice
               </button>
             ) : null}
           </div>

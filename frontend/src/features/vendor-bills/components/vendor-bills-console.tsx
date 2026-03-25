@@ -1297,6 +1297,33 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
               </div>
             </div>
             <div className={styles.workspaceToolbarActions}>
+              {isEditingMode ? (
+                <>
+                  <button
+                    type="button"
+                    className={styles.toolbarActionButton}
+                    onClick={handleRecreateAsNewDraftTemplate}
+                    disabled={!selectedVendorBillId}
+                  >
+                    Duplicate Bill
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.toolbarActionButton}
+                    onClick={handleStartNewVendorBill}
+                  >
+                    New Bill
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.toolbarActionButton}
+                  onClick={() => { billForm.resetCreateForm(); flashCreator(); }}
+                >
+                  Reset
+                </button>
+              )}
               {canMutateVendorBills ? (
                 <>
                   <input
@@ -1316,25 +1343,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
                     disabled={isScanning || !selectedProjectId}
                   >
                     {isScanning ? "Scanning…" : "Scan Document"}
-                  </button>
-                </>
-              ) : null}
-              {isEditingMode ? (
-                <>
-                  <button
-                    type="button"
-                    className={styles.toolbarActionButton}
-                    onClick={handleRecreateAsNewDraftTemplate}
-                    disabled={!selectedVendorBillId}
-                  >
-                    Recreate as New
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.toolbarActionButton}
-                    onClick={handleStartNewVendorBill}
-                  >
-                    New Bill
                   </button>
                 </>
               ) : null}

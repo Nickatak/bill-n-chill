@@ -319,7 +319,7 @@ export function ChangeOrdersWorkspacePanel({
             className={styles.primaryCreateButton}
             onClick={onStartNew}
           >
-            {selectedChangeOrder ? "Create New Change Order" : "Reset"}
+            {selectedChangeOrder ? "New Change Order" : "Reset"}
           </button>
           {selectedChangeOrder ? (
             <button
@@ -328,7 +328,7 @@ export function ChangeOrdersWorkspacePanel({
               onClick={onDuplicateAsNew}
               disabled={!canMutateChangeOrders}
             >
-              Duplicate as New
+              Duplicate Change Order
             </button>
           ) : null}
         </div>

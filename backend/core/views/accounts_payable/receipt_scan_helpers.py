@@ -16,7 +16,7 @@ Return ONLY a JSON object with these keys — no markdown, no explanation:
   "document_type": "receipt" or "bill" — use "receipt" for retail store receipts, "bill" for vendor invoices/bills,
   "vendor_name": "the vendor or company name on a bill/invoice, or empty string if not applicable or unreadable",
   "store_name": "the store or retail business name on a receipt, or empty string if not applicable or unreadable",
-  "bill_number": "the invoice or bill number, or empty string if not found",
+  "bill_number": "any document identifier — invoice number, receipt number, transaction number, order number, confirmation number — or empty string if not found",
   "issue_date": "the document date or invoice date in YYYY-MM-DD format, or empty string if unreadable",
   "due_date": "the due date or payment due date in YYYY-MM-DD format, or empty string if not found",
   "subtotal": "the subtotal before tax as a decimal string like '130.00', or empty string if not found",

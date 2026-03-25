@@ -171,12 +171,12 @@ export function EstimatesWorkspacePanel({
               </span>
             </div>
             <p className={styles.workspaceToolbarHint}>
-              Create New Estimate opens a fresh draft workspace. Duplicate copies the selected estimate into the create form.
+              New Estimate opens a fresh draft workspace. Duplicate copies the selected estimate into the create form.
             </p>
           </div>
           <div className={`${styles.lifecycleActions} ${styles.composerPrepActions} ${styles.workspaceToolbarActions}`}>
             <button type="button" className={styles.toolbarPrimaryButton} onClick={onStartNew}>
-              {selectedEstimate ? "Create New Estimate" : "Reset"}
+              {selectedEstimate ? "New Estimate" : "Reset"}
             </button>
             {selectedEstimate ? (
               <button
@@ -184,7 +184,7 @@ export function EstimatesWorkspacePanel({
                 className={styles.toolbarSecondaryButton}
                 onClick={onDuplicateAsNew}
               >
-                Duplicate as New
+                Duplicate Estimate
               </button>
             ) : null}
           </div>
