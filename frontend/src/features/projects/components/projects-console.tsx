@@ -62,7 +62,6 @@ import { useSharedSessionAuth } from "@/shared/session/use-shared-session";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./projects-console.module.css";
 import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
-import { QuickExpense } from "@/features/vendor-bills/components/quick-expense";
 import { ProjectListViewer } from "@/shared/project-list-viewer";
 import { DepositPanel } from "./deposit-panel";
 import { ApiResponse, ApprovedEstimate, ProjectFinancialSummary, ProjectRecord } from "../types";
@@ -114,7 +113,7 @@ export function ProjectsConsole() {
   } | null>(null);
   const [acceptedEstimateTotal, setAcceptedEstimateTotal] = useState("--");
   const [invoiceAllocationTargets, setInvoiceAllocationTargets] = useState<AllocationTarget[]>([]);
-  const [toolbarPanel, setToolbarPanel] = useState<"deposit" | "payment" | "expense" | null>(null);
+  const [toolbarPanel, setToolbarPanel] = useState<"deposit" | "payment" | null>(null);
   const [approvedEstimates, setApprovedEstimates] = useState<ApprovedEstimate[]>([]);
   const [linkedEstimateIds, setLinkedEstimateIds] = useState<Set<number>>(new Set());
   /** After a deposit invoice is created, holds the new invoice for payment pivot. */
@@ -826,13 +825,6 @@ export function ProjectsConsole() {
                 >
                   Record Payment
                 </button>
-                <button
-                  type="button"
-                  className={`${styles.toolbarAction} ${toolbarPanel === "expense" ? styles.toolbarActionActive : ""}`}
-                  onClick={() => setToolbarPanel(toolbarPanel === "expense" ? null : "expense")}
-                >
-                  Log Expense
-                </button>
               </div>
 
             </div>
@@ -883,14 +875,6 @@ export function ProjectsConsole() {
                   onPaymentsChanged={() => {
                     void loadFinancialSummary();
                     void loadInvoiceAllocationTargets(selectedProject.id);
-                  }}
-                />
-              ) : toolbarPanel === "expense" ? (
-                <QuickExpense
-                  projectId={selectedProject.id}
-                  authToken={authToken ?? ""}
-                  onExpenseCreated={() => {
-                    void loadFinancialSummary();
                   }}
                 />
               ) : (
