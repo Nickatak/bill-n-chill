@@ -69,7 +69,25 @@ docker compose -f "${PROJECT_DIR}/docker-compose.yml" -f "${PROJECT_DIR}/docker-
     | gzip > "$BACKUP_PATH"
 
 DUMP_SIZE="$(du -h "$BACKUP_PATH" | cut -f1)"
+DUMP_BYTES="$(stat --format=%s "$BACKUP_PATH" 2>/dev/null || stat -f%z "$BACKUP_PATH")"
 echo "$(date '+%Y-%m-%d %H:%M:%S') Dump complete: ${BACKUP_FILE} (${DUMP_SIZE})"
+
+# ---------------------------------------------------------------------------
+# Integrity checks
+# ---------------------------------------------------------------------------
+if [[ "$DUMP_BYTES" -lt 1024 ]]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') ERROR: Backup file suspiciously small (${DUMP_BYTES} bytes). Aborting."
+    rm -f "$BACKUP_PATH"
+    exit 1
+fi
+
+if ! gunzip -t "$BACKUP_PATH" 2>/dev/null; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') ERROR: Backup file failed gzip integrity check. Aborting."
+    rm -f "$BACKUP_PATH"
+    exit 1
+fi
+
+echo "$(date '+%Y-%m-%d %H:%M:%S') Integrity checks passed (${DUMP_BYTES} bytes, gzip OK)"
 
 # ---------------------------------------------------------------------------
 # Upload to Backblaze B2

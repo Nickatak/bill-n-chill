@@ -488,11 +488,10 @@ class VendorBillTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         bill = response.json()["data"]
-        self.assertEqual(bill["store_name"], "Home Depot")
+        self.assertEqual(bill["vendor_name"], "Home Depot")
         self.assertEqual(bill["total"], "237.50")
         self.assertEqual(bill["balance_due"], "0.00")
-        self.assertIsNone(bill["vendor"])
-        self.assertEqual(bill["vendor_name"], "")
+        self.assertIsNotNone(bill["vendor"])
         self.assertEqual(bill["bill_number"], "")
         self.assertEqual(bill["status"], "open")
         self.assertEqual(bill["payment_status"], "paid")
@@ -556,8 +555,8 @@ class VendorBillTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
-    def test_unique_constraint_skipped_for_null_vendor(self):
-        """Multiple expenses with null vendor don't trigger unique constraint."""
+    def test_unique_constraint_skipped_for_empty_bill_number(self):
+        """Multiple expenses with empty bill_number don't trigger unique constraint."""
         for _ in range(3):
             response = self.client.post(
                 f"/api/v1/projects/{self.project.id}/expenses/",

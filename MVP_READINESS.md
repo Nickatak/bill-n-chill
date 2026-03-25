@@ -14,9 +14,9 @@ Core product is solid. Auth, money handling, org scoping, and the estimate->CO->
 
 ## Tier 2 — Should do soon, not blocking
 
-- [ ] **Create `restore-db.sh`** — Backup script is solid but no documented restore procedure. Untested backups aren't backups.
+- [x] **Create `restore-db.sh`** — Backup script is solid but no documented restore procedure. Untested backups aren't backups.
 - [x] **Add Python linting to CI + pre-commit** — No ruff/flake8 configured anywhere. Frontend has ESLint; backend has nothing.
-- [ ] **15 untested endpoints** — Push (3), impersonate (3), org management (7), stores (1), receipt scan (1). All functional, just no test coverage. Org management is the most important gap — invite flows, role changes, logo upload.
+- [x] **15 untested endpoints** — Push (3), impersonate (3), org management (7), stores (1), receipt scan (1). All functional, just no test coverage. Org management is the most important gap — invite flows, role changes, logo upload.
 - [x] **Pre-commit hook only runs frontend lint** — Backend changes get zero local validation before commit. Extend to include Python lint + `tsc --noEmit`.
 
 ## Tier 3 — Track, don't block
@@ -42,12 +42,13 @@ Core product is solid. Auth, money handling, org scoping, and the estimate->CO->
 
 | Status | Description | Count |
 |--------|-------------|-------|
-| Fully tested | Auth, estimates, invoices, COs, payments, vendor bills, customers, projects, public signing | ~50 |
+| Fully tested | Auth, estimates, invoices, COs, payments, vendor bills, customers, projects, public signing, push, impersonate, org management, vendors, invites, receipt scan | ~76 |
 | Partially tested | Reporting, project cost codes | ~5 |
-| Untested | Push (3), impersonate (3), org management (7), receipt scan (1), stores (1) | 15 |
+| Untested | — | 0 |
 
 ## Notes
 
 - Two "high risk" org-scoping claims from initial audit were verified as FALSE — payment_detail_view and project_accounting_export_view both correctly filter by organization_id.
-- Receipt scan silent failure is the only confirmed code-level bug.
-- CI runs: pip-audit, npm audit, backend tests, frontend lint + test + build. Missing: tsc --noEmit, Python linting, coverage.
+- Receipt scan silent failure was fixed (returns 502/503 on failure).
+- CI runs: pip-audit, npm audit, ruff (Python lint), backend tests, frontend lint + tsc --noEmit + test + build. Missing: coverage.
+- Test sweep (237 tests): no hallucinations, no no-op tests, no incorrect assertions found. One misleading test name fixed.

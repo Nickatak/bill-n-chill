@@ -147,6 +147,9 @@ install-hooks:
 backup:
 	./scripts/backup-db.sh $(ARGS)
 
+restore:
+	./scripts/restore-db.sh $(ARGS)
+
 local-kill-ports:
 	@echo "Stopping listeners on ports: $(LOCAL_KILL_PORTS)"
 	@for port in $(LOCAL_KILL_PORTS); do \

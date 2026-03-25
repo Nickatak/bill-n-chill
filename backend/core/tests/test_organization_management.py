@@ -1,3 +1,5 @@
+from django.core.files.uploadedfile import SimpleUploadedFile
+
 from core.tests.common import *
 
 
@@ -282,3 +284,143 @@ class OrganizationManagementTests(TestCase):
         )
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["error"]["code"], "not_found")
+
+    # ------------------------------------------------------------------
+    # Complete Onboarding
+    # ------------------------------------------------------------------
+
+    def test_complete_onboarding_requires_authentication(self):
+        response = self.client.post("/api/v1/organization/complete-onboarding/")
+        self.assertEqual(response.status_code, 401)
+
+    def test_complete_onboarding_sets_flag(self):
+        self.assertFalse(self.organization.onboarding_completed)
+        response = self.client.post(
+            "/api/v1/organization/complete-onboarding/",
+            HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["data"]["onboarding_completed"])
+        self.organization.refresh_from_db()
+        self.assertTrue(self.organization.onboarding_completed)
+
+    def test_complete_onboarding_is_idempotent(self):
+        self.organization.onboarding_completed = True
+        self.organization.save(update_fields=["onboarding_completed"])
+
+        response = self.client.post(
+            "/api/v1/organization/complete-onboarding/",
+            HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["data"]["onboarding_completed"])
+
+    def test_complete_onboarding_any_member_role_can_call(self):
+        """Even a viewer can complete onboarding — no RBAC gate."""
+        response = self.client.post(
+            "/api/v1/organization/complete-onboarding/",
+            HTTP_AUTHORIZATION=f"Token {self.viewer_token.key}",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["data"]["onboarding_completed"])
+
+    # ------------------------------------------------------------------
+    # Logo Upload
+    # ------------------------------------------------------------------
+
+    def test_logo_upload_requires_authentication(self):
+        logo = SimpleUploadedFile("logo.png", b"fake-png", content_type="image/png")
+        response = self.client.post("/api/v1/organization/logo/", {"logo": logo})
+        self.assertEqual(response.status_code, 401)
+
+    def test_logo_upload_requires_org_identity_edit_capability(self):
+        """Viewer lacks org_identity.edit and should get 403."""
+        logo = SimpleUploadedFile("logo.png", b"fake-png", content_type="image/png")
+        response = self.client.post(
+            "/api/v1/organization/logo/",
+            {"logo": logo},
+            HTTP_AUTHORIZATION=f"Token {self.viewer_token.key}",
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["error"]["code"], "forbidden")
+
+    def test_logo_upload_rejects_missing_file(self):
+        response = self.client.post(
+            "/api/v1/organization/logo/",
+            {},
+            HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "validation_error")
+        self.assertIn("No logo file", response.json()["error"]["message"])
+
+    def test_logo_upload_rejects_unsupported_content_type(self):
+        gif = SimpleUploadedFile("logo.gif", b"fake-gif", content_type="image/gif")
+        response = self.client.post(
+            "/api/v1/organization/logo/",
+            {"logo": gif},
+            HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "validation_error")
+        self.assertIn("Unsupported file type", response.json()["error"]["message"])
+
+    def test_logo_upload_rejects_file_too_large(self):
+        # 2 MB + 1 byte exceeds the limit
+        oversized = b"x" * (2 * 1024 * 1024 + 1)
+        big_logo = SimpleUploadedFile("logo.png", oversized, content_type="image/png")
+        response = self.client.post(
+            "/api/v1/organization/logo/",
+            {"logo": big_logo},
+            HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"]["code"], "validation_error")
+        self.assertIn("2 MB", response.json()["error"]["message"])
+
+    def test_logo_upload_succeeds_for_owner(self):
+        logo = SimpleUploadedFile("logo.png", b"fake-png-data", content_type="image/png")
+        response = self.client.post(
+            "/api/v1/organization/logo/",
+            {"logo": logo},
+            HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("organization", response.json()["data"])
+        self.organization.refresh_from_db()
+        self.assertTrue(self.organization.logo)
+
+    def test_logo_upload_creates_audit_record(self):
+        logo = SimpleUploadedFile("logo.jpg", b"fake-jpg-data", content_type="image/jpeg")
+        self.client.post(
+            "/api/v1/organization/logo/",
+            {"logo": logo},
+            HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
+            format="multipart",
+        )
+        record = OrganizationRecord.objects.filter(
+            organization=self.organization,
+            event_type=OrganizationRecord.EventType.UPDATED,
+            recorded_by=self.owner_user,
+        ).latest("id")
+        self.assertEqual(record.metadata_json["changed_fields"], ["logo"])
+
+    def test_logo_upload_accepts_all_allowed_types(self):
+        for ct, ext in [
+            ("image/jpeg", "logo.jpg"),
+            ("image/png", "logo.png"),
+            ("image/webp", "logo.webp"),
+        ]:
+            logo = SimpleUploadedFile(ext, b"fake-image-data", content_type=ct)
+            response = self.client.post(
+                "/api/v1/organization/logo/",
+                {"logo": logo},
+                HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
+                format="multipart",
+            )
+            self.assertEqual(response.status_code, 200, f"Expected 200 for {ct}, got {response.status_code}")
