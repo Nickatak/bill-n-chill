@@ -429,53 +429,8 @@
     flex-direction: column;
   }
 
-  /* ── Status events table: stacked cards on mobile ── */
-  .statusEventsTable {
-    min-width: 0;
-  }
-
-  .statusEventsTable thead {
-    display: none;
-  }
-
-  .statusEventsTable tbody tr {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px 10px;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface-secondary);
-    margin-bottom: 6px;
-  }
-
-  .statusEventsTable tbody tr:nth-child(even) {
-    background: var(--surface-secondary);
-  }
-
-  .statusEventsTable tbody td {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    padding: 4px 0;
-    border-top: 0;
-    font-size: 0.82rem;
-  }
-
-  .statusEventsTable tbody td::before {
-    content: attr(data-label);
-    font-size: 0.62rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-tertiary, var(--text-secondary));
-    opacity: 0.7;
-  }
-
-  .statusEventsTableWrap {
-    border: 0;
-    border-radius: 0;
-    overflow: visible;
+  .actionConfirmActions .invoiceActionButton {
+    flex: 1 1 auto;
   }
 }
 
@@ -760,6 +715,60 @@
 
 .statusEventsTable tbody tr:nth-child(even) {
   background: var(--table-row-alt);
+}
+
+/* ── Status events table: stacked cards on mobile ── */
+@media (max-width: 700px) {
+  .statusEventsTable,
+  .statusEventsTable tbody {
+    min-width: 0;
+    background: transparent;
+  }
+
+  .statusEventsTable thead {
+    display: none;
+  }
+
+  .statusEventsTable tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-secondary);
+    margin-bottom: 6px;
+  }
+
+  .statusEventsTable tbody tr:nth-child(even) {
+    background: var(--surface-secondary);
+  }
+
+  .statusEventsTable tbody td {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 4px 0;
+    border-top: 0;
+    font-size: 0.82rem;
+  }
+
+  .statusEventsTable tbody td::before {
+    content: attr(data-label);
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-tertiary, var(--text-secondary));
+    opacity: 0.7;
+  }
+
+  .statusEventsTableWrap {
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+    background: transparent;
+  }
 }
 
 .invoiceEventBadge {
