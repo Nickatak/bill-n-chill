@@ -19,7 +19,6 @@ import type {
   ProjectRecord,
 } from "../types";
 import styles from "./estimates-console.module.css";
-import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
 
 // ---------------------------------------------------------------------------
