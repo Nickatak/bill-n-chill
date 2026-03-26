@@ -66,7 +66,6 @@ export function CostCodesConsole() {
     setItems: setCostCodes,
     selectedId,
     setSelectedId,
-    refresh: refreshCostCodes,
     status: {
       message: statusMessage,
       tone: statusTone,

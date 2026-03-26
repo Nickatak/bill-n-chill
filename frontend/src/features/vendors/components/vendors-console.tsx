@@ -30,7 +30,6 @@ export function VendorsConsole() {
     setItems: setVendors,
     selectedId,
     setSelectedId,
-    refresh: refreshVendors,
     status: {
       message: statusMessage,
       tone: statusTone,
