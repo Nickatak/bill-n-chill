@@ -106,7 +106,6 @@ export function useVendorForm({
     if (response.status === 409 && payload.error?.code === "duplicate_detected") {
       const duplicateData = payload.data as { duplicate_candidates?: VendorRecord[] };
       setDuplicateCandidates(duplicateData.duplicate_candidates ?? []);
-      status.setError(payload.error.message ?? "A vendor with this name already exists.");
       return;
     }
 

@@ -373,61 +373,6 @@
   border-color: var(--accent-border);
 }
 
-/* ── CSV Import ──────────────────────────────────────────────── */
-
-.importToggle {
-  appearance: none;
-  -webkit-appearance: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  border: 0;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-}
-
-.importToggleArrow {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  transition: transform 140ms ease;
-}
-
-.importHint {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-}
-
-.importResult {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 10px;
-  background: var(--surface);
-  display: grid;
-  gap: var(--space-sm);
-}
-
-.resultRows {
-  margin: 0;
-  padding-left: 18px;
-  max-height: 200px;
-  overflow: auto;
-  display: grid;
-  gap: var(--space-sm);
-}
-
-.resultRow {
-  color: var(--text-secondary);
-  font-size: 0.84rem;
-}
-
-.resultRowError {
-  color: var(--tone-error-text);
-}
 
 /* ── Empty state ─────────────────────────────────────────────── */
 

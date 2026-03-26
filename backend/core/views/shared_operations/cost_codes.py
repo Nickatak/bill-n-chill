@@ -7,10 +7,8 @@ from rest_framework.response import Response
 
 from core.models import CostCode
 from core.serializers import CostCodeSerializer
-from core.utils.csv_import import CsvImportError, process_csv_import
 from core.views.helpers import (
     _ensure_org_membership,
-    _parse_request_bool,
     _capability_gate,
 )
 from core.views.shared_operations.cost_codes_helpers import (
@@ -152,91 +150,3 @@ def cost_code_detail_view(request, cost_code_id):
     return Response({"data": CostCodeSerializer(cost_code).data})
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def cost_codes_import_csv_view(request):
-    """Import cost codes from CSV with preview (dry_run) and apply modes.
-
-    Accepts raw CSV text with ``code`` and ``name`` columns.  In dry-run mode,
-    validates and returns what would happen without writing.  In apply mode,
-    creates new codes and updates existing ones (matched by code, case-insensitive).
-
-    Flow:
-        1. Capability gate: ``cost_codes.create``.
-        2. Parse ``csv_text`` and ``dry_run`` from request body.
-        3. Delegate to ``process_csv_import`` with row validation, lookup,
-           create, update, and serialization callbacks.
-
-    URL: ``POST /api/v1/cost-codes/import-csv/``
-
-    Request body::
-
-        { "csv_text": "code,name\\n01-100,Framing\\n...", "dry_run": true }
-
-    Success 200::
-
-        { "data": { "created": 2, "updated": 1, "skipped": 0, "rows": [{ ... }, ...] } }
-
-    Errors:
-        - 400: Invalid CSV (missing headers, empty rows, row validation failures).
-        - 403: Missing ``cost_codes.create`` capability.
-    """
-    permission_error, _ = _capability_gate(request.user, "cost_codes", "create")
-    if permission_error:
-        return Response(permission_error, status=403)
-
-    scope_filter = _org_scope_filter(request.user)
-    membership = _ensure_org_membership(request.user)
-    csv_text = request.data.get("csv_text", "")
-    dry_run = _parse_request_bool(request.data.get("dry_run", True), default=True)
-
-    headers = {"code", "name"}
-
-    def validate_row(row):
-        if not row.get("code") or not row.get("name"):
-            return "code and name are required."
-        return None
-
-    def lookup_existing(row):
-        return CostCode.objects.filter(scope_filter, code__iexact=row["code"]).first()
-
-    def create_cost_code(row):
-        return CostCode.objects.create(
-            created_by=request.user,
-            organization_id=membership.organization_id,
-            code=row["code"],
-            name=row["name"],
-            is_active=True,
-        )
-
-    def update_cost_code(existing, row):
-        existing.name = row["name"]
-        existing.save(update_fields=["name", "updated_at"])
-        return existing
-
-    def serialize_row(_instance, status, row, row_number, message):
-        return {
-            "row_number": row_number,
-            "code": row.get("code", ""),
-            "name": row.get("name", ""),
-            "status": status,
-            "message": message,
-        }
-
-    try:
-        rows_out, summary = process_csv_import(
-            csv_text=csv_text,
-            dry_run=dry_run,
-            required_headers=headers,
-            allowed_headers=headers,
-            entity_name="cost code",
-            lookup_existing_fn=lookup_existing,
-            create_fn=create_cost_code,
-            update_fn=update_cost_code,
-            validate_row_fn=validate_row,
-            serialize_row_fn=serialize_row,
-        )
-    except CsvImportError as exc:
-        return Response(exc.error_payload, status=400)
-
-    return Response({"data": {**summary, "rows": rows_out}})

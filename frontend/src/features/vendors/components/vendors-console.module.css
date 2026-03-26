@@ -133,72 +133,19 @@
   font-size: 0.85rem;
 }
 
-.countBadge {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  padding: 3px 10px;
-  color: var(--text-secondary);
-  font-size: 0.76rem;
-  background: var(--surface);
-}
 
-/* ── Quick add ──────────────────────────────────────────────── */
+/* ── Combobox row (search + quick-add) ──────────────────────── */
 
-.quickAddRow {
+.comboRow {
   display: flex;
   gap: var(--space-sm);
   align-items: center;
 }
 
-/* ── Filter row ──────────────────────────────────────────────── */
-
-.filterRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  align-items: center;
-}
-
-.filterPills {
-  display: flex;
-  gap: 6px;
-}
-
-.filterPill {
-  appearance: none;
-  -webkit-appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  padding: 5px 11px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  cursor: pointer;
-  background: var(--surface);
-  color: var(--text-secondary);
-  transition: border-color 140ms ease, background 140ms ease;
-}
-
-.filterPillActive {
-  border-color: var(--accent);
-  background: var(--accent-lighter);
-  color: var(--accent-text);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent);
-}
-
-.filterPillCount {
-  border: 1px solid color-mix(in srgb, var(--text-secondary) 40%, transparent);
-  border-radius: var(--radius-pill);
-  min-width: 20px;
-  padding: 0 6px;
-  font-size: 0.66rem;
-  line-height: 1.3;
-  font-variant-numeric: tabular-nums;
-  background: color-mix(in srgb, var(--surface) 50%, transparent);
+.duplicateWarning {
+  composes: noticeError from "../../../shared/styles/notices.module.css";
+  margin: 0;
+  font-size: 0.85rem;
 }
 
 .searchInput {
@@ -400,32 +347,6 @@
   font-size: 0.87rem;
 }
 
-.duplicateCard {
-  border: 1px solid var(--tone-error-border);
-  border-radius: var(--radius-lg);
-  background: var(--tone-error-bg);
-  padding: 10px var(--space-md);
-  display: grid;
-  gap: var(--space-sm);
-}
-
-.duplicateTitle {
-  margin: 0;
-  color: var(--tone-error-text);
-  font-weight: 700;
-}
-
-.duplicateList {
-  margin: 0;
-  padding-left: var(--space-lg);
-  display: grid;
-  gap: 3px;
-}
-
-.duplicateList li {
-  color: var(--tone-error-text);
-  font-size: 0.84rem;
-}
 
 .formActions {
   display: flex;
@@ -482,61 +403,6 @@
   border-color: var(--accent-border);
 }
 
-/* ── CSV Import ──────────────────────────────────────────────── */
-
-.importToggle {
-  appearance: none;
-  -webkit-appearance: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  border: 0;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-}
-
-.importToggleArrow {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  transition: transform 140ms ease;
-}
-
-.importHint {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-}
-
-.importResult {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 10px;
-  background: var(--surface);
-  display: grid;
-  gap: var(--space-sm);
-}
-
-.resultRows {
-  margin: 0;
-  padding-left: 18px;
-  max-height: 200px;
-  overflow: auto;
-  display: grid;
-  gap: var(--space-sm);
-}
-
-.resultRow {
-  color: var(--text-secondary);
-  font-size: 0.84rem;
-}
-
-.resultRowError {
-  color: var(--tone-error-text);
-}
 
 /* ── Responsive ──────────────────────────────────────────────── */
 
@@ -547,18 +413,3 @@
   }
 }
 
-@media (max-width: 700px) {
-  .filterRow {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .filterPills {
-    width: 100%;
-  }
-
-  .filterPill {
-    flex: 1;
-    justify-content: center;
-  }
-}

@@ -53,7 +53,6 @@ import { PaginationControls } from "@/shared/components/pagination-controls";
 
 import { useCostCodeForm } from "../hooks/use-cost-code-form";
 import { useCostCodeFilters } from "../hooks/use-cost-code-filters";
-import { useCsvImport } from "../hooks/use-csv-import";
 import type { CostCode } from "../types";
 import styles from "./cost-codes-console.module.css";
 
@@ -100,13 +99,6 @@ export function CostCodesConsole() {
   });
 
   const filters = useCostCodeFilters(costCodes);
-
-  const csvImport = useCsvImport({
-    authToken,
-    canMutate: canMutateCostCodes,
-    status: { setNeutral: setNeutralStatus, setSuccess: setSuccessStatus, setError: setErrorStatus },
-    refreshCostCodes,
-  });
 
   const { paginatedItems: pageRows, page, totalPages, totalCount, setPage } =
     useClientPagination(filters.filteredRows, 25);
@@ -257,68 +249,6 @@ export function CostCodesConsole() {
                   ) : null}
                 </div>
               </form>
-            </section>
-
-            <section className={styles.panel}>
-              <button
-                type="button"
-                className={styles.importToggle}
-                onClick={() => csvImport.setIsExpanded((current) => !current)}
-                aria-expanded={csvImport.isExpanded}
-              >
-                <h3 className={styles.panelTitle}>CSV Import</h3>
-                <span className={styles.importToggleArrow}>{csvImport.isExpanded ? "▲" : "▼"}</span>
-              </button>
-              {csvImport.isExpanded ? (
-                <>
-                  <label className={styles.field}>
-                    CSV text
-                    <textarea
-                      value={csvImport.csvText}
-                      onChange={(event) => csvImport.setCsvText(event.target.value)}
-                      rows={8}
-                    />
-                  </label>
-                  <div className={styles.buttonRow}>
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
-                      onClick={() => void csvImport.runImport(true)}
-                      disabled={!canMutateCostCodes}
-                    >
-                      Preview
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.primaryButton}
-                      onClick={() => void csvImport.runImport(false)}
-                      disabled={!canMutateCostCodes}
-                    >
-                      Apply
-                    </button>
-                  </div>
-                  {csvImport.importResult ? (
-                    <div className={styles.importResult}>
-                      <p className={styles.importHint}>
-                        Rows: {csvImport.importResult.total_rows} | Create: {csvImport.importResult.created_count} | Update: {" "}
-                        {csvImport.importResult.updated_count} | Errors: {csvImport.importResult.error_count}
-                      </p>
-                      <ul className={styles.resultRows}>
-                        {csvImport.importResult.rows.map((row) => (
-                          <li
-                            key={`${row.row_number}-${row.code ?? "none"}-${row.status}`}
-                            className={`${styles.resultRow} ${
-                              row.status === "error" ? styles.resultRowError : ""
-                            }`}
-                          >
-                            row {row.row_number} | {row.status} | {row.code || "(no code)"}: {row.message}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                </>
-              ) : null}
             </section>
           </div>
         </div>

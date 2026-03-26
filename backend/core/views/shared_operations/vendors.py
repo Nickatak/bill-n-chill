@@ -7,11 +7,9 @@ from rest_framework.response import Response
 
 from core.models import Vendor
 from core.serializers import VendorSerializer, VendorWriteSerializer
-from core.utils.csv_import import CsvImportError, process_csv_import
 from core.views.helpers import (
     _ensure_org_membership,
     _paginate_queryset,
-    _parse_request_bool,
     _capability_gate,
 )
 from core.views.shared_operations.vendors_helpers import (
@@ -238,91 +236,3 @@ def vendor_detail_view(request, vendor_id):
         return Response({"data": VendorSerializer(vendor).data})
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def vendors_import_csv_view(request):
-    """Import vendors from a CSV payload in preview or apply mode.
-
-    Accepts raw CSV text with required ``name`` header.  In dry-run mode
-    (default) returns a preview of what would be created/updated without
-    persisting.  In apply mode, creates new vendors and updates existing
-    ones matched by name (case-insensitive).
-
-    Flow:
-        1. Capability gate: ``vendors.create``.
-        2. Parse CSV text and validate headers.
-        3. For each row: validate, look up existing vendor by name, create or update.
-        4. Return per-row results and summary counts.
-
-    URL: ``POST /api/v1/vendors/import-csv/``
-
-    Request body::
-
-        { "csv_text": "name,email\\nAcme,info@acme.com", "dry_run": true }
-
-    Success 200::
-
-        { "data": { "created": 1, "updated": 0, "skipped": 0, "rows": [...] } }
-
-    Errors:
-        - 400: Missing/invalid headers or row validation failure.
-        - 403: Missing ``vendors.create`` capability.
-    """
-    permission_error, _ = _capability_gate(request.user, "vendors", "create")
-    if permission_error:
-        return Response(permission_error, status=403)
-
-    csv_text = request.data.get("csv_text", "")
-    dry_run = _parse_request_bool(request.data.get("dry_run", True), default=True)
-    membership = _ensure_org_membership(request.user)
-    scope_filter = _org_scope_filter(request.user)
-
-    def validate_row(row):
-        if not row.get("name"):
-            return "name is required."
-        return None
-
-    def lookup_existing(row):
-        return Vendor.objects.filter(scope_filter, name__iexact=row["name"]).first()
-
-    def create_vendor(row):
-        return Vendor.objects.create(
-            created_by=request.user,
-            organization_id=membership.organization_id,
-            name=row["name"],
-            email=row.get("email", ""),
-            phone=row.get("phone", ""),
-            tax_id_last4=row.get("tax_id_last4", ""),
-            notes=row.get("notes", ""),
-        )
-
-    def update_vendor(existing, row):
-        existing.email = row.get("email", "")
-        existing.phone = row.get("phone", "")
-        existing.tax_id_last4 = row.get("tax_id_last4", "")
-        existing.notes = row.get("notes", "")
-        existing.save(
-            update_fields=["email", "phone", "tax_id_last4", "notes", "updated_at"]
-        )
-        return existing
-
-    def serialize_row(_instance, status, row, row_number, message):
-        return {"row_number": row_number, "name": row.get("name", ""), "status": status, "message": message}
-
-    try:
-        rows_out, summary = process_csv_import(
-            csv_text=csv_text,
-            dry_run=dry_run,
-            required_headers={"name"},
-            allowed_headers={"name", "email", "phone", "tax_id_last4", "notes"},
-            entity_name="vendor",
-            lookup_existing_fn=lookup_existing,
-            create_fn=create_vendor,
-            update_fn=update_vendor,
-            validate_row_fn=validate_row,
-            serialize_row_fn=serialize_row,
-        )
-    except CsvImportError as exc:
-        return Response(exc.error_payload, status=400)
-
-    return Response({"data": {**summary, "rows": rows_out}})
