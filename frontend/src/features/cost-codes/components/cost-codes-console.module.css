@@ -4,66 +4,6 @@
   color: var(--text-primary);
 }
 
-/* ── Header ──────────────────────────────────────────────────── */
-
-.headerRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px var(--space-lg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--surface-secondary);
-}
-
-.headerCopy {
-  display: grid;
-  gap: var(--space-xs);
-}
-
-.headerTitle {
-  margin: 0;
-  font-size: 1.2rem;
-  line-height: 1.1;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  font-family: var(--font-geist-mono);
-  font-weight: 700;
-}
-
-.headerSubtitle {
-  margin: 0;
-  max-width: 66ch;
-  color: var(--text-secondary);
-  font-size: var(--font-base);
-}
-
-.headerStats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-}
-
-.headerStatPill {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  padding: var(--space-xs) 10px;
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  background: var(--surface);
-}
-
-.headerStatActive {
-  border-color: var(--status-green-border);
-  color: var(--status-green-text);
-  background: var(--status-green-bg);
-}
-
 /* ── Status & auth ───────────────────────────────────────────── */
 
 .statusBanner {
@@ -200,16 +140,6 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
-.filterPillCount {
-  border: 1px solid color-mix(in srgb, var(--text-secondary) 40%, transparent);
-  border-radius: var(--radius-pill);
-  min-width: 20px;
-  padding: 0 6px;
-  font-size: 0.66rem;
-  line-height: 1.3;
-  font-variant-numeric: tabular-nums;
-  background: color-mix(in srgb, var(--surface) 50%, transparent);
-}
 
 .searchInput {
   flex: 1;
@@ -352,36 +282,55 @@
   min-height: 120px;
 }
 
-.segmentRow {
+.toggleField {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-sm);
+  color: var(--text-primary);
+  font-size: var(--font-base);
 }
 
-.segmentButton {
+.switchRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.switchInput {
+  width: 40px;
+  height: 22px;
+  margin: 0;
+  appearance: none;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--text-secondary);
-  padding: 7px var(--space-md);
+  background: var(--input-border);
+  position: relative;
   cursor: pointer;
-  font-weight: 700;
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  transition: border-color 140ms ease, background 140ms ease;
 }
 
-.segmentButtonActive {
-  border-color: var(--status-green-border);
-  background: var(--status-green-bg);
-  color: var(--status-green-text);
+.switchInput::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.18s ease-in-out;
 }
 
-.segmentButtonInactive {
-  border-color: var(--status-gray-border);
-  background: var(--status-gray-bg);
-  color: var(--status-gray-text);
+.switchInput:checked {
+  background: var(--tone-error-border);
+  border-color: var(--tone-error-border);
+}
+
+.switchInput:checked::before {
+  transform: translateX(18px);
+}
+
+.switchLabel {
+  font-size: 0.86rem;
+  color: var(--text-secondary);
 }
 
 /* ── Buttons ─────────────────────────────────────────────────── */
@@ -511,19 +460,6 @@
 }
 
 @media (max-width: 700px) {
-  .headerRow {
-    padding: var(--space-md);
-  }
-
-  .headerStats {
-    width: 100%;
-  }
-
-  .headerStatPill {
-    flex: 1;
-    text-align: center;
-  }
-
   .filterRow {
     flex-direction: column;
     align-items: stretch;
@@ -541,9 +477,5 @@
   .primaryButton,
   .secondaryButton {
     width: 100%;
-  }
-
-  .segmentRow {
-    grid-template-columns: 1fr;
   }
 }

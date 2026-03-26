@@ -116,17 +116,6 @@ export function CostCodesConsole() {
 
   return (
     <section className={styles.console}>
-      <div className={styles.headerRow}>
-        <div className={styles.headerCopy}>
-          <h2 className={styles.headerTitle}>Cost Codes</h2>
-        </div>
-        <div className={styles.headerStats}>
-          <span className={styles.headerStatPill}>Total {costCodes.length}</span>
-          <span className={`${styles.headerStatPill} ${styles.headerStatActive}`}>Active {filters.activeCount}</span>
-          <span className={styles.headerStatPill}>Archived {filters.archivedCount}</span>
-        </div>
-      </div>
-
       {!authToken ? <p className={styles.authNotice}>{authMessage}</p> : null}
 
       {statusMessage ? (
@@ -167,7 +156,6 @@ export function CostCodesConsole() {
                   aria-pressed={!filters.includeArchived}
                 >
                   Active
-                  <span className={styles.filterPillCount}>{filters.activeCount}</span>
                 </button>
                 <button
                   type="button"
@@ -176,7 +164,6 @@ export function CostCodesConsole() {
                   aria-pressed={filters.includeArchived}
                 >
                   All
-                  <span className={styles.filterPillCount}>{costCodes.length}</span>
                 </button>
               </div>
             </div>
@@ -246,25 +233,18 @@ export function CostCodesConsole() {
                   <input value={form.name} onChange={(event) => form.setName(event.target.value)} required />
                 </label>
                 {isEditing ? (
-                  <div className={styles.field}>
-                    Status
-                    <div className={styles.segmentRow}>
-                      <button
-                        type="button"
-                        className={`${styles.segmentButton} ${form.isActive ? styles.segmentButtonActive : ""}`}
-                        onClick={() => form.setIsActive(true)}
-                      >
-                        Active
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.segmentButton} ${!form.isActive ? styles.segmentButtonInactive : ""}`}
-                        onClick={() => form.setIsActive(false)}
-                      >
-                        Archived
-                      </button>
-                    </div>
-                  </div>
+                  <label className={styles.toggleField}>
+                    Archive
+                    <span className={styles.switchRow}>
+                      <input
+                        className={styles.switchInput}
+                        type="checkbox"
+                        checked={!form.isActive}
+                        onChange={(event) => form.setIsActive(!event.target.checked)}
+                      />
+                      <span className={styles.switchLabel}>{form.isActive ? "Active" : "Archived"}</span>
+                    </span>
+                  </label>
                 ) : null}
                 <div className={styles.buttonRow}>
                   <button type="submit" className={styles.primaryButton} disabled={!canMutateCostCodes}>
