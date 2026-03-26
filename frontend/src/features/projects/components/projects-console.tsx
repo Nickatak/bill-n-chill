@@ -14,10 +14,9 @@
  * ┌──────────────┬──────────────────────────────────┐
  * │ Project list │ Financial snapshot                │
  * │   ├── Search │   ├── Contract / AR / AP metrics  │
- * │   ├── Status │   ├── Estimate status counts      │
- * │   │   pills  │   ├── CO / Invoice / Bill counts  │
- * │   └── Cards  │   ├── Quick-entry tabs             │
- * │              │   └── Billing tree (scoped links)  │
+ * │   ├── Status │   ├── Workflow pipeline progress   │
+ * │   │   pills  │   ├── Quick-entry tabs             │
+ * │   └── Cards  │   └── Billing tree (scoped links)  │
  * │              ├──────────────────────────────────┤
  * │              │ Profile editor (collapsible)      │
  * │              │   ├── Project name                │
@@ -27,7 +26,7 @@
  *
  * ## State (useState) — 14 calls
  *
- * Data: projects, summary, estimate/CO/bill/invoice status counts,
+ * Data: projects, summary, estimate/CO/bill/invoice progress,
  *       acceptedEstimateTotal, invoiceAllocationTargets
  * Selection: selectedProjectId, isProjectEditOpen
  * Filters: projectSearch, projectStatusFilters
@@ -37,7 +36,7 @@
  *
  * - loadProjects() — fetches all projects, auto-selects based on URL scope
  * - loadFinancialSummary() — fetches /projects/:id/financial-summary/
- * - loadStatusCounts() — fetches status breakdowns for estimates, COs, bills, invoices
+ * - loadEstimateProgress / loadCoProgress / loadBillProgress / loadInvoiceProgress — fetches workflow progress
  * - hydrateForm(project) — populates name + status fields
  * - handleProjectSave(event) — PATCHes project profile
  * - toggleProjectStatusFilter(status) — toggles a status pill in/out
@@ -46,7 +45,7 @@
  *
  * 1. Fetch projects on mount (deps: [token])
  * 2. Fetch financial summary when selection changes (deps: [selectedProjectId, token])
- * 3. Fetch status counts when selection changes (deps: [selectedProjectId, token])
+ * 3. Fetch workflow progress when selection changes (deps: [selectedProjectId, token])
  * 4. Fetch allocation targets when selection changes (deps: [selectedProjectId, token])
  * 5. Auto-select scoped project from URL params (deps: [projects, scopedProjectId])
  */
@@ -92,25 +91,10 @@ export function ProjectsConsole() {
     DEFAULT_PROJECT_STATUS_FILTERS,
   );
   const [summary, setSummary] = useState<ProjectFinancialSummary | null>(null);
-  const [estimateStatusCounts, setEstimateStatusCounts] = useState<{
-    draft: number;
-    sent: number;
-    approved: number;
-  } | null>(null);
-  const [changeOrderStatusCounts, setChangeOrderStatusCounts] = useState<{
-    draft: number;
-    sent: number;
-    accepted: number;
-  } | null>(null);
-  const [billStatusCounts, setBillStatusCounts] = useState<{
-    open: number;
-    disputed: number;
-  } | null>(null);
-  const [invoiceStatusCounts, setInvoiceStatusCounts] = useState<{
-    draft: number;
-    sent: number;
-    outstanding: number;
-  } | null>(null);
+  const [estimateProgress, setEstimateProgress] = useState<{ total: number } | null>(null);
+  const [coProgress, setCoProgress] = useState<{ done: number; total: number } | null>(null);
+  const [billProgress, setBillProgress] = useState<{ done: number; total: number } | null>(null);
+  const [invoiceProgress, setInvoiceProgress] = useState<{ done: number; total: number } | null>(null);
   const [acceptedEstimateTotal, setAcceptedEstimateTotal] = useState("--");
   const [invoiceAllocationTargets, setInvoiceAllocationTargets] = useState<AllocationTarget[]>([]);
   const [toolbarPanel, setToolbarPanel] = useState<"deposit" | "payment" | null>(null);
@@ -144,7 +128,8 @@ export function ProjectsConsole() {
   const isSelectedProjectTerminal =
     selectedProject?.status === "completed" || selectedProject?.status === "cancelled";
   const isSelectedProjectProspect = selectedProject?.status === "prospect";
-  const hasApprovedEstimate = (estimateStatusCounts?.approved ?? 0) > 0;
+  const hasApprovedEstimate = approvedEstimates.length > 0;
+  const estimateDone = approvedEstimates.filter((e) => linkedEstimateIds.has(e.id)).length;
   const hasPayableInvoices = invoiceAllocationTargets.length > 0;
   const computedProfileStatuses = selectedProject
     ? allowedProfileStatuses(selectedProject.status as ProjectStatusValue)
@@ -253,10 +238,10 @@ export function ProjectsConsole() {
       } else {
         setSelectedProjectId("");
         setSummary(null);
-        setEstimateStatusCounts(null);
-        setChangeOrderStatusCounts(null);
-        setBillStatusCounts(null);
-        setInvoiceStatusCounts(null);
+        setEstimateProgress(null);
+        setCoProgress(null);
+        setBillProgress(null);
+        setInvoiceProgress(null);
       }
     } catch {
       // Network error — silently fail; the empty project list is visible feedback.
@@ -284,30 +269,25 @@ export function ProjectsConsole() {
     }
   }
 
-  /** Loads estimate counts by status for the scope-control badges. */
-  async function loadEstimateStatusCounts(projectId: number) {
+  /** Loads estimate progress (total non-void, approved list) for the pipeline. */
+  async function loadEstimateProgress(projectId: number) {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
         headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setEstimateStatusCounts(null);
+        setEstimateProgress(null);
         return;
       }
       const rows = (payload.data as Array<{ id?: number; status?: string; title?: string; grand_total?: string | number }>) ?? [];
-      let draft = 0;
-      let sent = 0;
-      let approved = 0;
+      let total = 0;
       let acceptedTotal = 0;
       const approvedList: ApprovedEstimate[] = [];
       for (const estimate of rows) {
-        if (estimate.status === "draft") {
-          draft += 1;
-        } else if (estimate.status === "sent") {
-          sent += 1;
-        } else if (estimate.status === "approved") {
-          approved += 1;
+        if (estimate.status === "void" || estimate.status === "draft") continue;
+        total += 1;
+        if (estimate.status === "approved") {
           acceptedTotal += parseMoneyValue(estimate.grand_total);
           approvedList.push({
             id: estimate.id ?? 0,
@@ -316,99 +296,87 @@ export function ProjectsConsole() {
           });
         }
       }
-      setEstimateStatusCounts({ draft, sent, approved });
+      setEstimateProgress({ total });
       setAcceptedEstimateTotal(formatCurrency(acceptedTotal));
       setApprovedEstimates(approvedList);
     } catch {
-      setEstimateStatusCounts(null);
+      setEstimateProgress(null);
       setAcceptedEstimateTotal("--");
     }
   }
 
-  /** Loads change order counts by status for the scope-control badges. */
-  async function loadChangeOrderStatusCounts(projectId: number) {
+  /** Loads change order progress (accepted / total non-void) for the pipeline. */
+  async function loadCoProgress(projectId: number) {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/change-orders/`, {
         headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setChangeOrderStatusCounts(null);
+        setCoProgress(null);
         return;
       }
-      const rows = (payload.data as Array<{ status?: string; amount_delta?: string | number }>) ?? [];
-      let draft = 0;
-      let sent = 0;
-      let accepted = 0;
-      for (const changeOrder of rows) {
-        if (changeOrder.status === "draft") {
-          draft += 1;
-        } else if (changeOrder.status === "sent") {
-          sent += 1;
-        } else if (changeOrder.status === "approved") {
-          accepted += 1;
-        }
+      const rows = (payload.data as Array<{ status?: string }>) ?? [];
+      let total = 0;
+      let done = 0;
+      for (const co of rows) {
+        if (co.status === "void" || co.status === "draft") continue;
+        total += 1;
+        if (co.status === "approved") done += 1;
       }
-      setChangeOrderStatusCounts({ draft, sent, accepted });
+      setCoProgress({ done, total });
     } catch {
-      setChangeOrderStatusCounts(null);
+      setCoProgress(null);
     }
   }
 
-  /** Loads vendor bill counts by status for the pipeline badges. */
-  async function loadBillStatusCounts(projectId: number) {
+  /** Loads vendor bill progress (closed / total non-void) for the pipeline. */
+  async function loadBillProgress(projectId: number) {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/vendor-bills/`, {
         headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setBillStatusCounts(null);
+        setBillProgress(null);
         return;
       }
       const rows = (payload.data as Array<{ status?: string }>) ?? [];
-      let open = 0;
-      let disputed = 0;
+      let total = 0;
+      let done = 0;
       for (const bill of rows) {
-        if (bill.status === "open") {
-          open += 1;
-        } else if (bill.status === "disputed") {
-          disputed += 1;
-        }
+        if (bill.status === "void") continue;
+        total += 1;
+        if (bill.status === "closed") done += 1;
       }
-      setBillStatusCounts({ open, disputed });
+      setBillProgress({ done, total });
     } catch {
-      setBillStatusCounts(null);
+      setBillProgress(null);
     }
   }
 
-  /** Loads invoice counts by status for the pipeline badges. */
-  async function loadInvoiceStatusCounts(projectId: number) {
+  /** Loads invoice progress (closed / total non-void) for the pipeline. */
+  async function loadInvoiceProgress(projectId: number) {
     try {
       const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/invoices/`, {
         headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setInvoiceStatusCounts(null);
+        setInvoiceProgress(null);
         return;
       }
       const rows = (payload.data as Array<{ status?: string }>) ?? [];
-      let draft = 0;
-      let sent = 0;
-      let outstanding = 0;
+      let total = 0;
+      let done = 0;
       for (const invoice of rows) {
-        if (invoice.status === "draft") {
-          draft += 1;
-        } else if (invoice.status === "sent") {
-          sent += 1;
-        } else if (invoice.status === "outstanding") {
-          outstanding += 1;
-        }
+        if (invoice.status === "void" || invoice.status === "draft") continue;
+        total += 1;
+        if (invoice.status === "closed") done += 1;
       }
-      setInvoiceStatusCounts({ draft, sent, outstanding });
+      setInvoiceProgress({ done, total });
     } catch {
-      setInvoiceStatusCounts(null);
+      setInvoiceProgress(null);
     }
   }
 
@@ -471,10 +439,10 @@ export function ProjectsConsole() {
       return;
     }
     void loadFinancialSummary();
-    void loadEstimateStatusCounts(projectId);
-    void loadChangeOrderStatusCounts(projectId);
-    void loadBillStatusCounts(projectId);
-    void loadInvoiceStatusCounts(projectId);
+    void loadEstimateProgress(projectId);
+    void loadCoProgress(projectId);
+    void loadBillProgress(projectId);
+    void loadInvoiceProgress(projectId);
     void loadInvoiceAllocationTargets(projectId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProjectId, authToken]);
@@ -496,10 +464,10 @@ export function ProjectsConsole() {
     hydrateForm(fallbackProject);
 
     setSummary(null);
-    setEstimateStatusCounts(null);
-    setChangeOrderStatusCounts(null);
-    setBillStatusCounts(null);
-    setInvoiceStatusCounts(null);
+    setEstimateProgress(null);
+    setCoProgress(null);
+    setBillProgress(null);
+    setInvoiceProgress(null);
     setAcceptedEstimateTotal("--");
   }, [selectedProjectId, statusFilteredProjects]);
 
@@ -537,10 +505,10 @@ export function ProjectsConsole() {
 
     // Clear stale financial data so it re-loads for the new project.
     setSummary(null);
-    setEstimateStatusCounts(null);
-    setChangeOrderStatusCounts(null);
-    setBillStatusCounts(null);
-    setInvoiceStatusCounts(null);
+    setEstimateProgress(null);
+    setCoProgress(null);
+    setBillProgress(null);
+    setInvoiceProgress(null);
     setAcceptedEstimateTotal("--");
   }
 
@@ -711,17 +679,23 @@ export function ProjectsConsole() {
                     <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
                   </svg>
                   <span className={styles.pipelineLabel}>Estimates</span>
-                  <span className={styles.pipelineCounts}>
-                    <span className={`${styles.estimateCountPill} ${styles.estimateCountDraft}`}>
-                      D{estimateStatusCounts ? estimateStatusCounts.draft : "--"}
-                    </span>
-                    <span className={`${styles.estimateCountPill} ${styles.estimateCountSent}`}>
-                      S{estimateStatusCounts ? estimateStatusCounts.sent : "--"}
-                    </span>
-                    <span className={`${styles.estimateCountPill} ${styles.estimateCountApproved}`}>
-                      A{estimateStatusCounts ? estimateStatusCounts.approved : "--"}
-                    </span>
-                  </span>
+                  <div className={styles.progressSection}>
+                    {estimateProgress && estimateProgress.total > 0 ? (
+                      <>
+                        <div className={styles.progressTrack}>
+                          <div
+                            className={styles.progressFill}
+                            style={{ width: `${(estimateDone / estimateProgress.total) * 100}%` }}
+                          />
+                        </div>
+                        <span className={styles.progressText}>
+                          {estimateDone} of {estimateProgress.total} invoiced
+                        </span>
+                      </>
+                    ) : (
+                      <span className={styles.progressHint}>Create an estimate</span>
+                    )}
+                  </div>
                 </Link>
 
                 <span className={styles.pipelineArrow} aria-hidden="true">
@@ -739,17 +713,23 @@ export function ProjectsConsole() {
                     <path d="M21 13v2a4 4 0 0 1-4 4H3" />
                   </svg>
                   <span className={styles.pipelineLabel}>Change Orders</span>
-                  <span className={styles.pipelineCounts}>
-                    <span className={`${styles.estimateCountPill} ${styles.estimateCountDraft}`}>
-                      D{changeOrderStatusCounts ? changeOrderStatusCounts.draft : "--"}
-                    </span>
-                    <span className={`${styles.estimateCountPill} ${styles.estimateCountSent}`}>
-                      S{changeOrderStatusCounts ? changeOrderStatusCounts.sent : "--"}
-                    </span>
-                    <span className={`${styles.estimateCountPill} ${styles.estimateCountApproved}`}>
-                      A{changeOrderStatusCounts ? changeOrderStatusCounts.accepted : "--"}
-                    </span>
-                  </span>
+                  <div className={styles.progressSection}>
+                    {coProgress && coProgress.total > 0 ? (
+                      <>
+                        <div className={styles.progressTrack}>
+                          <div
+                            className={styles.progressFill}
+                            style={{ width: `${(coProgress.done / coProgress.total) * 100}%` }}
+                          />
+                        </div>
+                        <span className={styles.progressText}>
+                          {coProgress.done} of {coProgress.total} accepted
+                        </span>
+                      </>
+                    ) : (
+                      <span className={styles.progressHint}>No change orders yet</span>
+                    )}
+                  </div>
                 </Link>
 
                 <span className={styles.pipelineArrow} aria-hidden="true">
@@ -767,17 +747,23 @@ export function ProjectsConsole() {
                     <line x1="16" y1="17" x2="8" y2="17" />
                   </svg>
                   <span className={styles.pipelineLabel}>Invoices</span>
-                  <span className={styles.pipelineCounts}>
-                    <span className={`${styles.estimateCountPill} ${styles.estimateCountDraft}`}>
-                      D{invoiceStatusCounts ? invoiceStatusCounts.draft : "--"}
-                    </span>
-                    <span className={`${styles.estimateCountPill} ${styles.estimateCountSent}`}>
-                      S{invoiceStatusCounts ? invoiceStatusCounts.sent : "--"}
-                    </span>
-                    <span className={`${styles.estimateCountPill} ${styles.invoiceCountPartial}`}>
-                      O{invoiceStatusCounts ? invoiceStatusCounts.outstanding : "--"}
-                    </span>
-                  </span>
+                  <div className={styles.progressSection}>
+                    {invoiceProgress && invoiceProgress.total > 0 ? (
+                      <>
+                        <div className={styles.progressTrack}>
+                          <div
+                            className={styles.progressFill}
+                            style={{ width: `${(invoiceProgress.done / invoiceProgress.total) * 100}%` }}
+                          />
+                        </div>
+                        <span className={styles.progressText}>
+                          {invoiceProgress.done} of {invoiceProgress.total} closed
+                        </span>
+                      </>
+                    ) : (
+                      <span className={styles.progressHint}>Invoice an approved estimate</span>
+                    )}
+                  </div>
                 </Link>
 
                 <span className={styles.pipelineArrow} aria-hidden="true">
@@ -793,14 +779,23 @@ export function ProjectsConsole() {
                     <path d="M7 15h0M2 9.5h20" />
                   </svg>
                   <span className={styles.pipelineLabel}>Expenses</span>
-                  <span className={styles.pipelineCounts}>
-                    <span className={`${styles.estimateCountPill} ${styles.billCountReceived}`}>
-                      O{billStatusCounts ? billStatusCounts.open : "--"}
-                    </span>
-                    <span className={`${styles.estimateCountPill} ${styles.billCountDisputed}`}>
-                      D{billStatusCounts ? billStatusCounts.disputed : "--"}
-                    </span>
-                  </span>
+                  <div className={styles.progressSection}>
+                    {billProgress && billProgress.total > 0 ? (
+                      <>
+                        <div className={styles.progressTrack}>
+                          <div
+                            className={styles.progressFill}
+                            style={{ width: `${(billProgress.done / billProgress.total) * 100}%` }}
+                          />
+                        </div>
+                        <span className={styles.progressText}>
+                          {billProgress.done} of {billProgress.total} paid
+                        </span>
+                      </>
+                    ) : (
+                      <span className={styles.progressHint}>No expenses yet</span>
+                    )}
+                  </div>
                 </Link>
 
               </nav>
@@ -839,7 +834,7 @@ export function ProjectsConsole() {
                     setDepositInvoice(invoice);
                     // Refresh data so the new invoice shows up in counts + targets.
                     void loadFinancialSummary();
-                    void loadInvoiceStatusCounts(selectedProject.id);
+                    void loadInvoiceProgress(selectedProject.id);
                     void loadInvoiceAllocationTargets(selectedProject.id);
                   }}
                 />
