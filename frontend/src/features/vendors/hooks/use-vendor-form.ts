@@ -5,8 +5,7 @@
  * duplicate-candidate state surfaced by 409 responses. Duplicate vendor
  * names are blocked outright — there is no override path.
  *
- * Consumer: VendorsConsole (composed alongside useVendorFilters
- * and useVendorCsvImport).
+ * Consumer: VendorsConsole (composed alongside useVendorFilters).
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";

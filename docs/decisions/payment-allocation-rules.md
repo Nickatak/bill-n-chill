@@ -38,7 +38,7 @@ against one invoice). The relationship is **many payments → 1 document**.
 ### 3. Partial allocation is valid
 
 A $2,000 payment against a $5,000 invoice is fine. The invoice moves to
-`partially_paid` status. The payment is fully applied — its entire amount
+`outstanding` status. The payment is fully applied — its entire amount
 goes to that one document.
 
 ## Enforcement

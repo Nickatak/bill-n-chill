@@ -25,14 +25,16 @@ _Regenerate: `python scripts/generate_ai_index.py`_
 - [Shared — Hooks](#shared-hooks)
 - [Shared — Onboarding](#shared-onboarding)
 - [Shared — Project List Viewer](#shared-project-list-viewer)
+- [Shared — Pwa](#shared-pwa)
 - [Shared — Session](#shared-session)
 - [Shared — Shell](#shared-shell)
 - [Shared — Types](#shared-types)
+- [Shared — Utils](#shared-utils)
 
 ## App Routes
 
 ### `frontend/src/app/accounting/page.tsx`
-_Accounting page — org-wide ledger for reconciliation and payment management._
+_Accounting page — tabbed hub for invoices and bills._
 
 **Depends on:**
 - `@/features/payments`
@@ -50,16 +52,6 @@ _Superuser impersonation page — lists all impersonatable users_
 - `@/shared/session/session-authorization`
 
 - [default] `ImpersonatePage`
-
-### `frontend/src/app/bills/page.tsx`
-
-**Depends on:**
-- `@/features/vendor-bills`
-- `@/shared/shell`
-- `@/shared/shell/route-metadata`
-
-- [Component] `generateMetadata({...})`
-- [default] `BillsPage`
 
 ### `frontend/src/app/change-order/[publicRef]/page.tsx`
 
@@ -99,7 +91,6 @@ _Superuser impersonation page — lists all impersonatable users_
 
 **Depends on:**
 - `@/features/dashboard`
-- `@/shared/session/session-authorization`
 - `@/shared/shell`
 - `@/shared/shell/page-shell.module.css`
 
@@ -108,6 +99,10 @@ _Superuser impersonation page — lists all impersonatable users_
 ### `frontend/src/app/dashboard/page.tsx`
 
 - [default] `DashboardPage`
+
+### `frontend/src/app/dev-notes/page.tsx`
+
+- [default] `DevNotesPage`
 
 ### `frontend/src/app/error.tsx`
 
@@ -147,6 +142,7 @@ _Superuser impersonation page — lists all impersonatable users_
 ### `frontend/src/app/layout.tsx`
 
 **Depends on:**
+- `@/shared/pwa`
 - `@/shared/session/session-authorization`
 - `@/shared/shell`
 
@@ -167,6 +163,14 @@ _Superuser impersonation page — lists all impersonatable users_
 - `@/shared/api/health`
 
 - [default] `LoginPage`
+
+### `frontend/src/app/manifest.ts`
+
+- [default] `manifest`
+
+### `frontend/src/app/offline/page.tsx`
+
+- [default] `OfflinePage`
 
 ### `frontend/src/app/onboarding/page.tsx`
 
@@ -197,6 +201,16 @@ _Superuser impersonation page — lists all impersonatable users_
 
 - [Component] `generateMetadata({...})`
 - [default] `ProjectAuditTrailPage`
+
+### `frontend/src/app/projects/[projectId]/bills/page.tsx`
+
+**Depends on:**
+- `@/features/vendor-bills`
+- `@/shared/shell`
+- `@/shared/shell/route-metadata`
+
+- [Component] `generateMetadata({...})`
+- [default] `ProjectBillsPage`
 
 ### `frontend/src/app/projects/[projectId]/change-orders/page.tsx`
 
@@ -314,20 +328,40 @@ _Estimate document creator sheet used for both creating and editing estimates._
 ### `frontend/src/features/estimates/components/estimates-console.tsx`
 
 **Depends on:**
-- `@/shared/document-creator/creator-foundation.module.css`
+- `@/shared/api/base`
+- `@/shared/date-format`
 - `@/shared/hooks/use-creator-flash`
+- `@/shared/hooks/use-line-items`
 - `@/shared/hooks/use-media-query`
 - `@/shared/hooks/use-policy-contract`
 - `@/shared/hooks/use-status-filters`
-- `@/shared/money-format`
-- `@/shared/project-list-viewer`
 - `@/shared/session/auth-headers`
 - `@/shared/session/rbac`
 - `@/shared/session/use-shared-session`
 - `@/shared/shell/printable-context`
-- `@/shared/styles/decision-stamp.module.css`
 
 - [fn] `EstimatesConsole({...})`
+
+### `frontend/src/features/estimates/components/estimates-viewer-panel.tsx`
+_Presentational component for the estimates viewer panel._
+
+**Depends on:**
+- `@/shared/date-format`
+- `@/shared/money-format`
+- `@/shared/project-list-viewer`
+
+- [Component] `EstimatesViewerPanel({...})`
+- [type] `EstimateFamily` { title, items }
+- [type] `EstimatesViewerPanelProps` { selectedProject, isMobile, isViewerExpanded, setIsViewerExpanded, viewerStatusOptions, estimateStatusFilters, ... }
+
+### `frontend/src/features/estimates/components/estimates-workspace-panel.tsx`
+_Workspace panel for the estimates console — toolbar, family-collision_
+
+**Depends on:**
+- `@/shared/styles/decision-stamp.module.css`
+
+- [Component] `EstimatesWorkspacePanel({...})`
+- [type] `EstimatesWorkspacePanelProps` { workspaceContextLabel, workspaceContext, workspaceBadgeClass, workspaceBadgeLabel, selectedEstimate, onStartNew, ... }
 
 ### `frontend/src/features/estimates/document-adapter.ts`
 _Document-creator adapter for estimates._
@@ -354,10 +388,23 @@ _Pure helper functions for the estimates feature._
 - [fn] `mapLineCostCodes(estimate)`
 - [fn] `estimateStatusLabel(status)`
 - [fn] `formatStatusAction(event)`
+- [fn] `isResendStatusEvent(event)`
 - [fn] `isNotatedStatusEvent(event)`
+- [fn] `toNumber(value)`
+- [fn] `computeLineTotal(line)`
+- [fn] `groupEstimateFamilies(estimates)` — Group estimates by title into families, sorted by version within each
+- [fn] `computeEstimateStatusCounts(families)` — Count how many families have each status as their latest version's status.
+- [fn] `filterVisibleFamilies(families, statusFilters)` — Filter families to those whose latest version's status is in the active filter set.
 - [type] `NormalizedEstimatePolicy` { statuses, statusLabels, allowedTransitions, quickActionByStatus, defaultCreateStatus, defaultStatusFilters }
 - [type] `LineValidationIssue` { localId, rowNumber, message }
 - [type] `LineValidationResult` { issues, issuesByLocalId }
+- [type] `EstimateFamily` { title, items }
+
+### `frontend/src/features/estimates/hooks/use-estimate-form-fields.ts`
+_Estimate form field state for the composer panel._
+
+- [fn] `useEstimateFormFields({...})` — Manage estimate composer form fields: title, dates, tax, terms, sort,
+- [type] `EstimateFamilyCollisionPrompt` { title, latestEstimateId, latestVersion, familySize }
 
 ### `frontend/src/features/estimates/index.ts`
 
@@ -371,14 +418,14 @@ _Pure helper functions for the estimates feature._
 **Depends on:**
 - `@/shared/types/domain`
 
-- [type] `ProjectRecord` { id, name, status, customer_display_name, customer_billing_address, customer_email, ... }
+- [type] `ProjectRecord` { id, name, status, customer, customer_display_name, customer_billing_address, ... }
 - [type] `EstimateRecord` { id, project, version, status, title, valid_through, ... }
 - [type] `EstimateLineItemRecord` { id, cost_code, cost_code_code, cost_code_name, description, quantity, ... }
 - [type] `EstimateStatusEventRecord` { id, from_status, to_status, note, action_type, changed_by_email, ... }
 - [type] `EstimateRelatedChangeOrderRecord` { id, number, revision_number, title, status, origin_estimate, ... }
 - [type] `EstimateLineInput` { localId, costCodeId, description, quantity, unit, unitCost, ... }
 - [type] `EstimatePolicyContract` { policy_version, status_labels, statuses, default_create_status, default_status_filters, allowed_status_transitions, ... }
-- [type] `ApiResponse` { email_sent, cloned_from, duplicated_from, conversion_status, code, message, ... }
+- [type] `ApiResponse` { email_sent, conversion_status, code, message, fields, latest_estimate_id, ... }
 
 ## Features — Change Orders
 
@@ -408,25 +455,15 @@ _Change-order feature API layer._
 ### `frontend/src/features/change-orders/components/change-orders-console.tsx`
 
 **Depends on:**
-- `@/features/estimates/components/cost-code-combobox`
-- `@/shared/components/pagination-controls`
-- `@/shared/document-creator`
-- `@/shared/document-creator/change-order-creator.module.css`
+- `@/shared/api/base`
 - `@/shared/document-creator/creator-foundation.module.css`
-- `@/shared/document-creator/mobile-line-card`
-- `@/shared/document-creator/mobile-line-card.module.css`
-- `@/shared/document-viewer/read-only-line-table`
-- `@/shared/hooks/use-client-pagination`
 - `@/shared/hooks/use-creator-flash`
 - `@/shared/hooks/use-media-query`
 - `@/shared/hooks/use-policy-contract`
 - `@/shared/money-format`
-- `@/shared/project-list-viewer`
 - `@/shared/session/auth-headers`
-- `@/shared/session/rbac`
 - `@/shared/session/use-shared-session`
 - `@/shared/shell/printable-context`
-- `@/shared/styles/decision-stamp.module.css`
 
 - [fn] `ChangeOrdersConsole({...})`
 
@@ -451,6 +488,35 @@ _Pure display helpers for change order consoles and viewers._
 - [fn] `lastStatusEventForChangeOrder(changeOrderId, projectAuditEvents)` — Find the most recent status event for a specific change order from the project's audit events.
 - [fn] `toLinePayload(lines)`
 
+### `frontend/src/features/change-orders/components/change-orders-viewer-panel.tsx`
+_Presentational component for the change-orders viewer panel._
+
+**Depends on:**
+- `@/shared/components/pagination-controls`
+- `@/shared/document-creator/creator-foundation.module.css`
+- `@/shared/project-list-viewer`
+
+- [Component] `ChangeOrdersViewerPanel({...})`
+- [type] `ChangeOrdersViewerPanelProps` { isMobile, isViewerExpanded, setIsViewerExpanded, selectedProjectId, selectedProjectName, selectedProjectCustomerEmail, ... }
+
+### `frontend/src/features/change-orders/components/change-orders-workspace-panel.tsx`
+_Workspace panel for the change-orders console -- toolbar, create form,_
+
+**Depends on:**
+- `@/features/estimates/components/cost-code-combobox`
+- `@/shared/document-creator`
+- `@/shared/document-creator/change-order-creator.module.css`
+- `@/shared/document-creator/creator-foundation.module.css`
+- `@/shared/document-creator/mobile-line-card`
+- `@/shared/document-creator/mobile-line-card.module.css`
+- `@/shared/document-creator/types`
+- `@/shared/document-viewer/read-only-line-table`
+- `@/shared/money-format`
+- `@/shared/styles/decision-stamp.module.css`
+
+- [Component] `ChangeOrdersWorkspacePanel({...})`
+- [type] `ChangeOrdersWorkspacePanelProps` { isMobile, selectedProjectId, selectedViewerEstimateId, selectedViewerEstimate, projectEstimates, selectedChangeOrder, ... }
+
 ### `frontend/src/features/change-orders/document-adapter.ts`
 _Document-creator adapter for change orders._
 
@@ -468,9 +534,39 @@ _Pure helper functions for the change-orders feature._
 - [fn] `validateLineItems(lines)`
 - [fn] `emptyLine(localId)`
 - [fn] `defaultChangeOrderTitle(projectName)`
-- [fn] `coLabel(changeOrder, "family_key" | "revision_number">)`
+- [fn] `coLabel(changeOrder, "family_key">)`
 - [fn] `publicChangeOrderHref(publicRef)`
 - [fn] `readChangeOrderApiError(payload, fallback)`
+
+### `frontend/src/features/change-orders/hooks/use-change-order-form.ts`
+_Dual-mode form state for the change-orders console._
+
+**Depends on:**
+- `@/shared/hooks/use-line-items`
+- `@/shared/money-format`
+
+- [fn] `useChangeOrderForm()` — Manage dual-mode (create + edit) form state for change orders.
+
+### `frontend/src/features/change-orders/hooks/use-change-order-project-data.ts`
+_Project-scoped data fetching for the change-orders console._
+
+**Depends on:**
+- `@/shared/api/base`
+- `@/shared/session/auth-headers`
+
+- [fn] `useChangeOrderProjectData({...})` — Fetch and manage all project-scoped data for the change-orders console.
+
+### `frontend/src/features/change-orders/hooks/use-change-order-viewer.ts`
+_Viewer-side derived state for the change-orders console._
+
+**Depends on:**
+- `@/shared/hooks/use-client-pagination`
+- `@/shared/money-format`
+- `@/shared/session/rbac`
+
+- [fn] `sortChangeOrdersForViewer(changeOrders)`
+- [fn] `computeWorkingTotals({...})` — Compute pre- and post-approval working budget totals for the selected
+- [fn] `useChangeOrderViewer({...})` — Compute all viewer-side derived state for the change-orders console.
 
 ### `frontend/src/features/change-orders/index.ts`
 
@@ -490,7 +586,7 @@ _Pure helper functions for the change-orders feature._
 - [type] `AuditEventRecord` { id, event_type, object_type, object_id, from_status, to_status, ... }
 - [type] `CostCodeOption` { id, code, name, is_active }
 - [type] `ChangeOrderLineRecord` { id, change_order, cost_code, cost_code_id, cost_code_code, cost_code_name, ... }
-- [type] `ChangeOrderRecord` { id, project, family_key, revision_number, title, status, ... }
+- [type] `ChangeOrderRecord` { id, project, family_key, title, status, public_ref, ... }
 - [type] `ChangeOrderPolicyContract` { policy_version, status_labels, statuses, default_create_status, allowed_status_transitions, terminal_statuses, ... }
 - [type] `ChangeOrderLineInput` { localId, costCodeId, description, adjustmentReason, amountDelta, daysDelta }
 - [type] `LineValidationIssue` { localId, rowNumber, message }
@@ -524,17 +620,11 @@ _Invoices feature API layer._
 ### `frontend/src/features/invoices/components/invoices-console.tsx`
 
 **Depends on:**
-- `@/features/estimates/components/cost-code-combobox`
-- `@/shared/components/pagination-controls`
+- `@/shared/api/base`
 - `@/shared/date-format`
-- `@/shared/document-creator`
-- `@/shared/document-creator/creator-foundation.module.css`
-- `@/shared/document-creator/invoice-creator.module.css`
-- `@/shared/document-creator/mobile-line-card`
-- `@/shared/document-creator/mobile-line-card.module.css`
-- `@/shared/document-viewer/read-only-line-table`
 - `@/shared/hooks/use-client-pagination`
 - `@/shared/hooks/use-creator-flash`
+- `@/shared/hooks/use-line-items`
 - `@/shared/hooks/use-media-query`
 - `@/shared/hooks/use-policy-contract`
 - `@/shared/hooks/use-status-filters`
@@ -544,9 +634,38 @@ _Invoices feature API layer._
 - `@/shared/session/rbac`
 - `@/shared/session/use-shared-session`
 - `@/shared/shell/printable-context`
-- `@/shared/styles/decision-stamp.module.css`
 
 - [fn] `InvoicesConsole({...})`
+
+### `frontend/src/features/invoices/components/invoices-viewer-panel.tsx`
+_Presentational component for the invoices viewer panel._
+
+**Depends on:**
+- `@/shared/components/pagination-controls`
+- `@/shared/date-format`
+- `@/shared/document-viewer/read-only-line-table`
+- `@/shared/money-format`
+
+- [Component] `InvoicesViewerPanel({...})`
+- [type] `InvoicesViewerPanelProps` { selectedProject, invoiceSearch, onInvoiceSearchChange, invoiceStatuses, invoiceStatusFilters, toggleInvoiceStatusFilter, ... }
+
+### `frontend/src/features/invoices/components/invoices-workspace-panel.tsx`
+_Workspace panel for the invoices console — toolbar, DocumentCreator form,_
+
+**Depends on:**
+- `@/features/estimates/components/cost-code-combobox`
+- `@/shared/document-creator`
+- `@/shared/document-creator/creator-foundation.module.css`
+- `@/shared/document-creator/invoice-creator.module.css`
+- `@/shared/document-creator/mobile-line-card`
+- `@/shared/document-creator/mobile-line-card.module.css`
+- `@/shared/document-creator/types`
+- `@/shared/document-viewer/read-only-line-table`
+- `@/shared/money-format`
+- `@/shared/styles/decision-stamp.module.css`
+
+- [Component] `InvoicesWorkspacePanel({...})`
+- [type] `InvoicesWorkspacePanelProps` { isMobile, canMutateInvoices, workspaceSourceInvoice, workspaceIsLocked, workspaceContext, workspaceBadgeLabel, ... }
 
 ### `frontend/src/features/invoices/document-adapter.ts`
 _Document-creator adapter for invoices._
@@ -567,13 +686,31 @@ _Pure helper functions for the invoices feature._
 - [fn] `invoiceStatusLabel(status)`
 - [fn] `publicInvoiceHref(publicRef)`
 - [fn] `invoiceNextActionHint(status)`
-- [fn] `nextInvoiceNumberPreview(rows)`
+- [fn] `nextInvoiceNumberPreview(invoices)`
 - [fn] `invoiceStatusEventActionLabel(event, statusLabel)`
 - [fn] `readInvoiceApiError(payload, fallback)`
 - [fn] `projectStatusLabel(statusValue)`
 - [fn] `validateInvoiceLineItems(lines)`
 - [type] `InvoiceLineValidationIssue` { localId, rowNumber, message }
 - [type] `InvoiceLineValidationResult` { issues, issuesByLocalId }
+
+### `frontend/src/features/invoices/hooks/use-invoice-data.ts`
+_Invoice data fetching and list state._
+
+**Depends on:**
+- `@/shared/api/base`
+- `@/shared/session/auth-headers`
+
+- [fn] `useInvoiceData({...})` — Fetch and manage invoice-related data for the scoped project.
+- [type] `ContractBreakdown` { active_estimate, approved_change_orders }
+
+### `frontend/src/features/invoices/hooks/use-invoice-form-fields.ts`
+_Invoice workspace form field state._
+
+**Depends on:**
+- `@/shared/date-format`
+
+- [fn] `useInvoiceFormFields({...})` — Manage invoice workspace form fields and workspace context.
 
 ### `frontend/src/features/invoices/index.ts`
 
@@ -587,7 +724,7 @@ _Pure helper functions for the invoices feature._
 - `@/shared/document-creator`
 - `@/shared/types/domain`
 
-- [type] `ProjectRecord` { id, name, customer_display_name, customer_email, status }
+- [type] `ProjectRecord` { id, name, customer, customer_display_name, customer_email, status }
 - [type] `InvoiceRecord` { id, project, customer, customer_display_name, invoice_number, public_ref, ... }
 - [type] `InvoiceStatusEventRecord` { id, invoice, from_status, to_status, note, action_type, ... }
 - [type] `InvoicePolicyContract` { policy_version, status_labels, statuses, default_create_status, default_status_filters, allowed_status_transitions, ... }
@@ -609,12 +746,18 @@ _Vendor-bills feature API layer._
 ### `frontend/src/features/vendor-bills/components/vendor-bills-console.tsx`
 
 **Depends on:**
-- `@/features/payments`
+- `@/shared/api/base`
 - `@/shared/api/error`
 - `@/shared/date-format`
+- `@/shared/document-creator/creator-foundation.module.css`
+- `@/shared/document-creator/mobile-line-card`
+- `@/shared/document-creator/mobile-line-card.module.css`
+- `@/shared/hooks/use-combobox`
 - `@/shared/hooks/use-creator-flash`
+- `@/shared/hooks/use-media-query`
 - `@/shared/hooks/use-policy-contract`
 - `@/shared/hooks/use-status-filters`
+- `@/shared/hooks/use-status-message`
 - `@/shared/session/auth-headers`
 - `@/shared/session/rbac`
 - `@/shared/session/use-shared-session`
@@ -629,6 +772,23 @@ _Pure helper functions for the vendor-bills feature._
 - [fn] `projectStatusLabel(statusValue)`
 - [fn] `formatMoney(value)`
 
+### `frontend/src/features/vendor-bills/hooks/use-vendor-bill-form.ts`
+_Vendor bill create/edit form state._
+
+**Depends on:**
+- `@/shared/date-format`
+
+- [fn] `useVendorBillForm({...})` — Manage vendor bill form fields for both create and edit modes.
+
+### `frontend/src/features/vendor-bills/hooks/use-vendor-bill-viewer.ts`
+_Vendor bill viewer panel state — status actions, accordion sections, and snapshots._
+
+**Depends on:**
+- `@/shared/api/base`
+- `@/shared/session/auth-headers`
+
+- [fn] `useVendorBillViewer({...})` — Manage viewer panel state for the selected vendor bill.
+
 ### `frontend/src/features/vendor-bills/index.ts`
 
 - [re-export] `VendorBillsConsole` from `./components/vendor-bills-console`
@@ -641,13 +801,17 @@ _Pure helper functions for the vendor-bills feature._
 - `@/shared/types/domain`
 
 - [type] `ProjectRecord` { id, name, customer_display_name, status }
-- [type] `VendorRecord` { id, name, vendor_type, is_canonical, email, is_active }
+- [type] `VendorRecord` { id, name, email }
+- [type] `VendorBillAllocationRecord` { id, payment, applied_amount, payment_date, payment_method, payment_status, ... }
 - [type] `VendorBillRecord` { id, project, project_name, vendor, vendor_name, bill_number, ... }
-- [type] `VendorBillLineRecord` { id, cost_code, cost_code_code, cost_code_description, description, quantity, ... }
-- [type] `VendorBillLineInput` { costCode, description, quantity, unit, unitPrice }
-- [type] `VendorBillPayload` { projectId, vendor, bill_number, status, received_date, issue_date, ... }
-- [type] `VendorBillPolicyContract` { policy_version, status_labels, statuses, default_create_status, create_shortcut_statuses, allowed_status_transitions, ... }
-- [type] `ApiResponse` { duplicate_candidates, allowed_resolutions, meta, error }
+- [type] `VendorBillLineRecord` { id, cost_code, cost_code_code, cost_code_name, description, quantity, ... }
+- [type] `VendorBillSnapshotRecord` { id, vendor_bill, capture_status, status_note, acted_by, acted_by_email, ... }
+- [type] `VendorBillLineInput` { description, quantity, unit_price }
+- [type] `VendorBillPayload` { projectId, vendor, bill_number, received_date, issue_date, due_date, ... }
+- [type] `ScanResultLineItem` { description, quantity, unit_price }
+- [type] `ScanResult` { document_type, vendor_name, bill_number, issue_date, due_date, subtotal, ... }
+- [type] `VendorBillPolicyContract` { policy_version, status_labels, statuses, default_create_status, allowed_status_transitions, terminal_statuses }
+- [type] `ApiResponse` { duplicate_candidates, error }
 
 ## Features — Payments
 
@@ -661,6 +825,38 @@ _Payments feature API layer._
 - [fn] `fetchPaymentPolicyContract({...})` — Fetch the payment policy contract from the backend.
 - [re-export] `defaultApiBaseUrl, normalizeApiBaseUrl` from `@/shared/api/base`
 
+### `frontend/src/features/payments/components/accounting-console.tsx`
+
+**Depends on:**
+- `@/shared/api/base`
+- `@/shared/hooks/use-media-query`
+- `@/shared/session/use-shared-session`
+
+- [Component] `AccountingConsole()`
+
+### `frontend/src/features/payments/components/bills-tab.tsx`
+
+**Depends on:**
+- `@/features/vendor-bills/types`
+- `@/shared/api/base`
+- `@/shared/components/pagination-controls`
+- `@/shared/date-format`
+- `@/shared/hooks/use-client-pagination`
+- `@/shared/session/auth-headers`
+
+- [fn] `BillsTab({...})`
+
+### `frontend/src/features/payments/components/invoices-tab.tsx`
+
+**Depends on:**
+- `@/shared/api/base`
+- `@/shared/components/pagination-controls`
+- `@/shared/date-format`
+- `@/shared/hooks/use-client-pagination`
+- `@/shared/session/auth-headers`
+
+- [fn] `InvoicesTab({...})`
+
 ### `frontend/src/features/payments/components/payment-recorder.tsx`
 
 **Depends on:**
@@ -670,11 +866,12 @@ _Payments feature API layer._
 - `@/shared/session/use-shared-session`
 
 - [fn] `PaymentRecorder({...})`
-- [type] `PaymentRecorderProps` { projectId, direction, allocationTargets, onPaymentsChanged, hideHeader, createOnly }
+- [type] `PaymentRecorderProps` { projectId, direction, allocationTargets, onPaymentsChanged, hideHeader, createOnly, ... }
 
 ### `frontend/src/features/payments/components/payments-console.tsx`
 
 **Depends on:**
+- `@/shared/api/base`
 - `@/shared/components/pagination-controls`
 - `@/shared/date-format`
 - `@/shared/hooks/use-client-pagination`
@@ -686,10 +883,44 @@ _Payments feature API layer._
 
 - [fn] `PaymentsConsole()`
 
+### `frontend/src/features/payments/components/payments-ledger-tab.tsx`
+
+**Depends on:**
+- `@/shared/api/base`
+- `@/shared/components/pagination-controls`
+- `@/shared/date-format`
+- `@/shared/hooks/use-client-pagination`
+- `@/shared/session/auth-headers`
+
+- [fn] `PaymentsLedgerTab({...})`
+
+### `frontend/src/features/payments/hooks/use-payment-data.ts`
+_Payment data loading, policy contract, and entity lists._
+
+**Depends on:**
+- `@/shared/api/base`
+- `@/shared/session/auth-headers`
+
+- [fn] `usePaymentData(authToken, scopedCustomerId, scopedProjectId)` — Fetch and manage all server data for the payments console.
+
+### `frontend/src/features/payments/hooks/use-payment-filters.ts`
+_Client-side payment list filtering and search._
+
+- [fn] `usePaymentFilters(allPayments)` — Filter and search the payment list for display.
+
+### `frontend/src/features/payments/hooks/use-payment-form.ts`
+_Payment form field state and lifecycle helpers._
+
+**Depends on:**
+- `@/shared/date-format`
+
+- [fn] `usePaymentForm(initialMethod)` — Manage payment form field state and mode transitions.
+
 ### `frontend/src/features/payments/index.ts`
 
 - [re-export] `PaymentRecorder` from `./components/payment-recorder`
 - [re-export] `PaymentsConsole` from `./components/payments-console`
+- [re-export] `AccountingConsole` from `./components/accounting-console`
 - [re-export] `*` from `./api`
 - [re-export] `*` from `./types`
 
@@ -700,14 +931,12 @@ _Payments feature API layer._
 
 - [type] `ProjectRecord` { id, customer, name, customer_display_name, status }
 - [type] `AllocationTarget` { id, label, balanceDue }
-- [type] `PaymentAllocationRecord` { id, payment, target_type, target_id, invoice, vendor_bill, ... }
 - [type] `CustomerRecord` { id, display_name }
 - [type] `PaymentRecord` { id, organization, customer, customer_name, project, project_name, ... }
 - [type] `InvoiceRecord` { id, invoice_number, status, total, balance_due }
 - [type] `VendorBillRecord` { id, bill_number, status, total, balance_due }
-- [type] `PaymentAllocateResult` { payment, created_allocations }
 - [type] `PaymentPolicyContract` { policy_version, status_labels, statuses, directions, methods, default_create_status, ... }
-- [type] `ApiResponse` { allocated_total, unapplied_amount, code, message, fields }
+- [type] `ApiResponse` { code, message, fields }
 
 ## Features — Projects
 
@@ -715,6 +944,15 @@ _Payments feature API layer._
 _Projects feature API configuration._
 
 - [re-export] `defaultApiBaseUrl, normalizeApiBaseUrl` from `@/shared/api/base`
+
+### `frontend/src/features/projects/components/deposit-panel.tsx`
+
+**Depends on:**
+- `@/shared/money-format`
+- `@/shared/session/auth-headers`
+- `@/shared/session/use-shared-session`
+
+- [fn] `DepositPanel({...})`
 
 ### `frontend/src/features/projects/components/project-activity-console.tsx`
 
@@ -756,11 +994,12 @@ _Projects feature API configuration._
 - [type] `AccountingSyncEventRecord` { id, project, project_name, provider, object_type, object_id, ... }
 - [type] `ProjectTraceabilityRecord` { id, label, status, amount, detail_endpoint }
 - [type] `ProjectTraceabilityBucket` { ui_route, list_endpoint, total, records }
+- [type] `ApprovedEstimate` { id, title, grand_total }
 - [type] `ApiResponse` { retry_status, code, message, fields }
 - [type] `PortfolioProjectSnapshot` { project_id, project_name, project_status, ar_outstanding, ap_outstanding, approved_change_orders_total }
 - [type] `PortfolioSnapshot` { generated_at, date_from, date_to, active_projects_count, ar_total_outstanding, ap_total_outstanding, ... }
-- [type] `ChangeImpactProject` { project_id, project_name, approved_change_order_count, approved_change_order_total }
-- [type] `ChangeImpactSummary` { generated_at, date_from, date_to, approved_change_order_count, approved_change_order_total, projects }
+- [type] `ChangeImpactProject` { project_id, project_name, approved_change_orders_count, approved_change_orders_total }
+- [type] `ChangeImpactSummary` { generated_at, date_from, date_to, approved_change_orders_count, approved_change_orders_total, projects }
 - [type] `AttentionFeedItem` { kind, severity, label, detail, project_id, project_name, ... }
 - [type] `AttentionFeed` { generated_at, due_soon_window_days, item_count, items }
 - [type] `ProjectTimelineItem` { timeline_id, category, event_type, occurred_at, label, detail, ... }
@@ -797,8 +1036,6 @@ _Customers feature API layer._
 ### `frontend/src/features/customers/components/customers-console.tsx`
 
 **Depends on:**
-- `@/features/projects/types`
-- `@/shared/session/auth-headers`
 - `@/shared/session/rbac`
 - `@/shared/session/use-shared-session`
 
@@ -816,18 +1053,18 @@ _Customers feature API layer._
 
 - [Component] `CustomersList({...})`
 
-### `frontend/src/features/customers/components/duplicate-resolution-panel.tsx`
+### `frontend/src/features/customers/components/quick-add/duplicate-resolution-panel.tsx`
 
 - [Component] `DuplicateResolutionPanel({...})`
 
-### `frontend/src/features/customers/components/quick-add-console.tsx`
+### `frontend/src/features/customers/components/quick-add/quick-add-console.tsx`
 
 **Depends on:**
 - `@/shared/session/use-shared-session`
 
 - [Component] `QuickAddConsole({...})`
 
-### `frontend/src/features/customers/components/quick-add-form.tsx`
+### `frontend/src/features/customers/components/quick-add/quick-add-form.tsx`
 
 - [Component] `QuickAddForm({...})`
 
@@ -835,13 +1072,58 @@ _Customers feature API layer._
 
 - [type] `LeadFieldErrors` { full_name, phone, project_address, project_name }
 - [type] `PendingSubmission` { payload, intent, projectName, projectStatus }
-- [type] `UseQuickAddControllerArgs` { token, baseAuthMessage, onCustomerCreated }
+- [type] `UseQuickAddControllerArgs` { authToken, baseAuthMessage, onCustomerCreated }
 - [type] `QuickAddControllerApi` { fullNameRef, authMessage, leadMessage, leadMessageTone, conversionMessage, conversionMessageTone, ... }
 
 ### `frontend/src/features/customers/hooks/quick-add-validation.ts`
 _Client-side validation for the quick-add customer intake form._
 
 - [fn] `validateLeadFields(payload, {...})` — Validate lead-capture fields and return a map of field-level errors.
+
+### `frontend/src/features/customers/hooks/use-customer-editor.ts`
+_Customer editor modal lifecycle hook._
+
+**Depends on:**
+- `@/shared/api/base`
+- `@/shared/hooks/use-backdrop-dismiss`
+- `@/shared/session/auth-headers`
+
+- [fn] `useCustomerEditor({...})` — Manage the customer edit modal lifecycle: open, populate, PATCH, close.
+
+### `frontend/src/features/customers/hooks/use-customer-filters.ts`
+_Client-side customer list filtering._
+
+- [fn] `useCustomerFilters(customerRows)` — Filter customer rows by activity status and project ownership.
+
+### `frontend/src/features/customers/hooks/use-customer-list-fetch.ts`
+_Customer list data fetching hook._
+
+**Depends on:**
+- `@/shared/api/base`
+- `@/shared/session/auth-headers`
+
+- [fn] `useCustomerListFetch(authToken)` — Fetch and paginate the customer list from the server.
+
+### `frontend/src/features/customers/hooks/use-project-creator.ts`
+_Project creation modal lifecycle hook._
+
+**Depends on:**
+- `@/features/projects/types`
+- `@/shared/api/base`
+- `@/shared/hooks/use-backdrop-dismiss`
+- `@/shared/session/auth-headers`
+
+- [fn] `useProjectCreator({...})` — Manage the create-project modal lifecycle: open, populate, POST, navigate.
+
+### `frontend/src/features/customers/hooks/use-projects-by-customer.ts`
+_Project-by-customer index for the customer list accordion._
+
+**Depends on:**
+- `@/features/projects/types`
+- `@/shared/api/base`
+- `@/shared/session/auth-headers`
+
+- [fn] `useProjectsByCustomer(authToken)` — Fetch all projects and group them by customer ID.
 
 ### `frontend/src/features/customers/hooks/use-quick-add-auth-status.ts`
 _Derives a user-facing authentication status message for the quick-add form._
@@ -861,7 +1143,7 @@ _Top-level controller hook for the quick-add customer intake form._
 ### `frontend/src/features/customers/index.ts`
 
 - [re-export] `CustomersConsole` from `./components/customers-console`
-- [re-export] `QuickAddConsole` from `./components/quick-add-console`
+- [re-export] `QuickAddConsole` from `./components/quick-add/quick-add-console`
 
 ### `frontend/src/features/customers/types.ts`
 
@@ -894,13 +1176,26 @@ _Vendors feature API configuration._
 ### `frontend/src/features/vendors/components/vendors-console.tsx`
 
 **Depends on:**
+- `@/shared/hooks/use-api-list`
 - `@/shared/hooks/use-pagination`
-- `@/shared/hooks/use-status-message`
-- `@/shared/session/auth-headers`
 - `@/shared/session/rbac`
 - `@/shared/session/use-shared-session`
 
-- [fn] `VendorsConsole()`
+- [Component] `VendorsConsole()`
+
+### `frontend/src/features/vendors/hooks/use-vendor-filters.ts`
+_Client-side vendor search filtering._
+
+- [fn] `useVendorFilters(vendors)` — Filter and sort vendors by search text.
+
+### `frontend/src/features/vendors/hooks/use-vendor-form.ts`
+_Vendor create/edit form state, CRUD handlers, and duplicate detection._
+
+**Depends on:**
+- `@/shared/api/base`
+- `@/shared/session/auth-headers`
+
+- [fn] `useVendorForm({...})` — Manage vendor form state, CRUD operations, and duplicate detection.
 
 ### `frontend/src/features/vendors/index.ts`
 
@@ -913,10 +1208,9 @@ _Vendors feature API configuration._
 **Depends on:**
 - `@/shared/types/domain`
 
-- [type] `VendorRecord` { id, name, vendor_type, is_canonical, email, phone, ... }
-- [type] `VendorPayload` { name, vendor_type, email, phone, tax_id_last4, notes, ... }
-- [type] `VendorCsvImportResult` { entity, mode, total_rows, created_count, updated_count, error_count, ... }
-- [type] `ApiResponse` { duplicate_candidates, allowed_resolutions, meta, error }
+- [type] `VendorRecord` { id, name, email, phone, tax_id_last4, notes, ... }
+- [type] `VendorPayload` { name, email, phone, tax_id_last4, notes }
+- [type] `ApiResponse` { duplicate_candidates, error }
 
 ## Features — Cost Codes
 
@@ -929,13 +1223,26 @@ _Cost-codes feature API configuration._
 
 **Depends on:**
 - `@/shared/components/pagination-controls`
+- `@/shared/hooks/use-api-list`
 - `@/shared/hooks/use-client-pagination`
-- `@/shared/hooks/use-status-message`
-- `@/shared/session/auth-headers`
 - `@/shared/session/rbac`
 - `@/shared/session/use-shared-session`
 
-- [fn] `CostCodesConsole()`
+- [Component] `CostCodesConsole()`
+
+### `frontend/src/features/cost-codes/hooks/use-cost-code-filters.ts`
+_Client-side cost code search and visibility filtering._
+
+- [fn] `useCostCodeFilters(costCodes)` — Filter and sort cost codes by search text and visibility.
+
+### `frontend/src/features/cost-codes/hooks/use-cost-code-form.ts`
+_Cost code create/edit form state and CRUD handlers._
+
+**Depends on:**
+- `@/shared/api/base`
+- `@/shared/session/auth-headers`
+
+- [fn] `useCostCodeForm({...})` — Manage cost code form state and CRUD operations.
 
 ### `frontend/src/features/cost-codes/index.ts`
 
@@ -948,8 +1255,6 @@ _Cost-codes feature API configuration._
 **Depends on:**
 - `@/shared/types/domain`
 
-- [type] `CsvImportRowResult` { row_number, code, name, status, message }
-- [type] `CsvImportResult` { entity, mode, total_rows, created_count, updated_count, error_count, ... }
 - [type] `ApiResponse` { data, error }
 
 ## Features — Organization
@@ -973,6 +1278,14 @@ _Organization feature API configuration._
 
 - [fn] `DocumentSettingsTab({...})`
 
+### `frontend/src/features/organization/components/notifications-tab.tsx`
+
+**Depends on:**
+- `@/shared/pwa`
+- `@/shared/styles/animations.module.css`
+
+- [Component] `NotificationsTab({...})`
+
 ### `frontend/src/features/organization/components/organization-console.tsx`
 
 **Depends on:**
@@ -989,6 +1302,7 @@ _Organization feature API configuration._
 **Depends on:**
 - `@/shared/date-format`
 - `@/shared/session/auth-headers`
+- `@/shared/styles/animations.module.css`
 
 - [fn] `TeamTab({...})`
 
@@ -1029,19 +1343,29 @@ _Organization feature API configuration._
 
 ## Features — Onboarding
 
+### `frontend/src/features/onboarding/components/dismiss-guide-button.tsx`
+
+**Depends on:**
+- `@/shared/api/base`
+- `@/shared/session/auth-headers`
+- `@/shared/session/client-session`
+- `@/shared/session/use-shared-session`
+
+- [Component] `DismissGuideButton()`
+
 ### `frontend/src/features/onboarding/components/onboarding-checklist.tsx`
 
 **Depends on:**
 - `@/shared/api/base`
 - `@/shared/onboarding/guide-arrow-overlay`
 - `@/shared/session/auth-headers`
-- `@/shared/session/client-session`
 - `@/shared/session/use-shared-session`
 
 - [fn] `OnboardingChecklist()`
 
 ### `frontend/src/features/onboarding/index.ts`
 
+- [re-export] `DismissGuideButton` from `./components/dismiss-guide-button`
 - [re-export] `OnboardingChecklist, ORG_VISITED_KEY` from `./components/onboarding-checklist`
 
 ## Shared — Api
@@ -1087,6 +1411,7 @@ _Client-side session persistence layer._
 **Depends on:**
 - `@/shared/api/base`
 - `@/shared/api/health`
+- `@/shared/styles/animations.module.css`
 
 - [fn] `HomeAuthConsole({...})` — Login form console. Authenticates credentials against the Django auth endpoint,
 
@@ -1095,6 +1420,7 @@ _Client-side session persistence layer._
 **Depends on:**
 - `@/shared/api/base`
 - `@/shared/api/health`
+- `@/shared/styles/animations.module.css`
 
 - [fn] `HomeRegisterConsole({...})` — Registration console supporting three flows: standard signup (Flow A),
 
@@ -1102,6 +1428,7 @@ _Client-side session persistence layer._
 
 **Depends on:**
 - `@/shared/api/base`
+- `@/shared/styles/animations.module.css`
 
 - [Component] `ResetPasswordConsole({...})` — Password reset flow. Two modes:
 
@@ -1180,7 +1507,6 @@ _Persistent banner shown when a superuser is impersonating another user._
 - [re-export] `AppToolbar` from `./app-toolbar`
 - [re-export] `ImpersonationBanner` from `./impersonation-banner/impersonation-banner`
 - [re-export] `MobileBottomNav` from `./mobile-bottom-nav`
-- [re-export] `MobileDrawer` from `./mobile-drawer`
 - [re-export] `PrintableProvider, usePrintable` from `./printable-context`
 - [re-export] `WorkflowShell` from `./workflow-shell`
 - [re-export] `WorkflowNavbar` from `./workflow-navbar`
@@ -1203,24 +1529,22 @@ _Persistent banner shown when a superuser is impersonating another user._
 
 - [Component] `MobileBottomNav()`
 
-### `frontend/src/shared/shell/mobile-drawer/index.ts`
-
-- [re-export] `MobileDrawer` from `./mobile-drawer`
-
-### `frontend/src/shared/shell/mobile-drawer/mobile-drawer.tsx`
-
-**Depends on:**
-- `@/shared/session/client-session`
-- `@/shared/session/public-routes`
-- `@/shared/session/use-shared-session`
-
-- [Component] `MobileDrawer()`
-
 ### `frontend/src/shared/shell/nav-routes.ts`
 _Canonical route definitions for the workflow navbar and business menu._
 
 - [fn] `isRouteActive(pathname, route)` — Determine whether a route should be highlighted as "active" for
 - [type] `NavRoute` { href, label, shortLabel, exact, startsWith, section } — Canonical route definitions for the workflow navbar and business menu.
+
+### `frontend/src/shared/shell/onboarding-banner/index.ts`
+
+- [re-export] `OnboardingBanner` from `./onboarding-banner`
+
+### `frontend/src/shared/shell/onboarding-banner/onboarding-banner.tsx`
+
+**Depends on:**
+- `@/shared/session/use-shared-session`
+
+- [Component] `OnboardingBanner()`
 
 ### `frontend/src/shared/shell/page-shell.tsx`
 _Shared layout primitives for route pages._
@@ -1286,6 +1610,19 @@ _Workflow shell region rendered below the app toolbar._
 
 ## Shared — Hooks
 
+### `frontend/src/shared/hooks/use-api-list.ts`
+_Generic hook for fetching and managing a list of items from the API._
+
+**Depends on:**
+- `@/shared/api/base`
+- `@/shared/session/auth-headers`
+
+- [fn] `useApiList(config)`
+
+### `frontend/src/shared/hooks/use-backdrop-dismiss.ts`
+
+- [fn] `useBackdropDismiss(onDismiss)` — Encapsulates the two-phase backdrop-dismiss pattern for modal overlays.
+
 ### `frontend/src/shared/hooks/use-client-pagination.ts`
 
 - [fn] `useClientPagination(items, pageSize = 20)` — Client-side pagination for an already-loaded list.
@@ -1325,7 +1662,7 @@ _Shared hook for fetching and normalizing backend policy contracts._
 - [fn] `usePolicyContract(config)`
 - [type] `PolicyContractBase` { statuses, status_labels, allowed_status_transitions, default_create_status, terminal_statuses }
 - [type] `NormalizedPolicy` { statuses, statusLabels, allowedTransitions, defaultCreateStatus }
-- [type] `UsePolicyContractConfig` { fetchContract, fallbackStatuses, fallbackLabels, fallbackTransitions, baseUrl, token, ... }
+- [type] `UsePolicyContractConfig` { fetchContract, fallbackStatuses, fallbackLabels, fallbackTransitions, baseUrl, authToken, ... }
 
 ### `frontend/src/shared/hooks/use-print-context.ts`
 _Shared hook for print-context management in public document previews._
@@ -1354,7 +1691,8 @@ _Generic document creator component._
 ### `frontend/src/shared/document-creator/index.ts`
 
 - [re-export] `DocumentCreator` from `./document-creator`
-- [re-export] `resolveOrganizationBranding, toAddressLines, ` from `./organization-branding`
+- [re-export] `resolveOrganizationBranding` from `./organization-branding`
+- [re-export] `toAddressLines` from `../utils/address`
 
 ### `frontend/src/shared/document-creator/mobile-line-card.tsx`
 _Mobile line-item card: renders a single line item as a stacked card_
@@ -1365,7 +1703,6 @@ _Mobile line-item card: renders a single line item as a stacked card_
 ### `frontend/src/shared/document-creator/organization-branding.ts`
 _Organization branding resolution for the internal document composer._
 
-- [fn] `toAddressLines(address)` — Split a multi-line address string into individual trimmed lines,
 - [fn] `resolveOrganizationBranding(defaults)` — Resolve raw organization branding defaults into a normalized shape.
 - [type] `ResolvedOrganizationBranding` { senderName, senderDisplayName, senderAddress, senderAddressLines, logoUrl, helpEmail }
 
@@ -1388,7 +1725,6 @@ _Organization branding resolution for the internal document composer._
 ### `frontend/src/shared/document-viewer/public-document-context.ts`
 _Context resolution for public (token-authenticated) document viewers._
 
-- [fn] `toAddressLines(value)` — Split an address string into individual display lines.
 - [fn] `resolvePublicSender(organizationContext, documentSender)` — Resolve organization context into a display-ready sender shape.
 - [fn] `resolvePublicRecipient(projectContext)` — Resolve project context into a display-ready recipient shape.
 - [fn] `resolveDefaultTerms(organizationContext, documentType)` — Look up the default terms text for a given document type.
@@ -1415,6 +1751,7 @@ _ReadOnlyLineTable — polished read-only line-items table for reference data._
 
 **Depends on:**
 - `@/shared/api/base`
+- `@/shared/styles/animations.module.css`
 
 - [fn] `SigningCeremony({...})`
 - [type] `DecisionOption` { label, value, variant }
@@ -1477,3 +1814,33 @@ _Format a phone number string for display._
 ### `frontend/src/shared/components/pagination-controls.tsx`
 
 - [Component] `PaginationControls({...})` — Minimal Prev/Next pagination controls with item count.
+
+## Shared — Pwa
+
+### `frontend/src/shared/pwa/index.ts`
+
+- [re-export] `ServiceWorkerRegistration` from `./service-worker-registration`
+- [re-export] `usePushSubscription` from `./use-push-subscription`
+
+### `frontend/src/shared/pwa/service-worker-registration.tsx`
+
+- [fn] `ServiceWorkerRegistration()`
+
+### `frontend/src/shared/pwa/use-push-subscription.ts`
+
+**Depends on:**
+- `@/shared/api/base`
+- `@/shared/session/auth-headers`
+
+- [fn] `usePushSubscription(authToken)`
+
+## Shared — Utils
+
+### `frontend/src/shared/utils/address.ts`
+_Split an address string into individual trimmed display lines,_
+
+- [fn] `toAddressLines(value)` — Split an address string into individual trimmed display lines,
+
+### `frontend/src/shared/utils/class-names.ts`
+
+- [fn] `joinClassNames(...parts)`

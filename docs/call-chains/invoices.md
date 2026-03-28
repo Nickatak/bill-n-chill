@@ -133,8 +133,8 @@ All: `fetch PATCH /api/v1/invoices/{invoiceId}/`
 - [`build_invoice_patch_ingress(validated_data)`](../../backend/core/views/accounts_receivable/invoice_ingress.py#L103)
   - Per-field `has_*` presence flags (only touches fields the client sent)
 - Status transition validation via `Invoice.ALLOWED_STATUS_TRANSITIONS` map
-  - Allowed: draft→{sent,void}, sent→{partially_paid,paid,void}, partially_paid→{paid,sent}
-  - Terminal: paid, void (no outbound)
+  - Allowed: draft→{sent,void}, sent→{closed,void}, outstanding→{closed}
+  - Terminal: closed, void (no outbound)
   - Same-status allowed for re-send (sent→sent) and status notes
 - `due_date < issue_date` → 400
 - Line item cost code validation via [`_resolve_cost_codes_for_user()`](../../backend/core/views/helpers.py)
@@ -147,7 +147,7 @@ All: `fetch PATCH /api/v1/invoices/{invoiceId}/`
   - **Line items branch** (three-way):
     - `has_line_items` → [`_apply_invoice_lines_and_totals()`](../../backend/core/views/accounts_receivable/invoices_helpers.py#L79) — full line replace + totals recompute, balance_due from settled allocations
     - `has_tax_percent` only → re-applies existing lines with new tax (same helper)
-    - **status change only** → recomputes `balance_due` from settled `PaymentAllocation` records; honors `PAID` override (balance_due=0)
+    - **status change only** → recomputes `balance_due` from settled `PaymentAllocation` records; honors `CLOSED` override (balance_due=0)
   - **Status event:** [`InvoiceStatusEvent.record(from, to, note)`](../../backend/core/models) — recorded when status changed, re-sent, or note requested
 
 *── post-commit: email ──*

@@ -84,7 +84,7 @@ This section is the canonical glossary for bill-n-chill. For model fields and li
 | Public Decision Link | Tokenized public customer decision flow for estimate/CO/invoice. | Public token/ref on document models | `/api/v1/public/.../{token}/decision/` | State-gated; writes audit/lifecycle context. |
 | Vendor | Payee identity for subcontractor/supplier billing workflows. | `Vendor` | `GET/POST /api/v1/vendors/`, `GET/PATCH /api/v1/vendors/{id}/` | Duplicate warning + override flow supported. |
 | Vendor Bill | AP invoice from vendor/subcontractor. | `VendorBill`, `VendorBillSnapshot` | `GET/POST /api/v1/projects/{id}/vendor-bills/`, `GET/PATCH /api/v1/vendor-bills/{id}/` | Lifecycle: `planned`, `received`, `approved`, `scheduled`, `paid`, `void`. |
-| Invoice | AR billing document sent to customer. | `Invoice`, `InvoiceLine`, `InvoiceStatusEvent` | `GET/POST /api/v1/projects/{id}/invoices/`, `GET/PATCH /api/v1/invoices/{id}/`, `POST /api/v1/invoices/{id}/send/` | Lifecycle: `draft`, `sent`, `partially_paid`, `paid`, `overdue`, `void`. |
+| Invoice | AR billing document sent to customer. | `Invoice`, `InvoiceLine`, `InvoiceStatusEvent` | `GET/POST /api/v1/projects/{id}/invoices/`, `GET/PATCH /api/v1/invoices/{id}/`, `POST /api/v1/invoices/{id}/send/` | Lifecycle: `draft`, `sent`, `outstanding`, `closed`, `void`. |
 | Payment | Money movement record (inbound AR or outbound AP). | `Payment`, `PaymentRecord` | `GET/POST /api/v1/projects/{id}/payments/`, `GET/PATCH /api/v1/payments/{id}/` | Lifecycle: `pending`, `settled`, `failed`, `void`. |
 | Payment Allocation | Applied amount from one payment to invoice/vendor bill targets. | `PaymentAllocation`, `PaymentAllocationRecord` | `POST /api/v1/payments/{id}/allocate/` | Direction guard: `inbound->invoice`, `outbound->vendor_bill`. |
 | Accounting Export | Reconciliation export aligned to financial summary math. | Derived from project financial entities | `GET /api/v1/projects/{id}/accounting-export/?export_format=csv|json` | Includes summary rows + traceability records. |
@@ -474,7 +474,7 @@ Key fields:
 - `project_id`
 - `customer_id`
 - `invoice_number`
-- `status` (`draft`, `sent`, `partially_paid`, `paid`, `overdue`, `void`)
+- `status` (`draft`, `sent`, `outstanding`, `closed`, `void`)
 - `issue_date`
 - `due_date`
 - `sender_name`

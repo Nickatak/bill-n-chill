@@ -8,7 +8,7 @@
  *   gray    — void, completed, archived, inactive, closed
  *   emerald — paid, closed (invoices)
  *   orange  — overdue, disputed
- *   violet  — outstanding (invoices)
+ *   violet  — outstanding (invoices), partially paid (payment status)
  */
 
 .badge {
@@ -62,5 +62,6 @@
 /* --- Orange: overdue --- */
 .overdue { composes: badge; background: var(--status-orange-bg); border-color: var(--status-orange-border); color: var(--status-orange-text); }
 
-/* --- Violet: partially_paid --- */
-.partiallyPaid { composes: badge; background: var(--status-violet-bg); border-color: var(--status-violet-border); color: var(--status-violet-text); }
+/* --- Violet: outstanding, partially paid --- */
+.outstanding    { composes: badge; background: var(--status-violet-bg); border-color: var(--status-violet-border); color: var(--status-violet-text); }
+.partiallyPaid  { composes: badge; background: var(--status-violet-bg); border-color: var(--status-violet-border); color: var(--status-violet-text); }

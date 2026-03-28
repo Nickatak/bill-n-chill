@@ -4,7 +4,7 @@
  * Cost code management console — root component for the /cost-codes page.
  *
  * Pure orchestrator — composes hooks for list fetching, form CRUD,
- * filtering, and CSV import. Owns no domain state itself.
+ * and filtering. Owns no domain state itself.
  *
  * Parent: app/cost-codes/page.tsx
  *
@@ -20,19 +20,13 @@
  * │   ├── Filter pills   │   ├── Name                   │
  * │   ├── Code list      │   ├── Status toggle (edit)   │
  * │   └── Pagination     │   └── Submit / Cancel        │
- * │                      ├──────────────────────────────┤
- * │                      │ CSV Import (collapsible)     │
- * │                      │   ├── Textarea               │
- * │                      │   ├── Preview / Apply        │
- * │                      │   └── Result summary         │
  * └──────────────────────┴──────────────────────────────┘
  *
  * ## Hook dependency graph
  *
  * useApiList (shared — owns list data, selection, status messaging)
  *   ├── useCostCodeFilters  (reads costCodes)
- *   ├── useCostCodeForm     (reads + writes costCodes, reads selectedId)
- *   └── useCsvImport        (calls refreshCostCodes after apply)
+ *   └── useCostCodeForm     (reads + writes costCodes, reads selectedId)
  * useClientPagination       (reads filteredRows)
  *
  * ## Orchestration (in JSX)
@@ -56,7 +50,7 @@ import { useCostCodeFilters } from "../hooks/use-cost-code-filters";
 import type { CostCode } from "../types";
 import styles from "./cost-codes-console.module.css";
 
-/** Full CRUD console for cost codes with search, visibility filter, and CSV import. */
+/** Full CRUD console for cost codes with search and visibility filter. */
 export function CostCodesConsole() {
   const { token: authToken, authMessage, capabilities } = useSharedSessionAuth();
   const canMutateCostCodes = canDo(capabilities, "cost_codes", "create");

@@ -398,59 +398,6 @@ function ICWorkflow() {
             <li><strong>InvoiceStatusEvent</strong> &mdash; auto-recorded when payment causes invoice status transition (e.g., &quot;Payment settled — invoice fully paid.&quot;).</li>
           </ul>
         </Step>
-        <Step num={7} title="User logs receipts + their associated egress payment.">
-          <h4 style={{ margin: "0 0 0.5rem" }}>What is a Receipt?</h4>
-          <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>Lightweight expense record &mdash; no statuses, no document lifecycle.</li>
-            <li>Represents money already spent (backward-looking). Not a bill.</li>
-            <li>Optionally linked to a Store (org-scoped lookup table, auto-created on first mention, case-insensitive).</li>
-            <li>Has a derived <code>balance_due</code> computed from settled payment allocations.</li>
-          </ul>
-
-          <h4 style={{ margin: "0 0 0.5rem" }}>A. Create Receipt (Quick Receipt on project page)</h4>
-          <ol style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>User opens Quick Receipt tab on the project page.</li>
-            <li>Optionally uploads a photo &rarr; Gemini Vision OCR extracts fields.</li>
-            <li>Fills in: store name, amount, date, notes.</li>
-            <li><code>POST /projects/&lt;id&gt;/receipts/</code> creates the receipt. <strong>No payment auto-created.</strong></li>
-          </ol>
-
-          <h4 style={{ margin: "0 0 0.5rem" }}>B. Record Egress Payment (Accounting page &rarr; Receipts tab)</h4>
-          <ol style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>User opens Accounting page, Receipts tab.</li>
-            <li>Expands a receipt row &rarr; sees balance_due, existing allocations.</li>
-            <li>Fills in: amount (pre-filled with balance_due), method, date, reference, notes.</li>
-            <li>Two-step behind the scenes:
-              <ol style={{ margin: "0.25rem 0", paddingLeft: "1.25rem" }}>
-                <li><code>POST /payments/</code> creates outbound payment (settled by default).</li>
-                <li><code>POST /payments/&lt;id&gt;/allocate/</code> allocates to the receipt.</li>
-              </ol>
-            </li>
-            <li>Receipt balance_due recalculated.</li>
-          </ol>
-
-          <h4 style={{ margin: "0 0 0.5rem" }}>Receipt vs. Vendor Bill</h4>
-          <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li><strong>Receipt:</strong> No statuses, no line items, no lifecycle. Standalone expense record. Linked to Store (optional lookup, not a relationship).</li>
-            <li><strong>Vendor Bill:</strong> Full document lifecycle (received &rarr; approved &rarr; closed). Has line items. Linked to Vendor (B2B relationship entity).</li>
-            <li>Separated by design &mdash; receipts aren&apos;t bills, even though both represent outgoing money.</li>
-          </ul>
-
-          <h4 style={{ margin: "0 0 0.5rem" }}>Key Mechanics</h4>
-          <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li><strong>No auto-payment:</strong> Receipt creation and payment recording are intentionally separate steps.</li>
-            <li><strong>Store auto-create:</strong> Entering a new store name creates the Store record automatically (case-insensitive dedup).</li>
-            <li><strong>Balance tracking:</strong> <code>balance_due = amount - sum(settled allocations)</code>. No &quot;paid&quot; status &mdash; balance_due = 0 means fully covered.</li>
-            <li><strong>Direction-locked:</strong> Outbound payments only. Allocation target_type = &quot;receipt&quot;.</li>
-          </ul>
-
-          <h4 style={{ margin: "0 0 0.5rem" }}>Audit</h4>
-          <ul style={{ margin: "0 0 0.5rem", paddingLeft: "1.25rem" }}>
-            <li><strong>No receipt-specific audit model.</strong> Receipts are tracked through their payment allocations.</li>
-            <li><strong>PaymentRecord</strong> &mdash; immutable snapshot when the outbound payment is created/updated/voided.</li>
-            <li><strong>PaymentAllocationRecord</strong> &mdash; APPLIED / REVERSED events when payment is allocated to receipt.</li>
-          </ul>
-        </Step>
       </ol>
 
       <div style={note.box}>
@@ -856,46 +803,6 @@ function GCWorkflow() {
             <li><strong>VendorBillSnapshot</strong> &mdash; immutable record on every status transition (received, approved, disputed, closed, void). Full bill + line items + decision context.</li>
             <li><strong>PaymentAllocationRecord</strong> &mdash; immutable when outbound payment allocated to bill (APPLIED / REVERSED).</li>
             <li><strong>PaymentRecord</strong> &mdash; immutable snapshot on outbound payment creation/status change.</li>
-          </ul>
-        </Step>
-        <Step num={9} title="User logs receipts + their associated egress payment.">
-          <h4 style={{ margin: "0 0 0.5rem" }}>What is a Receipt?</h4>
-          <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>Lightweight expense record &mdash; no statuses, no document lifecycle.</li>
-            <li>Represents money already spent (backward-looking). Not a bill.</li>
-            <li>Optionally linked to a Store (org-scoped lookup table, auto-created on first mention).</li>
-            <li>Has a derived <code>balance_due</code> computed from settled payment allocations.</li>
-          </ul>
-
-          <h4 style={{ margin: "0 0 0.5rem" }}>A. Create Receipt (Quick Receipt on project page)</h4>
-          <ol style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>User opens Quick Receipt tab on the project page.</li>
-            <li>Optionally uploads a photo &rarr; Gemini Vision OCR extracts fields.</li>
-            <li>Fills in: store name, amount, date, notes.</li>
-            <li><code>POST /projects/&lt;id&gt;/receipts/</code> creates the receipt. <strong>No payment auto-created.</strong></li>
-          </ol>
-
-          <h4 style={{ margin: "0 0 0.5rem" }}>B. Record Egress Payment (Accounting page &rarr; Receipts tab)</h4>
-          <ol style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>User opens Accounting page, Receipts tab.</li>
-            <li>Expands a receipt row &rarr; sees balance_due, existing allocations.</li>
-            <li>Fills in: amount, method, date, reference, notes.</li>
-            <li>Creates outbound payment + allocates to receipt in two-step behind the scenes.</li>
-            <li>Receipt balance_due recalculated.</li>
-          </ol>
-
-          <h4 style={{ margin: "0 0 0.5rem" }}>Receipt vs. Vendor Bill</h4>
-          <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li><strong>Receipt:</strong> No statuses, no line items, no lifecycle. Linked to Store (optional).</li>
-            <li><strong>Vendor Bill:</strong> Full lifecycle. Has line items. Linked to Vendor (B2B).</li>
-            <li>Separated by design &mdash; receipts aren&apos;t bills.</li>
-          </ul>
-
-          <h4 style={{ margin: "0 0 0.5rem" }}>Audit</h4>
-          <ul style={{ margin: "0 0 0.5rem", paddingLeft: "1.25rem" }}>
-            <li><strong>No receipt-specific audit model.</strong> Tracked through payment allocations.</li>
-            <li><strong>PaymentRecord</strong> &mdash; immutable snapshot on outbound payment creation/status change.</li>
-            <li><strong>PaymentAllocationRecord</strong> &mdash; APPLIED / REVERSED events when allocated to receipt.</li>
           </ul>
         </Step>
       </ol>

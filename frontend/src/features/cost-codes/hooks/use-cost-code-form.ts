@@ -5,8 +5,7 @@
  * and the POST/PATCH handlers. Reads from the shared cost-code list to find
  * the selected record, and writes back via setCostCodes for optimistic updates.
  *
- * Consumer: CostCodesConsole (composed alongside useCostCodeFilters
- * and useCsvImport).
+ * Consumer: CostCodesConsole (composed alongside useCostCodeFilters).
  *
  * ## State (useState)
  *

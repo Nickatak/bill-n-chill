@@ -4,8 +4,7 @@
  * Sorts vendors alphabetically by name, then applies a text search.
  * Pure derived state — no API calls, no effects.
  *
- * Consumer: VendorsConsole (composed alongside useVendorForm
- * and useVendorCsvImport).
+ * Consumer: VendorsConsole (composed alongside useVendorForm).
  */
 
 import { useMemo, useState } from "react";

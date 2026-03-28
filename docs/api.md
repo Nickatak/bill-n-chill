@@ -748,14 +748,13 @@ CO-02 extends existing CO endpoints with propagation behavior.
       - accepts same line schema as create (`line_type`, adjustment metadata)
   - Allowed transitions:
     - `draft -> sent | void`
-    - `sent -> draft | partially_paid | paid | overdue | void`
-    - `partially_paid -> sent | paid | overdue | void`
-    - `paid -> void`
-    - `overdue -> partially_paid | paid | void`
+    - `sent -> closed | void`
+    - `outstanding -> closed`
+    - `closed -> (no further transitions)`
     - `void -> (no further transitions)`
   - Totals behavior:
     - recalculates totals when line items or tax percent changes
-    - sets `balance_due = 0` when status is `paid`
+    - sets `balance_due = 0` when status is `closed`
 
 - `POST /api/v1/invoices/{invoice_id}/send/`
   - Auth required
@@ -779,9 +778,8 @@ INV-02 extends invoice billing actions with a scope guard based on approved proj
   - `Project.contract_value_current` is treated as approved billable scope.
   - Billable committed total is computed from project invoices in statuses:
     - `sent`
-    - `partially_paid`
-    - `paid`
-    - `overdue`
+    - `outstanding`
+    - `closed`
   - `draft` and `void` invoices are excluded from the committed total.
 
 - Guarded actions

@@ -55,9 +55,9 @@ Status: Accepted
 ### Invoices
 
 - Endpoint: `POST /api/v1/public/invoices/<token>/decision/`
-- Allowed from: `sent`, `partially_paid`, `overdue`
+- Allowed from: `sent`, `outstanding`
 - Decisions:
-  - `approve` -> transition to `paid` + status event
+  - `approve` -> transition to `closed` + status event
   - `dispute` -> note-only event (`from_status == to_status`)
 
 ## Tradeoffs

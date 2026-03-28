@@ -20,7 +20,7 @@ import { useVendorFilters } from "../hooks/use-vendor-filters";
 import type { VendorRecord } from "../types";
 import styles from "./vendors-console.module.css";
 
-/** Full CRUD console for vendor records with search, pagination, and CSV import. */
+/** Full CRUD console for vendor records with search and pagination. */
 export function VendorsConsole() {
   const { token: authToken, authMessage, capabilities } = useSharedSessionAuth();
   const canMutateVendors = canDo(capabilities, "vendors", "create");
@@ -188,7 +188,7 @@ export function VendorsConsole() {
             ) : vendors.length > 0 ? (
               <p className={styles.emptyState}>No vendors match the current filter.</p>
             ) : (
-              <p className={styles.emptyState}>No vendors yet. Add one above, or import via CSV.</p>
+              <p className={styles.emptyState}>No vendors yet. Add one above.</p>
             )}
 
           </section>

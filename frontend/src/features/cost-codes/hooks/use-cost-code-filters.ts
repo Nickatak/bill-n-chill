@@ -5,8 +5,7 @@
  * and an active/all visibility filter. Pure derived state — no API calls,
  * no effects.
  *
- * Consumer: CostCodesConsole (composed alongside useCostCodeForm
- * and useCsvImport).
+ * Consumer: CostCodesConsole (composed alongside useCostCodeForm).
  *
  * ## State (useState)
  *
