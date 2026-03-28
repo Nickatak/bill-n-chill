@@ -6,7 +6,7 @@ djangorestframework==3.16.1
 Pillow==12.1.1
 python-dotenv==1.1.0
 PyMySQL==1.1.1
-cryptography==46.0.5
+cryptography==46.0.6
 sqlparse==0.5.5
 google-generativeai==0.8.5
 gunicorn==23.0.0

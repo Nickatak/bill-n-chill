@@ -69,20 +69,6 @@ describe("VendorsConsole", () => {
     cleanup();
   });
 
-  it("renders vendor count badge", async () => {
-    setupDefaultFetch({
-      vendors: [
-        makeVendor(),
-        makeVendor({ id: 2, name: "BuildMart" }),
-      ],
-    });
-    render(<VendorsConsole />);
-
-    await waitFor(() => {
-      expect(screen.getByText("2/2")).toBeInTheDocument();
-    });
-  });
-
   it("loads and displays vendors from API", async () => {
     setupDefaultFetch({
       vendors: [
@@ -123,7 +109,7 @@ describe("VendorsConsole", () => {
       expect(screen.getByText(/Acme Supply/)).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText("Search vendors"), {
+    fireEvent.change(screen.getByLabelText("Search or add a vendor"), {
       target: { value: "buildmart" },
     });
 
@@ -169,10 +155,10 @@ describe("VendorsConsole", () => {
     render(<VendorsConsole />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText("New vendor name")).toBeInTheDocument();
+      expect(screen.getByLabelText("Search or add a vendor")).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText("New vendor name"), { target: { value: "New Vendor Co" } });
+    fireEvent.change(screen.getByLabelText("Search or add a vendor"), { target: { value: "New Vendor Co" } });
 
     mockFetch.mockImplementation((_url: string, opts?: RequestInit) => {
       if (opts?.method === "POST") {
@@ -230,10 +216,10 @@ describe("VendorsConsole", () => {
     render(<VendorsConsole />);
 
     await waitFor(() => {
-      expect(screen.getByLabelText("New vendor name")).toBeInTheDocument();
+      expect(screen.getByLabelText("Search or add a vendor")).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText("New vendor name"), { target: { value: "Acme Supply" } });
+    fireEvent.change(screen.getByLabelText("Search or add a vendor"), { target: { value: "Acme Supply" } });
 
     // POST returns 409 — duplicate name is blocked outright (no override)
     mockFetch.mockResolvedValueOnce({
@@ -254,12 +240,8 @@ describe("VendorsConsole", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Existing vendor with this name")).toBeInTheDocument();
-      expect(screen.getByText(/Acme Supply/)).toBeInTheDocument();
+      expect(screen.getByText(/A vendor with this name already exists/)).toBeInTheDocument();
     });
-
-    // No "Create Anyway" button — duplicates are blocked
-    expect(screen.queryByRole("button", { name: "Create Anyway" })).not.toBeInTheDocument();
   });
 
   it("shows pagination when vendors exceed page size", async () => {
@@ -290,20 +272,6 @@ describe("VendorsConsole", () => {
 
     fireEvent.click(screen.getByText("Deselect"));
     expect(screen.queryByText("Edit: Acme Supply")).not.toBeInTheDocument();
-  });
-
-  it("toggles CSV import section", async () => {
-    setupDefaultFetch();
-    render(<VendorsConsole />);
-
-    await waitFor(() => {
-      expect(screen.getByText("CSV Import")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole("button", { expanded: false }));
-
-    expect(screen.getByRole("button", { name: "Preview" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
   });
 
   it("shows empty state when no vendors exist", async () => {

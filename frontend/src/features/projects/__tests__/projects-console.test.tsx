@@ -214,7 +214,7 @@ describe("ProjectsConsole", () => {
     expect(screen.getByText("Remaining to Invoice")).toBeInTheDocument();
   });
 
-  it("displays estimate and CO status count badges", async () => {
+  it("displays estimate and CO workflow progress bars", async () => {
     setupDefaultFetch({
       estimates: [
         { status: "draft", grand_total: "5000.00" },
@@ -230,15 +230,13 @@ describe("ProjectsConsole", () => {
     });
     render(<ProjectsConsole />);
 
-    // Estimate badges: D{draft} S{sent} A{approved}
+    // Estimates: drafts skipped → 2 total (sent + approved), 0 invoiced
     await waitFor(() => {
-      expect(screen.getByText("D2")).toBeInTheDocument();
+      expect(screen.getByText(/0 of 2 invoiced/)).toBeInTheDocument();
     });
-    expect(screen.getByText("S1")).toBeInTheDocument();
 
-    // Approved estimates badge (first A in scope control)
-    const aBadges = screen.getAllByText(/^A\d+$/);
-    expect(aBadges.length).toBeGreaterThanOrEqual(2);
+    // COs: draft skipped → 2 total, "accepted" ≠ "approved" so 0 done
+    expect(screen.getByText(/0 of 2 accepted/)).toBeInTheDocument();
   });
 
   it("opens edit form and saves via PATCH", async () => {
@@ -625,7 +623,7 @@ describe("ProjectsConsole", () => {
   // Bill and invoice status count badges
   // ---------------------------------------------------------------------------
 
-  it("displays bill and invoice status count badges", async () => {
+  it("displays bill and invoice workflow progress bars", async () => {
     setupDefaultFetch({
       vendorBills: [
         { status: "open" },
@@ -641,19 +639,13 @@ describe("ProjectsConsole", () => {
     });
     render(<ProjectsConsole />);
 
-    // Bill badges: O{open} D{disputed}
+    // Bills: none void → 3 total, none closed → 0 done
     await waitFor(() => {
-      const billsLink = screen.getByRole("link", { name: /Expenses/ });
-      expect(within(billsLink).getByText("O2")).toBeInTheDocument();
+      expect(screen.getByText(/0 of 3 paid/)).toBeInTheDocument();
     });
-    const billsLink = screen.getByRole("link", { name: /Expenses/ });
-    expect(within(billsLink).getByText("D1")).toBeInTheDocument();
 
-    // Invoice badges: D{draft} S{sent} O{outstanding}
-    const invoicesLink = screen.getByRole("link", { name: /Invoices/ });
-    expect(within(invoicesLink).getByText("D1")).toBeInTheDocument();
-    expect(within(invoicesLink).getByText("S2")).toBeInTheDocument();
-    expect(within(invoicesLink).getByText("O1")).toBeInTheDocument();
+    // Invoices: draft skipped → 3 total (sent + sent + outstanding), none closed → 0 done
+    expect(screen.getByText(/0 of 3 closed/)).toBeInTheDocument();
   });
 
   // ---------------------------------------------------------------------------

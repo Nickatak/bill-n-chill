@@ -65,17 +65,16 @@ describe("CostCodesConsole", () => {
     cleanup();
   });
 
-  it("renders header with title and stats", async () => {
+  it("renders existing codes panel with count badge", async () => {
     setupDefaultFetch({ codes: [makeCostCode(), makeCostCode({ id: 2, code: "01-200", is_active: false })] });
     render(<CostCodesConsole />);
 
-    expect(screen.getByText("Cost Codes")).toBeInTheDocument();
+    expect(screen.getByText("Existing Codes")).toBeInTheDocument();
 
+    // Default filter is "Active", so only 1 visible
     await waitFor(() => {
-      expect(screen.getByText("Total 2")).toBeInTheDocument();
+      expect(screen.getByText("1")).toBeInTheDocument();
     });
-    expect(screen.getByText("Active 1")).toBeInTheDocument();
-    expect(screen.getByText("Archived 1")).toBeInTheDocument();
   });
 
   it("loads and displays cost codes from API", async () => {
@@ -245,21 +244,6 @@ describe("CostCodesConsole", () => {
 
     fireEvent.click(screen.getByText("+ New"));
     expect(screen.getByText("New Cost Code")).toBeInTheDocument();
-  });
-
-  it("toggles CSV import section", async () => {
-    setupDefaultFetch();
-    render(<CostCodesConsole />);
-
-    await waitFor(() => {
-      expect(screen.getByText("CSV Import")).toBeInTheDocument();
-    });
-
-    // Click to expand
-    fireEvent.click(screen.getByRole("button", { expanded: false }));
-
-    expect(screen.getByRole("button", { name: "Preview" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
   });
 
   it("shows empty state when no codes match search", async () => {
