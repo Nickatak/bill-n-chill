@@ -41,8 +41,15 @@
   font-size: 1.15rem;
   line-height: 1.6;
   color: var(--text-secondary);
-  margin: 0 0 2.5rem;
+  margin: 0 0 0.75rem;
   max-width: 540px;
+}
+
+.audience {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin: 0 0 2.5rem;
+  letter-spacing: 0.02em;
 }
 
 .heroCtas {
@@ -128,9 +135,16 @@
 
 .footer {
   margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   padding: 1.5rem 2rem;
-  text-align: center;
   font-size: 0.8rem;
   color: var(--text-muted);
   border-top: 1px solid var(--border-light);
+}
+
+.footerDot {
+  opacity: 0.4;
 }

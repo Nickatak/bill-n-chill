@@ -59,7 +59,7 @@ export function WorkflowShell() {
             </span>
             <div className={styles.hintActions}>
               <Link href="/login" className={styles.hintPrimary}>Sign In</Link>
-              <Link href="/login?tab=register" className={styles.hintPrimary}>Get Started</Link>
+              <Link href="/register" className={styles.hintPrimary}>Get Started</Link>
             </div>
           </div>
         </div>

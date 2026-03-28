@@ -14,27 +14,27 @@ import styles from "./landing-page.module.css";
 const FEATURES = [
   {
     title: "Estimates",
-    desc: "Build detailed estimates with cost codes, send for customer approval, and convert to contracts.",
+    desc: "Build line-item estimates, send a professional link for customer approval, and lock in your contract baseline.",
   },
   {
     title: "Change Orders",
-    desc: "Track scope changes with full audit trail. Approved COs update your contract baseline automatically.",
+    desc: "Scope changes with full audit trail. Approved COs update your contract value automatically.",
   },
   {
     title: "Invoicing",
-    desc: "Create invoices from your approved budget or from scratch. Send professional links to customers.",
+    desc: "Invoice from your approved budget or ad-hoc. Customers review and approve from a branded link.",
   },
   {
     title: "Vendor Bills",
-    desc: "Log subcontractor and supplier invoices against projects to keep outgoing costs organized.",
+    desc: "Log sub and supplier invoices against projects. Snap a photo and let OCR do the data entry.",
   },
   {
     title: "Payments",
-    desc: "Record inbound and outbound payments, allocate against invoices and bills, track what's outstanding.",
+    desc: "Record what came in and what went out. Allocate against invoices and bills, see what's outstanding.",
   },
   {
-    title: "Dashboard",
-    desc: "Portfolio health, AR/AP at a glance, attention items, and change order impact across all projects.",
+    title: "Project Finance",
+    desc: "Contract value, billed-to-date, AR/AP, and cost tracking — one view per project, no spreadsheets.",
   },
 ];
 
@@ -62,14 +62,17 @@ export function LandingPage() {
             without the headache.
           </h1>
           <p className={styles.subheadline}>
-            Estimates, invoicing, change orders, and payment tracking for
-            contractors and remodelers. One place for the money side of every job.
+            Estimates, invoicing, change orders, and payment tracking —
+            one place for the money side of every job.
+          </p>
+          <p className={styles.audience}>
+            Built for general contractors, remodelers, and specialty subs.
           </p>
           <div className={styles.heroCtas}>
-            <Link href="/login?tab=register" className={styles.primaryCta}>
-              Get Started Free
+            <Link href="/register" className={styles.primaryCta}>
+              Get Started — Free During Early Access
             </Link>
-            <Link href="/login" className={styles.primaryCta}>
+            <Link href="/login" className={styles.secondaryCta}>
               Sign In
             </Link>
           </div>
@@ -85,7 +88,11 @@ export function LandingPage() {
         </div>
       </div>
 
-      <footer className={styles.footer}>Bill n&apos; Chill</footer>
+      <footer className={styles.footer}>
+        <span>&copy; {new Date().getFullYear()} Bill n&apos; Chill</span>
+        <span className={styles.footerDot}>&middot;</span>
+        <span>Built in Los Angeles</span>
+      </footer>
     </div>
   );
 }
