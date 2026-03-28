@@ -391,7 +391,7 @@
   align-self: start;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 850px) {
   .statusFilters,
   .workspaceToolbarActions {
     display: grid;
@@ -711,7 +711,7 @@
 }
 
 /* ── Status events table: stacked cards on mobile ── */
-@media (max-width: 700px) {
+@media (max-width: 850px) {
   .statusEventsTable,
   .statusEventsTable tbody {
     min-width: 0;

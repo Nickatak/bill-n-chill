@@ -1143,7 +1143,7 @@
   }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 850px) {
   .sheet {
     padding: var(--space-lg);
     border-radius: 14px;

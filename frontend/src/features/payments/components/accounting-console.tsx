@@ -43,7 +43,7 @@ const TABS: Array<{ key: AccountingTab; label: string }> = [
 export function AccountingConsole() {
   const { token: authToken } = useSharedSessionAuth();
   const [activeTab, setActiveTab] = useState<AccountingTab>("invoices");
-  const isMobile = useMediaQuery("(max-width: 700px)");
+  const isMobile = useMediaQuery("(max-width: 850px)");
 
   if (!authToken) {
     return <p className={styles.authNotice}>Sign in to view accounting data.</p>;

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Bottom navigation bar for mobile viewports (≤700px).
+ * Bottom navigation bar for mobile viewports (≤850px).
  *
  * Renders the primary workflow routes as a fixed bottom tab bar,
  * plus a "More" tab that opens a menu for secondary actions

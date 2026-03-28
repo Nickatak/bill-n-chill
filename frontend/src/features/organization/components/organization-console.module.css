@@ -456,7 +456,7 @@
 
 /* ── Responsive ── */
 
-@media (max-width: 700px) {
+@media (max-width: 850px) {
   .fieldRow,
   .fieldRowAddress {
     grid-template-columns: 1fr;

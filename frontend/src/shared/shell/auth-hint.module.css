@@ -80,7 +80,7 @@
   min-height: 49px;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 850px) {
   .bar {
     display: none;
   }

@@ -144,7 +144,7 @@ export function EstimateSheet({
   onSortLineItems,
   onSubmit,
 }: EstimateSheetProps) {
-  const isMobile = useMediaQuery("(max-width: 700px)");
+  const isMobile = useMediaQuery("(max-width: 850px)");
   const customerName = (project?.customer_display_name || "Customer name").trim();
   const rawBillingAddress = (project?.customer_billing_address || "").trim();
   const isExistingEstimate = Boolean(estimateId);

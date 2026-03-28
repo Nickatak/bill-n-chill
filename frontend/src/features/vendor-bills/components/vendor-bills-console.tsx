@@ -154,7 +154,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const scopedProjectId = scopedProjectIdProp;
   const preferredProjectId = scopedProjectId ?? queryProjectId;
 
-  const isMobile = useMediaQuery("(max-width: 700px)");
+  const isMobile = useMediaQuery("(max-width: 850px)");
   const { token: authToken, role, capabilities } = useSharedSessionAuth();
   const { message: formMessage, tone: formTone, setSuccess: setFormSuccess, setError: setFormError, clear: clearFormMessage } = useStatusMessage();
 

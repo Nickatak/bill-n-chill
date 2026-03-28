@@ -132,7 +132,7 @@
   text-decoration: underline;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 850px) {
   .input {
     min-height: 44px;
     font-size: 1rem;

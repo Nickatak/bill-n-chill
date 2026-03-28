@@ -147,7 +147,7 @@ type InvoicesConsoleProps = {
 };
 
 export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
-  const isMobile = useMediaQuery("(max-width: 700px)");
+  const isMobile = useMediaQuery("(max-width: 850px)");
   const { token: authToken, authMessage, role, capabilities } = useSharedSessionAuth();
   const canMutateInvoices = canDo(capabilities, "invoices", "create");
   const canSendInvoices = canDo(capabilities, "invoices", "send");

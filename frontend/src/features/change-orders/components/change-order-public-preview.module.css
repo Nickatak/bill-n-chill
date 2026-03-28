@@ -135,7 +135,7 @@
   cursor: default;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 850px) {
   .reasonBody {
     font-size: 0.95rem;
   }
