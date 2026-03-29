@@ -420,7 +420,7 @@ export function CostCodeCombobox({
           {filteredOptions.length === 0 ? (
             <div className={styles.noResults}>
               No matching cost codes.{" "}
-              <Link href="/cost-codes" className={styles.manageCodesLink}>
+              <Link href="/cost-codes" className={styles.manageCodesLink} onMouseDown={(e) => e.preventDefault()}>
                 Manage cost codes
               </Link>
               .

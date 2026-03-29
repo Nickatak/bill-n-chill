@@ -31,11 +31,12 @@ class EstimateLineItem(models.Model):
     unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     markup_percent = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     line_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["id"]
+        ordering = ["order", "id"]
 
     def __str__(self) -> str:
         return self.description

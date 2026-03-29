@@ -2,7 +2,7 @@
  * Estimate form field state for the composer panel.
  *
  * Owns the editable fields that populate the estimate draft composer:
- * title, dates, tax, terms, line sort, family collision prompts, and
+ * title, dates, tax, terms, family collision prompts, and
  * title lock state. Provides hydrate/reset callbacks so the console can
  * load an existing estimate into the form or clear it for a new draft.
  *
@@ -15,8 +15,6 @@
  * - validThrough            — ISO date string for validity expiration
  * - termsText               — terms & conditions text block
  * - taxPercent              — tax rate as string (e.g. "8.25")
- * - lineSortKey             — active column sort key (null = manual order)
- * - lineSortDirection       — "asc" | "desc"
  * - familyCollisionPrompt   — prompt data when title matches an existing family
  * - confirmedFamilyTitleKey — normalized title key user confirmed for family add
  * - titleLocked             — true when form was populated via duplicate (title read-only)
@@ -59,13 +57,11 @@ import {
   resolveEstimateValidationDeltaDays,
 } from "../helpers";
 import type { EstimateLineInput, EstimateRecord } from "../types";
-import type { OrganizationDocumentDefaults } from "../components/estimate-sheet";
+import type { OrganizationDocumentDefaults } from "../components/estimate-sheet-v2";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-export type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 
 export type EstimateFamilyCollisionPrompt = {
   title: string;
@@ -109,8 +105,6 @@ export function useEstimateFormFields({
   const [termsText, setTermsText] = useState("");
   const [notesText, setNotesText] = useState("");
   const [taxPercent, setTaxPercent] = useState("0");
-  const [lineSortKey, setLineSortKey] = useState<LineSortKey | null>(null);
-  const [lineSortDirection, setLineSortDirection] = useState<"asc" | "desc">("asc");
   const [familyCollisionPrompt, setFamilyCollisionPrompt] =
     useState<EstimateFamilyCollisionPrompt | null>(null);
   const [confirmedFamilyTitleKey, setConfirmedFamilyTitleKey] = useState("");
@@ -179,8 +173,6 @@ export function useEstimateFormFields({
     setNotesText("");
     setTaxPercent("0");
     resetLines();
-    setLineSortKey(null);
-    setLineSortDirection("asc");
     setEstimateDate(nextEstimateDate);
     setValidThrough(nextValidThrough);
   }, [organizationDefaults, resetLines]);
@@ -227,8 +219,6 @@ export function useEstimateFormFields({
     termsText,
     notesText,
     taxPercent,
-    lineSortKey,
-    lineSortDirection,
     familyCollisionPrompt,
     confirmedFamilyTitleKey,
     titleLocked,
@@ -243,8 +233,6 @@ export function useEstimateFormFields({
     setTermsText,
     setNotesText,
     setTaxPercent,
-    setLineSortKey,
-    setLineSortDirection,
     setFamilyCollisionPrompt,
     setConfirmedFamilyTitleKey,
     setTitleLocked,

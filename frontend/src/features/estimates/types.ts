@@ -31,6 +31,7 @@ export type EstimateRecord = {
   created_at: string;
   updated_at: string;
   line_items?: EstimateLineItemRecord[];
+  sections?: EstimateSectionRecord[];
   project_context?: ProjectRecord;
   organization_context?: OrganizationPublicContext;
   ceremony_consent_text?: string;
@@ -48,6 +49,14 @@ export type EstimateLineItemRecord = {
   unit: string;
   unit_price: string;
   markup_percent: string;
+  order?: number;
+};
+
+export type EstimateSectionRecord = {
+  id: number;
+  name: string;
+  order: number;
+  subtotal: string;
 };
 
 export type EstimateStatusEventRecord = {

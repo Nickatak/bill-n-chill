@@ -480,6 +480,7 @@ def project_estimates_view(request, project_id):
                 line_items_data=line_items,
                 tax_percent=data.get("tax_percent", Decimal("0")),
                 user=request.user,
+                sections_data=data.get("sections"),
             ):
                 transaction.set_rollback(True)
                 return Response(
@@ -611,7 +612,7 @@ def estimate_detail_view(request, estimate_id):
                 status=400,
             )
         is_locked = estimate.status != Estimate.Status.DRAFT
-        mutating_fields = {"title", "valid_through", "tax_percent", "line_items", "notes_text"}
+        mutating_fields = {"title", "valid_through", "tax_percent", "line_items", "sections", "notes_text"}
         if is_locked and any(field in data for field in mutating_fields):
             return Response(
                 {

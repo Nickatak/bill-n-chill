@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
-from core.models import Estimate, EstimateLineItem, EstimateStatusEvent
+from core.models import Estimate, EstimateLineItem, EstimateSection, EstimateStatusEvent
 from core.serializers.mixins import resolve_public_actor_customer_id, resolve_public_actor_display
 
 
@@ -35,16 +35,32 @@ class EstimateLineItemSerializer(serializers.ModelSerializer):
             "unit_price",
             "markup_percent",
             "line_total",
+            "order",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "line_total", "created_at", "updated_at"]
 
 
+class EstimateSectionSerializer(serializers.ModelSerializer):
+    """Read-only estimate section with stored subtotal."""
+
+    class Meta:
+        model = EstimateSection
+        fields = [
+            "id",
+            "name",
+            "order",
+            "subtotal",
+        ]
+        read_only_fields = fields
+
+
 class EstimateSerializer(serializers.ModelSerializer):
-    """Read-only estimate with nested line items."""
+    """Read-only estimate with nested line items and sections."""
 
     line_items = EstimateLineItemSerializer(many=True, read_only=True)
+    sections = EstimateSectionSerializer(many=True, read_only=True)
     public_ref = serializers.CharField(read_only=True)
 
     class Meta:
@@ -68,6 +84,7 @@ class EstimateSerializer(serializers.ModelSerializer):
             "grand_total",
             "public_ref",
             "line_items",
+            "sections",
             "created_at",
             "updated_at",
         ]
@@ -83,6 +100,7 @@ class EstimateSerializer(serializers.ModelSerializer):
             "tax_total",
             "grand_total",
             "line_items",
+            "sections",
             "created_at",
             "updated_at",
         ]
@@ -148,6 +166,14 @@ class EstimateLineItemInputSerializer(serializers.Serializer):
     markup_percent = serializers.DecimalField(
         max_digits=6, decimal_places=2, required=False, default=Decimal("0")
     )
+    order = serializers.IntegerField(required=False, default=0)
+
+
+class EstimateSectionInputSerializer(serializers.Serializer):
+    """Write serializer for a single estimate section in a create/update payload."""
+
+    name = serializers.CharField(max_length=200)
+    order = serializers.IntegerField()
 
 
 class EstimateWriteSerializer(serializers.Serializer):
@@ -163,6 +189,7 @@ class EstimateWriteSerializer(serializers.Serializer):
     notes_text = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
     tax_percent = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, default=0)
     line_items = EstimateLineItemInputSerializer(many=True, required=False)
+    sections = EstimateSectionInputSerializer(many=True, required=False, default=[])
 
     def validate_title(self, value: str) -> str:
         trimmed = value.strip()

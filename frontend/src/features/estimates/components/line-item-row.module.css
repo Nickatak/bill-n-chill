@@ -1,0 +1,310 @@
+/* Responsive line item: row on desktop, card on mobile. */
+
+.list {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Drag handle */
+.dragHandle {
+  cursor: grab;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 4px;
+  color: var(--text-secondary);
+  touch-action: none;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragGrip {
+  font-size: 1rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.row {
+  position: relative;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--surface);
+  display: grid;
+  gap: 8px;
+  /* Desktop: index row, then fields inline, then actions */
+  grid-template-columns: 2fr 1.5fr 70px 60px 90px 80px auto;
+  grid-template-areas:
+    "idx idx idx idx idx idx idx"
+    "desc costcode qty unit price markup amount"
+    "actions actions actions actions actions actions actions";
+  align-items: end;
+  transition: transform 0.15s ease-out;
+}
+
+.rowInvalid {
+  border-left: 3px solid var(--tone-error-border);
+}
+
+.rowIndex {
+  grid-area: idx;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rowIndex:active {
+  cursor: grabbing;
+}
+
+.field {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fieldDesc { grid-area: desc; }
+.fieldCostCode { grid-area: costcode; }
+.fieldQty { grid-area: qty; }
+.fieldUnit { grid-area: unit; }
+.fieldPrice { grid-area: price; }
+.fieldMarkup { grid-area: markup; }
+.fieldAmount {
+  grid-area: amount;
+  text-align: right;
+  align-self: end;
+}
+
+.fieldInvalid select,
+.fieldInvalid input {
+  border-color: var(--tone-error-border);
+}
+
+.fieldLabel {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.fieldInput {
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.fieldInput[disabled] {
+  background: var(--input-readonly-bg);
+  color: var(--input-readonly-text);
+  border-color: var(--input-border);
+  -webkit-text-fill-color: var(--input-readonly-text);
+  cursor: not-allowed;
+}
+
+.amountValue {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 8px 0;
+  color: var(--text-primary);
+}
+
+/* Desktop: hover-to-reveal X button */
+.removeX {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: var(--tone-error-bg);
+  color: var(--tone-error-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 1;
+}
+
+.row:hover .removeX,
+.sectionHeader:hover .removeX {
+  opacity: 1;
+}
+
+.removeX:hover {
+  background: var(--tone-error-border);
+}
+
+/* Actions bar — currently unused, kept for future use */
+.actions {
+  grid-area: actions;
+  display: none;
+}
+
+.moveBtn {
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--accent-text);
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.moveBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.actionSpacer {
+  flex: 1;
+}
+
+.validationError {
+  grid-column: 1 / -1;
+  font-size: 0.82rem;
+  color: var(--tone-error-text);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Section header row */
+.sectionHeader {
+  position: relative;
+  border-bottom: 2px solid var(--border-accent);
+  padding: var(--space-sm) var(--space-md);
+  margin-top: var(--space-sm);
+}
+
+.sectionHeader:first-child {
+  margin-top: 0;
+}
+
+.sectionNameRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sectionDragHandle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  margin: -8px 0;
+}
+
+.sectionDragHandle:active {
+  cursor: grabbing;
+}
+
+.sectionTotal {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text-primary);
+  margin-left: auto;
+  padding-right: 28px;
+}
+
+.sectionNameInput {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  width: 100%;
+  padding: 4px 0;
+}
+
+.sectionNameInput:focus {
+  outline: none;
+  border-bottom: 1px solid var(--accent-primary);
+}
+
+.sectionNameInput[disabled] {
+  color: var(--text-primary);
+  -webkit-text-fill-color: var(--text-primary);
+  cursor: default;
+}
+
+/* No markup column: drop markup from grid */
+.rowNoMarkup {
+  grid-template-columns: 2fr 1.5fr 70px 60px 90px auto;
+  grid-template-areas:
+    "idx idx idx idx idx idx"
+    "desc costcode qty unit price amount"
+    "actions actions actions actions actions actions";
+}
+
+/* Mobile: stack into card layout */
+@media (max-width: 850px) {
+  .row {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "idx idx"
+      "desc desc"
+      "costcode costcode"
+      "qty unit"
+      "price markup"
+      "amount amount";
+  }
+
+  .rowNoMarkup {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "idx idx"
+      "desc desc"
+      "costcode costcode"
+      "qty unit"
+      "price price"
+      "amount amount";
+  }
+
+  .fieldInput {
+    padding: 10px;
+    font-size: 1rem;
+    min-height: 44px;
+  }
+
+
+  .moveBtn {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 8px 12px;
+  }
+
+  .fieldAmount {
+    text-align: right;
+  }
+
+  /* Always show remove button on mobile (no hover) */
+  .removeX {
+    opacity: 1;
+  }
+}

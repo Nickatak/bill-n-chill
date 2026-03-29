@@ -11,11 +11,12 @@
 
 import { RefObject, useEffect, useRef } from "react";
 import type { LineValidationResult } from "../helpers";
-import { EstimateSheet, OrganizationDocumentDefaults } from "./estimate-sheet";
+import { EstimateSheetV2, type EstimateSheetV2Handle, type OrganizationDocumentDefaults } from "./estimate-sheet-v2";
 import type {
   CostCode,
   EstimateLineInput,
   EstimateRecord,
+  EstimateSectionRecord,
   ProjectRecord,
 } from "../types";
 import styles from "./estimates-console.module.css";
@@ -24,8 +25,6 @@ import stampStyles from "@/shared/styles/decision-stamp.module.css";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-type LineSortKey = "quantity" | "costCode" | "unitCost" | "markupPercent" | "amount";
 
 type EstimateFamilyCollisionPrompt = {
   title: string;
@@ -66,8 +65,9 @@ export type EstimatesWorkspacePanelProps = {
   canMutateEstimates: boolean;
   role: string;
 
-  // Creator (EstimateSheet pass-through)
+  // Creator (EstimateSheetV2 pass-through)
   estimateComposerRef: RefObject<HTMLDivElement | null>;
+  sheetRef: RefObject<EstimateSheetV2Handle | null>;
   organizationDefaults: OrganizationDocumentDefaults | null;
   estimateId: string;
   estimateDate: string;
@@ -88,19 +88,14 @@ export type EstimatesWorkspacePanelProps = {
   formErrorMessage: string;
   formSuccessMessage: string;
   lineValidation: LineValidationResult;
-  lineSortKey: LineSortKey | null;
-  lineSortDirection: "asc" | "desc";
+  apiSections?: EstimateSectionRecord[];
   onTitleChange: (title: string) => void;
   onValidThroughChange: (value: string) => void;
   onTaxPercentChange: (value: string) => void;
   onNotesTextChange: (value: string) => void;
   onLineItemChange: (localId: number, key: keyof Omit<EstimateLineInput, "localId">, value: string) => void;
   onAddLineItem: () => void;
-  onMoveLineItem: (localId: number, direction: "up" | "down") => void;
-  onReorderLineItems: (activeId: number, overId: number) => void;
-  onDuplicateLineItem: (localId: number) => void;
   onRemoveLineItem: (localId: number) => void;
-  onSortLineItems: (key: LineSortKey) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 };
 
@@ -129,6 +124,7 @@ export function EstimatesWorkspacePanel({
   canMutateEstimates,
   role,
   estimateComposerRef,
+  sheetRef,
   organizationDefaults,
   estimateId,
   estimateDate,
@@ -149,19 +145,14 @@ export function EstimatesWorkspacePanel({
   formErrorMessage,
   formSuccessMessage,
   lineValidation,
-  lineSortKey,
-  lineSortDirection,
+  apiSections,
   onTitleChange,
   onValidThroughChange,
   onTaxPercentChange,
   onNotesTextChange,
   onLineItemChange,
   onAddLineItem,
-  onMoveLineItem,
-  onReorderLineItems,
-  onDuplicateLineItem,
   onRemoveLineItem,
-  onSortLineItems,
   onSubmit,
 }: EstimatesWorkspacePanelProps) {
   const collisionDialogRef = useRef<HTMLDialogElement>(null);
@@ -250,7 +241,8 @@ export function EstimatesWorkspacePanel({
       ) : null}
 
       <div ref={estimateComposerRef}>
-        <EstimateSheet
+        <EstimateSheetV2
+          ref={sheetRef}
           project={selectedProject}
           organizationDefaults={organizationDefaults}
           estimateId={estimateId}
@@ -275,19 +267,14 @@ export function EstimatesWorkspacePanel({
           formErrorMessage={formErrorMessage}
           formSuccessMessage={formSuccessMessage}
           lineValidation={lineValidation}
-          lineSortKey={lineSortKey}
-          lineSortDirection={lineSortDirection}
+          apiSections={apiSections}
           onTitleChange={onTitleChange}
           onValidThroughChange={onValidThroughChange}
           onTaxPercentChange={onTaxPercentChange}
           onNotesTextChange={onNotesTextChange}
           onLineItemChange={onLineItemChange}
           onAddLineItem={onAddLineItem}
-          onMoveLineItem={onMoveLineItem}
-          onReorderLineItems={onReorderLineItems}
-          onDuplicateLineItem={onDuplicateLineItem}
           onRemoveLineItem={onRemoveLineItem}
-          onSortLineItems={onSortLineItems}
           onSubmit={onSubmit}
         />
         {selectedEstimate && (selectedEstimate.status === "approved" || selectedEstimate.status === "rejected") ? (

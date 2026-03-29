@@ -46,7 +46,7 @@
  * - handleUpdateEstimateStatus() — Apply status transition
  * - handleAddEstimateStatusNote() — Append note without transition
  * - handleFamilyCardQuickAction() — Route CO/duplicate quick actions
- * - handleSortLineItems()      — Column sort with toggle direction
+ * - buildOrderedPayload()     — Build line_items (with order) and sections for API
  *
  * ## Effects
  *
@@ -102,7 +102,7 @@ import {
   toNumber,
   validateEstimateLineItems,
 } from "../helpers";
-import type { OrganizationDocumentDefaults } from "./estimate-sheet";
+import type { EstimateSheetV2Handle, OrganizationDocumentDefaults } from "./estimate-sheet-v2";
 import { EstimatesViewerPanel } from "./estimates-viewer-panel";
 import { EstimatesWorkspacePanel } from "./estimates-workspace-panel";
 import { useLineItems } from "@/shared/hooks/use-line-items";
@@ -205,8 +205,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     items: lineItems, setItems: setLineItems,
     setNextId: setNextLineId,
     add: addLineRaw, remove: removeLineRaw,
-    update: updateLineRaw, move: moveLineRaw, reorder: reorderLineRaw,
-    duplicate: duplicateLineRaw, reset: resetLines,
+    update: updateLineRaw, reset: resetLines,
   } = useLineItems<EstimateLineInput>({ createEmpty: emptyLine });
 
   // -------------------------------------------------------------------------
@@ -302,6 +301,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [openFamilyHistory, setOpenFamilyHistory] = useState<Set<string>>(() => new Set());
   const [isViewerExpanded, setIsViewerExpanded] = useState(true);
   const { ref: estimateComposerRef, flash: flashCreator } = useCreatorFlash();
+  const sheetRef = useRef<EstimateSheetV2Handle>(null);
   const { setPrintable } = usePrintable();
 
   // -------------------------------------------------------------------------
@@ -487,8 +487,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     if (!isSameEstimate) {
       setStatusEvents([]);
     }
-    formFields.setLineSortKey(null);
-    formFields.setLineSortDirection("asc");
     setFormErrorMessage("");
     setFormSuccessMessage("");
     setActionMessage("");
@@ -714,23 +712,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     addLineRaw();
   }
 
-  function duplicateLineItem(localId: number) {
-    if (formErrorMessage === ESTIMATE_MIN_LINE_ITEMS_ERROR) setFormErrorMessage("");
-    duplicateLineRaw(localId);
-  }
-
-  function moveLineItem(localId: number, direction: "up" | "down") {
-    moveLineRaw(localId, direction);
-    formFields.setLineSortKey(null);
-    formFields.setLineSortDirection("asc");
-  }
-
-  function reorderLineItems(activeId: number, overId: number) {
-    reorderLineRaw(activeId, overId);
-    formFields.setLineSortKey(null);
-    formFields.setLineSortDirection("asc");
-  }
-
   function removeLineItem(localId: number) {
     if (!removeLineRaw(localId)) {
       setFormErrorMessage(ESTIMATE_MIN_LINE_ITEMS_ERROR);
@@ -748,53 +729,6 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     updateLineRaw(localId, { [key]: value });
   }
 
-  /** Sort line items by the given column key, toggling direction on repeat clicks. */
-  function handleSortLineItems(key: typeof formFields.lineSortKey & string) {
-    if (isReadOnly) {
-      return;
-    }
-    const nextDirection = formFields.lineSortKey === key && formFields.lineSortDirection === "asc" ? "desc" : "asc";
-    const directionFactor = nextDirection === "asc" ? 1 : -1;
-
-    function lineAmount(line: EstimateLineInput): number {
-      const quantity = toNumber(line.quantity);
-      const unitCost = toNumber(line.unitCost);
-      const markup = toNumber(line.markupPercent);
-      const base = quantity * unitCost;
-      return base + base * (markup / 100);
-    }
-
-    function costCodeLabel(line: EstimateLineInput): string {
-      const code = costCodes.find((candidate) => String(candidate.id) === line.costCodeId);
-      if (!code) {
-        return "";
-      }
-      return `${code.code} ${code.name}`.toLowerCase();
-    }
-
-    setLineItems((current) => {
-      const sorted = [...current].sort((a, b) => {
-        switch (key) {
-          case "quantity":
-            return (toNumber(a.quantity) - toNumber(b.quantity)) * directionFactor;
-          case "unitCost":
-            return (toNumber(a.unitCost) - toNumber(b.unitCost)) * directionFactor;
-          case "markupPercent":
-            return (toNumber(a.markupPercent) - toNumber(b.markupPercent)) * directionFactor;
-          case "amount":
-            return (lineAmount(a) - lineAmount(b)) * directionFactor;
-          case "costCode":
-            return costCodeLabel(a).localeCompare(costCodeLabel(b)) * directionFactor;
-          default:
-            return 0;
-        }
-      });
-      return sorted;
-    });
-    formFields.setLineSortKey(key);
-    formFields.setLineSortDirection(nextDirection);
-  }
-
   const canCreateEstimate = useMemo(
     () => canMutateEstimates && !isProjectTerminal && Boolean(selectedProjectId) && lineItems.length > 0,
     [canMutateEstimates, isProjectTerminal, lineItems.length, selectedProjectId],
@@ -803,6 +737,25 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   // -------------------------------------------------------------------------
   // Submit & mutation handlers
   // -------------------------------------------------------------------------
+
+  /** Build line_items (with order) and sections payload from the sheet's current state. */
+  function buildOrderedPayload() {
+    const orderPayload = sheetRef.current?.getOrderPayload();
+    const lineItemOrders = orderPayload?.lineItemOrders ?? new Map<number, number>();
+    const sections = orderPayload?.sections ?? [];
+
+    const orderedLineItems = lineItems.map((line) => ({
+      cost_code: Number(line.costCodeId),
+      description: line.description,
+      quantity: line.quantity,
+      unit: line.unit,
+      unit_price: line.unitCost,
+      markup_percent: line.markupPercent,
+      order: lineItemOrders.get(line.localId) ?? 0,
+    }));
+
+    return { line_items: orderedLineItems, sections };
+  }
 
   async function submitNewEstimateWithTitle({
     projectId,
@@ -817,6 +770,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     formFields.submitGuard.current = true;
     formFields.setIsSubmitting(true);
     try {
+      const { line_items, sections } = buildOrderedPayload();
       const response = await fetch(`${apiBaseUrl}/projects/${projectId}/estimates/`, {
         method: "POST",
         headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
@@ -826,14 +780,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           valid_through: formFields.validThrough || null,
           tax_percent: formFields.taxPercent,
           notes_text: formFields.notesText,
-          line_items: lineItems.map((line) => ({
-            cost_code: Number(line.costCodeId),
-            description: line.description,
-            quantity: line.quantity,
-            unit: line.unit,
-            unit_price: line.unitCost,
-            markup_percent: line.markupPercent,
-          })),
+          line_items,
+          sections,
         }),
       });
       const payload: ApiResponse = await response.json();
@@ -921,6 +869,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       formFields.submitGuard.current = true;
       formFields.setIsSubmitting(true);
       try {
+        const { line_items, sections } = buildOrderedPayload();
         const response = await fetch(`${apiBaseUrl}/estimates/${selectedEstimate.id}/`, {
           method: "PATCH",
           headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
@@ -929,14 +878,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
             valid_through: formFields.validThrough || null,
             tax_percent: formFields.taxPercent,
             notes_text: formFields.notesText,
-            line_items: lineItems.map((line) => ({
-              cost_code: Number(line.costCodeId),
-              description: line.description,
-              quantity: line.quantity,
-              unit: line.unit,
-              unit_price: line.unitCost,
-              markup_percent: line.markupPercent,
-            })),
+            line_items,
+            sections,
           }),
         });
         const payload: ApiResponse = await response.json();
@@ -1238,6 +1181,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         canMutateEstimates={canMutateEstimates}
         role={role}
         estimateComposerRef={estimateComposerRef}
+        sheetRef={sheetRef}
         organizationDefaults={organizationDefaults}
         estimateId={selectedEstimateId}
         estimateDate={formFields.estimateDate}
@@ -1258,19 +1202,14 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         formErrorMessage={formErrorMessage}
         formSuccessMessage={formSuccessMessage}
         lineValidation={lineValidation}
-        lineSortKey={formFields.lineSortKey}
-        lineSortDirection={formFields.lineSortDirection}
+        apiSections={selectedEstimate?.sections}
         onTitleChange={formFields.handleEstimateTitleChange}
         onValidThroughChange={formFields.setValidThrough}
         onTaxPercentChange={formFields.setTaxPercent}
         onNotesTextChange={formFields.setNotesText}
         onLineItemChange={updateLineItem}
         onAddLineItem={addLineItem}
-        onMoveLineItem={moveLineItem}
-        onReorderLineItems={reorderLineItems}
-        onDuplicateLineItem={duplicateLineItem}
         onRemoveLineItem={removeLineItem}
-        onSortLineItems={handleSortLineItems}
         onSubmit={handleCreateEstimate}
       />
     </section>

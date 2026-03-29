@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from core.models import (
     Estimate,
     EstimateLineItem,
+    EstimateSection,
     EstimateStatusEvent,
     Project,
 )
@@ -57,6 +58,7 @@ def _prefetch_estimate_qs(queryset: QuerySet) -> QuerySet:
     ).prefetch_related(
         "line_items",
         "line_items__cost_code",
+        "sections",
     )
 
 
@@ -227,18 +229,54 @@ def _calculate_line_totals(
     return computed_line_items, subtotal, markup_total
 
 
+def _compute_section_subtotals(
+    sections_data: list[dict],
+    line_items_with_totals: list[dict],
+) -> list[dict]:
+    """Compute each section's subtotal from the line items that follow it.
+
+    A section's subtotal is the sum of ``line_total`` for all line items whose
+    ``order`` falls between this section's ``order`` and the next section's
+    ``order`` (or end of list). Returns sections with ``subtotal`` populated.
+    """
+    if not sections_data:
+        return []
+
+    sorted_sections = sorted(sections_data, key=lambda s: s["order"])
+    line_totals_by_order = {
+        item["order"]: item["line_total"] for item in line_items_with_totals
+    }
+    all_line_orders = sorted(line_totals_by_order.keys())
+
+    result = []
+    for i, section in enumerate(sorted_sections):
+        section_order = section["order"]
+        next_boundary = sorted_sections[i + 1]["order"] if i + 1 < len(sorted_sections) else float("inf")
+
+        subtotal = MONEY_ZERO
+        for line_order in all_line_orders:
+            if line_order > section_order and line_order < next_boundary:
+                subtotal = quantize_money(subtotal + line_totals_by_order[line_order])
+
+        result.append({**section, "subtotal": subtotal})
+
+    return result
+
+
 def _apply_estimate_lines_and_totals(
     estimate: Estimate,
     line_items_data: list[dict],
     tax_percent: Decimal,
     user: AbstractUser,
+    sections_data: list[dict] | None = None,
 ) -> dict | None:
-    """Replace an estimate's line items and recompute all totals.
+    """Replace an estimate's line items, sections, and recompute all totals.
 
-    Deletes existing line items, resolves cost codes for the user,
-    bulk-creates new lines, and updates the estimate's financial totals.
-    Returns an error dict (``{"missing_cost_codes": [...]}"``) on
-    validation failure, or ``None`` on success.
+    Deletes existing line items and sections, resolves cost codes for the user,
+    bulk-creates new lines and sections, and updates the estimate's financial
+    totals. Section subtotals are computed from the line items that follow each
+    section in ordering space. Returns an error dict on validation failure, or
+    ``None`` on success.
     """
     computed_line_items, subtotal, markup_total = _calculate_line_totals(line_items_data)
     cost_code_map, missing = _resolve_cost_codes_for_user(user, computed_line_items)
@@ -248,6 +286,8 @@ def _apply_estimate_lines_and_totals(
     tax_percent = Decimal(str(tax_percent))
 
     estimate.line_items.all().delete()
+    estimate.sections.all().delete()
+
     lines_to_create = []
     taxable_base = MONEY_ZERO
     for line_item in computed_line_items:
@@ -268,12 +308,25 @@ def _apply_estimate_lines_and_totals(
                 unit_price=line_item["unit_price"],
                 markup_percent=line_item["markup_percent"],
                 line_total=line_item["line_total"],
+                order=line_item.get("order", 0),
             )
         )
 
     tax_total = quantize_money(taxable_base * (tax_percent / Decimal("100")))
     grand_total = quantize_money(subtotal + markup_total + tax_total)
     EstimateLineItem.objects.bulk_create(lines_to_create)
+
+    if sections_data:
+        computed_sections = _compute_section_subtotals(sections_data, computed_line_items)
+        EstimateSection.objects.bulk_create([
+            EstimateSection(
+                estimate=estimate,
+                name=section["name"],
+                order=section["order"],
+                subtotal=section["subtotal"],
+            )
+            for section in computed_sections
+        ])
 
     estimate.subtotal = subtotal
     estimate.markup_total = markup_total
@@ -345,6 +398,7 @@ def _handle_estimate_document_save(
                 line_items_data=data["line_items"],
                 tax_percent=data.get("tax_percent", estimate.tax_percent),
                 user=request.user,
+                sections_data=data.get("sections"),
             ):
                 transaction.set_rollback(True)
                 return Response(
@@ -366,14 +420,20 @@ def _handle_estimate_document_save(
                     "unit": line.unit,
                     "unit_price": line.unit_price,
                     "markup_percent": line.markup_percent,
+                    "order": line.order,
                 }
                 for line in estimate.line_items.all()
+            ]
+            current_sections = [
+                {"name": section.name, "order": section.order}
+                for section in estimate.sections.all()
             ]
             _apply_estimate_lines_and_totals(
                 estimate=estimate,
                 line_items_data=current_line_dicts,
                 tax_percent=estimate.tax_percent,
                 user=request.user,
+                sections_data=current_sections,
             )
 
     estimate.refresh_from_db()
