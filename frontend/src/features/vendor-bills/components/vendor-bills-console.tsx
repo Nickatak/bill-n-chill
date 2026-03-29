@@ -73,19 +73,11 @@
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
-import { useCombobox } from "@/shared/hooks/use-combobox";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import { useSearchParams } from "next/navigation";
-import { formatDateDisplay } from "@/shared/date-format";
 import { readApiErrorMessage } from "@/shared/api/error";
-import {
-  collapseToggleButtonStyles as collapseButtonStyles,
-} from "@/shared/project-list-viewer";
 
 import { useMediaQuery } from "@/shared/hooks/use-media-query";
-import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
-import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
-import mobileCardStyles from "@/shared/document-creator/mobile-line-card.module.css";
 import {
   fetchVendorBillPolicyContract,
 } from "../api";
@@ -112,6 +104,8 @@ import type {
 import { useVendorBillForm } from "../hooks/use-vendor-bill-form";
 import { useVendorBillViewer } from "../hooks/use-vendor-bill-viewer";
 import styles from "./vendor-bills-console.module.css";
+import { VendorBillsViewerPanel } from "./vendor-bills-viewer-panel";
+import { VendorBillsWorkspacePanel } from "./vendor-bills-workspace-panel";
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -276,7 +270,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   const workspaceContext = selectedVendorBill
     ? `#${selectedVendorBill.id} — ${selectedVendorBill.bill_number || "Untitled"}`
     : "New vendor bill";
-  const vendorOptions = vendors;
   const quickStatusOptions = selectedVendorBill
     ? allowedStatusTransitions[selectedVendorBill.status] ?? []
     : [];
@@ -284,272 +277,6 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
   // Workspace visibility + flash animation
   const [isViewerExpanded, setIsViewerExpanded] = useState(true);
   const { ref: billFormRef, flash: flashCreator } = useCreatorFlash<HTMLFormElement>();
-
-  // -------------------------------------------------------------------------
-  // Display helpers
-  // -------------------------------------------------------------------------
-
-  // --- Vendor combobox ---
-  type VendorOption = { id: number; name: string; label: string };
-
-  const vendorComboItems: VendorOption[] = useMemo(() => {
-    return vendorOptions.map((v) => ({
-      id: v.id,
-      name: v.name,
-      label: v.name,
-    }));
-  }, [vendorOptions]);
-
-  const { inputRef: vendorInputRef, menuRef: vendorMenuRef, ...vendorCombobox } = useCombobox<VendorOption>({
-    items: vendorComboItems,
-    getLabel: (item) => item.label,
-    onCommit: (item) => {
-      setFormVendorId(item ? String(item.id) : "");
-      vendorCombobox.close(item !== null);
-    },
-  });
-
-  /** The currently selected vendor option for display. */
-  const selectedVendorOption: VendorOption | null = useMemo(() => {
-    if (formVendorId) {
-      return vendorComboItems.find((o) => String(o.id) === formVendorId) ?? null;
-    }
-    return null;
-  }, [formVendorId, vendorComboItems]);
-
-  /** Returns the display label for a bill status, using policy-provided labels. */
-  function statusDisplayLabel(value: VendorBillStatus): string {
-    return billStatusLabels[value] ?? value;
-  }
-
-  /** Returns the CSS class for a status badge in the bill table. */
-  function statusBadgeClass(value: VendorBillStatus): string {
-    return styles[`tableStatus${value[0].toUpperCase()}${value.slice(1)}`] ?? "";
-  }
-
-  /** Returns the CSS class for a status pill button. */
-  function statusPillClass(value: VendorBillStatus): string {
-    return styles[`statusPill${value[0].toUpperCase()}${value.slice(1)}`] ?? "";
-  }
-
-  /** Renders the collapsible expanded sections for a selected vendor bill (shared between mobile cards and desktop table). */
-  function renderExpandedSections(vendorBill: VendorBillRecord) {
-    return (
-      <div className={styles.expandedSections} onClick={(e) => e.stopPropagation()}>
-        {/* Status & Actions */}
-        <div className={styles.viewerSection}>
-          <button
-            type="button"
-            className={styles.viewerSectionToggle}
-            onClick={(e) => { e.stopPropagation(); setIsStatusSectionOpen((v) => !v); }}
-            aria-expanded={isStatusSectionOpen}
-          >
-            <h4>Status &amp; Actions</h4>
-            <span className={styles.viewerSectionArrow}>&#9660;</span>
-          </button>
-          {isStatusSectionOpen ? (
-            <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
-              {quickStatusOptions.length > 0 ? (
-                <>
-                  <span className={styles.lifecycleFieldLabel}>Next status</span>
-                  <div className={styles.statusPills}>
-                    {quickStatusOptions.map((statusOption) => {
-                      const active = statusOption === viewerNextStatus;
-                      return (
-                        <button
-                          key={`viewer-status-${statusOption}`}
-                          type="button"
-                          className={`${styles.statusPill} ${
-                            active ? statusPillClass(statusOption) : styles.statusPillInactive
-                          } ${active ? styles.statusPillActive : ""}`}
-                          aria-pressed={active}
-                          onClick={() => setViewerNextStatus(statusOption)}
-                        >
-                          {statusDisplayLabel(statusOption)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              ) : (
-                <p className={styles.viewerHint}>No next statuses available for this bill.</p>
-              )}
-              <label className={styles.statusPickerLabel}>
-                Note
-                <textarea
-                  className={styles.viewerNoteInput}
-                  value={viewerNote}
-                  onChange={(e) => setViewerNote(e.target.value)}
-                  placeholder="Optional note..."
-                  disabled={!canMutateVendorBills}
-                />
-              </label>
-              <div className={styles.viewerStatusActions}>
-                <button
-                  type="button"
-                  className={styles.formPrimaryButton}
-                  onClick={() => void handleUpdateVendorBillStatus()}
-                  disabled={!selectedVendorBillId || !viewerNextStatus || !canMutateVendorBills}
-                >
-                  Update Status
-                </button>
-                <button
-                  type="button"
-                  className={styles.formSecondaryButton}
-                  onClick={() => void handleUpdateVendorBillNote()}
-                  disabled={!selectedVendorBillId || !canMutateVendorBills}
-                >
-                  Update Note
-                </button>
-              </div>
-              {viewerErrorMessage ? (
-                <p className={styles.viewerErrorText} role="alert" aria-live="polite">
-                  {viewerErrorMessage}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-
-        {/* Line Items */}
-        <div className={styles.viewerSection}>
-          <button
-            type="button"
-            className={styles.viewerSectionToggle}
-            onClick={(e) => { e.stopPropagation(); setIsLineItemsSectionOpen((v) => !v); }}
-            aria-expanded={isLineItemsSectionOpen}
-          >
-            <h4>Line Items ({vendorBill.line_items?.length ?? 0})</h4>
-            <span className={styles.viewerSectionArrow}>&#9660;</span>
-          </button>
-          {isLineItemsSectionOpen ? (
-            <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
-              {vendorBill.line_items && vendorBill.line_items.length > 0 ? (
-                <div className={styles.readOnlyTableWrap}>
-                  <table className={styles.readOnlyTable}>
-                    <thead>
-                      <tr>
-                        <th>Description</th>
-                        <th>Qty</th>
-                        <th>Unit Price</th>
-                        <th>Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {vendorBill.line_items.map((lineItem, lineIdx) => (
-                        <tr key={lineIdx}>
-                          <td>{lineItem.description || "—"}</td>
-                          <td>{lineItem.quantity}</td>
-                          <td>${lineItem.unit_price}</td>
-                          <td>${lineItem.amount}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className={styles.viewerHint}>No line items on this bill.</p>
-              )}
-            </div>
-          ) : null}
-        </div>
-
-        {/* Bill Details */}
-        <div className={styles.viewerSection}>
-          <button
-            type="button"
-            className={styles.viewerSectionToggle}
-            onClick={(e) => { e.stopPropagation(); setIsDetailsSectionOpen((v) => !v); }}
-            aria-expanded={isDetailsSectionOpen}
-          >
-            <h4>Bill Details</h4>
-            <span className={styles.viewerSectionArrow}>&#9660;</span>
-          </button>
-          {isDetailsSectionOpen ? (
-            <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
-              <div className={styles.detailGrid}>
-                <div>
-                  <p className={styles.detailLabel}>Vendor</p>
-                  <p className={styles.detailValue}>{vendorBill.vendor_name || "Expense"}</p>
-                </div>
-                <div>
-                  <p className={styles.detailLabel}>Bill #</p>
-                  <p className={styles.detailValue}>{vendorBill.bill_number}</p>
-                </div>
-                <div>
-                  <p className={styles.detailLabel}>Issue Date</p>
-                  <p className={styles.detailValue}>{formatDateDisplay(vendorBill.issue_date)}</p>
-                </div>
-                <div>
-                  <p className={styles.detailLabel}>Due Date</p>
-                  <p className={styles.detailValue}>{formatDateDisplay(vendorBill.due_date)}</p>
-                </div>
-                <div>
-                  <p className={styles.detailLabel}>Total</p>
-                  <p className={styles.detailValue}>${vendorBill.total}</p>
-                </div>
-                <div>
-                  <p className={styles.detailLabel}>Balance Due</p>
-                  <p className={styles.detailValue}>${vendorBill.balance_due}</p>
-                </div>
-                {vendorBill.notes ? (
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <p className={styles.detailLabel}>Notes</p>
-                    <p className={styles.detailValue}>{vendorBill.notes}</p>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-        </div>
-
-        {/* Status History */}
-        {snapshots.length > 0 ? (
-          <div className={styles.viewerSection}>
-            <button
-              type="button"
-              className={styles.viewerSectionToggle}
-              onClick={(e) => { e.stopPropagation(); setIsHistorySectionOpen((v) => !v); }}
-              aria-expanded={isHistorySectionOpen}
-            >
-              <h4>Status History ({snapshots.length})</h4>
-              <span className={styles.viewerSectionArrow}>&#9660;</span>
-            </button>
-            {isHistorySectionOpen ? (
-              <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
-                <div className={styles.readOnlyTableWrap}>
-                  <table className={styles.readOnlyTable}>
-                    <thead>
-                      <tr>
-                        <th>Action</th>
-                        <th>Date</th>
-                        <th>Note</th>
-                        <th>Who</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {snapshots.map((snap) => (
-                        <tr key={snap.id}>
-                          <td>
-                            <span className={`${styles.tableStatusBadge} ${statusBadgeClass(snap.capture_status as VendorBillStatus)}`}>
-                              {snap.action_type === "notate" ? "note" : statusDisplayLabel(snap.capture_status as VendorBillStatus)}
-                            </span>
-                          </td>
-                          <td>{formatDateDisplay(snap.created_at)}</td>
-                          <td>{snap.status_note || "—"}</td>
-                          <td>{snap.acted_by_display || snap.acted_by_email || "Unknown"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
 
 
   // -------------------------------------------------------------------------
@@ -948,6 +675,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   const scanInputRef = useRef<HTMLInputElement | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [scanUnmatchedVendorName, setScanUnmatchedVendorName] = useState("");
 
   /** Handles file selection from the hidden input, sends to scan endpoint. */
   async function handleScanFile(file: File) {
@@ -973,7 +701,7 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
       const unmatchedName = billForm.populateFromScan(scan);
       // Pre-fill combobox with scanned name so user can create a new vendor.
       if (unmatchedName) {
-        vendorCombobox.setQuery(unmatchedName);
+        setScanUnmatchedVendorName(unmatchedName);
       }
       flashCreator();
 
@@ -1064,594 +792,90 @@ export function VendorBillsConsole({ scopedProjectId: scopedProjectIdProp = null
 
   return (
     <section className={styles.console}>
-      {/* ── Viewer Panel: bill table + inline expansion ──────────── */}
-      <div className={styles.viewerPanel}>
-        <div className={styles.panelHeader}>
-          <h3>{selectedProject ? `Bills for: ${selectedProject.name}` : "Bills"}</h3>
-          {!isMobile ? (
-            <button
-              type="button"
-              className={collapseButtonStyles.collapseButton}
-              style={{ background: "var(--surface)" }}
-              onClick={() => setIsViewerExpanded((current) => !current)}
-              aria-expanded={isViewerExpanded}
-            >
-              {isViewerExpanded ? "Collapse" : "Expand"}
-            </button>
-          ) : null}
-        </div>
+      <VendorBillsViewerPanel
+        isMobile={isMobile}
+        selectedProject={selectedProject}
+        isViewerExpanded={isViewerExpanded}
+        setIsViewerExpanded={setIsViewerExpanded}
+        billStatuses={billStatuses}
+        billStatusFilters={billStatusFilters}
+        billStatusCounts={billStatusCounts}
+        billStatusLabels={billStatusLabels}
+        toggleBillStatusFilter={toggleBillStatusFilter}
+        setBillStatusFilters={setBillStatusFilters}
+        defaultBillStatusFiltersFn={defaultBillStatusFilters}
+        filteredVendorBills={filteredVendorBills}
+        selectedVendorBillId={selectedVendorBillId}
+        onSelectVendorBill={handleSelectVendorBill}
+        canMutateVendorBills={canMutateVendorBills}
+        quickStatusOptions={quickStatusOptions}
+        viewerNextStatus={viewerNextStatus}
+        setViewerNextStatus={setViewerNextStatus}
+        viewerNote={viewerNote}
+        setViewerNote={setViewerNote}
+        viewerErrorMessage={viewerErrorMessage}
+        onUpdateStatus={handleUpdateVendorBillStatus}
+        onUpdateNote={handleUpdateVendorBillNote}
+        isStatusSectionOpen={isStatusSectionOpen}
+        setIsStatusSectionOpen={setIsStatusSectionOpen}
+        isLineItemsSectionOpen={isLineItemsSectionOpen}
+        setIsLineItemsSectionOpen={setIsLineItemsSectionOpen}
+        isDetailsSectionOpen={isDetailsSectionOpen}
+        setIsDetailsSectionOpen={setIsDetailsSectionOpen}
+        isHistorySectionOpen={isHistorySectionOpen}
+        setIsHistorySectionOpen={setIsHistorySectionOpen}
+        snapshots={snapshots}
+      />
 
-        {(isMobile || isViewerExpanded) ? (
-        <>
-        <div className={styles.statusFilters}>
-          <div className={styles.statusFilterButtons}>
-            {billStatuses.map((statusValue) => {
-              const active = billStatusFilters.includes(statusValue);
-              const statusClass = `statusFilter${statusValue[0].toUpperCase()}${statusValue.slice(1)}`;
-              return (
-                <button
-                  key={statusValue}
-                  type="button"
-                  className={`${styles.filterPill} ${
-                    active
-                      ? `${styles.filterPillActive} ${styles[statusClass] ?? ""}`
-                      : styles.filterPillInactive
-                  }`}
-                  aria-pressed={active}
-                  onClick={() => toggleBillStatusFilter(statusValue)}
-                >
-                  <span>{statusDisplayLabel(statusValue)}</span>
-                  <span className={styles.filterPillCount}>{billStatusCounts[statusValue] ?? 0}</span>
-                </button>
-              );
-            })}
-          </div>
-          <div className={styles.filterActions}>
-            <button
-              type="button"
-              className={styles.filterActionButton}
-              onClick={() => { setBillStatusFilters([...billStatuses]); }}
-            >
-              Show All
-            </button>
-            <button
-              type="button"
-              className={styles.filterActionButton}
-              onClick={() => { setBillStatusFilters(defaultBillStatusFilters(billStatuses)); }}
-            >
-              Reset Filters
-            </button>
-          </div>
-        </div>
-
-        {isMobile ? (
-          /* ── Mobile: card list ── */
-          <div className={styles.billCardList}>
-            {filteredVendorBills.length ? (
-              filteredVendorBills.map((vendorBill) => {
-                const isSelected = selectedVendorBillId === String(vendorBill.id);
-                return (
-                  <div
-                    key={vendorBill.id}
-                    className={`${styles.billCard} ${isSelected ? styles.billCardSelected : ""}`}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleSelectVendorBill(String(vendorBill.id))}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        handleSelectVendorBill(String(vendorBill.id));
-                      }
-                    }}
-                  >
-                    <div className={styles.billCardTop}>
-                      <div className={styles.billCardIdentity}>
-                        <span className={styles.billCardVendor}>{vendorBill.vendor_name || "Expense"}</span>
-                        <span className={styles.billCardMeta}>
-                          #{vendorBill.id} {vendorBill.bill_number}
-                          {vendorBill.due_date ? ` · Due ${formatDateDisplay(vendorBill.due_date)}` : ""}
-                        </span>
-                      </div>
-                      <div className={styles.billCardAmountBlock}>
-                        <span className={styles.billCardAmount}>${vendorBill.total}</span>
-                        {Number(vendorBill.balance_due) > 0 && Number(vendorBill.balance_due) < Number(vendorBill.total) ? (
-                          <span className={styles.billCardBalance}>{`$${vendorBill.balance_due} due`}</span>
-                        ) : Number(vendorBill.balance_due) <= 0 && Number(vendorBill.total) > 0 ? (
-                          <span className={styles.billCardBalancePaid}>Paid</span>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className={styles.billCardFooter}>
-                      <span className={`${styles.tableStatusBadge} ${statusBadgeClass(vendorBill.status)}`}>
-                        {statusDisplayLabel(vendorBill.status)}
-                      </span>
-                    </div>
-                    {isSelected ? renderExpandedSections(vendorBill) : null}
-                  </div>
-                );
-              })
-            ) : (
-              <p className={styles.viewerHint}>No bills match the selected status/due filters.</p>
-            )}
-          </div>
-        ) : (
-          /* ── Desktop: table ── */
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Bill</th>
-                  <th>Vendor</th>
-                  <th>Status</th>
-                  <th>Due</th>
-                  <th>Total</th>
-                  <th>Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredVendorBills.length ? (
-                  filteredVendorBills.map((vendorBill) => {
-                    const isSelected = selectedVendorBillId === String(vendorBill.id);
-                    return [
-                      <tr
-                        key={vendorBill.id}
-                        className={isSelected ? styles.rowSelected : ""}
-                        onClick={() => handleSelectVendorBill(String(vendorBill.id))}
-                      >
-                        <td>
-                          <strong>#{vendorBill.id}</strong> {vendorBill.bill_number}
-                        </td>
-                        <td>{vendorBill.vendor_name || "Expense"}</td>
-                        <td>
-                          <span className={`${styles.tableStatusBadge} ${statusBadgeClass(vendorBill.status)}`}>
-                            {statusDisplayLabel(vendorBill.status)}
-                          </span>
-                        </td>
-                        <td>{formatDateDisplay(vendorBill.due_date)}</td>
-                        <td>${vendorBill.total}</td>
-                        <td>${vendorBill.balance_due}</td>
-                      </tr>,
-                      isSelected ? (
-                        <tr key={`expanded-${vendorBill.id}`} className={styles.expandedRow}>
-                          <td colSpan={6}>
-                            {renderExpandedSections(vendorBill)}
-                          </td>
-                        </tr>
-                      ) : null,
-                    ];
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={6} className={styles.projectEmptyCell}>
-                      No bills match the selected status/due filters.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-        </>
-        ) : null}
-      </div>
-
-      {/* ── Workspace Panel: bill form (create/edit) ─────────────── */}
-      <div className={styles.workspace}>
-          <div className={styles.workspaceToolbar}>
-            <div className={styles.workspaceContext}>
-              <span className={styles.workspaceContextLabel}>
-                {!selectedVendorBill ? "Creating" : workspaceIsLocked ? "Viewing" : "Editing"}
-              </span>
-              <div className={styles.workspaceContextValueRow}>
-                <strong>{workspaceContext}</strong>
-                <span className={`${styles.workspaceBadge} ${workspaceBadgeClass}`}>{workspaceBadgeLabel}</span>
-              </div>
-            </div>
-            <div className={styles.workspaceToolbarActions}>
-              {isEditingMode ? (
-                <>
-                  <button
-                    type="button"
-                    className={styles.toolbarActionButton}
-                    onClick={handleRecreateAsNewDraftTemplate}
-                    disabled={!selectedVendorBillId}
-                  >
-                    Duplicate Bill
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.toolbarActionButton}
-                    onClick={handleStartNewVendorBill}
-                  >
-                    New Bill
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  className={styles.toolbarActionButton}
-                  onClick={() => { billForm.resetCreateForm(); flashCreator(); }}
-                >
-                  Reset
-                </button>
-              )}
-              {canMutateVendorBills ? (
-                <>
-                  <input
-                    ref={scanInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/heic"
-                    className={styles.hiddenInput}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) void handleScanFile(file);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className={`${styles.toolbarActionButton} ${isScanning ? styles.scanningPulse : ""}`}
-                    onClick={() => scanInputRef.current?.click()}
-                    disabled={isScanning || !selectedProjectId}
-                  >
-                    {isScanning ? "Scanning…" : "Scan Bill/Receipt"}
-                  </button>
-                </>
-              ) : null}
-            </div>
-          </div>
-
-          {/* ── WYSIWYG Bill Document Form ───────────────────────────── */}
-          <form ref={billFormRef} className={styles.billDocument} onSubmit={handleSubmitVendorBillForm}>
-
-            {/* Header: vendor (letterhead) + bill number */}
-            <div className={styles.billDocHeader}>
-              <div className={styles.billDocFrom}>
-                <span className={styles.billDocFieldLabel}>From</span>
-                <div className={styles.vendorCombobox}>
-                  <div className={styles.vendorInputWrap}>
-                    <input
-                      ref={vendorInputRef}
-                      className={styles.vendorInput}
-                      role="combobox"
-                      aria-expanded={vendorCombobox.isOpen}
-                      aria-controls="vendor-combobox-listbox"
-                      value={vendorCombobox.isOpen ? vendorCombobox.query : (selectedVendorOption ? selectedVendorOption.name : vendorCombobox.query)}
-                      placeholder="Select vendor..."
-                      onFocus={() => vendorCombobox.open(selectedVendorOption ? selectedVendorOption.name : "")}
-                      onChange={(e) => {
-                        vendorCombobox.handleInput(e.target.value);
-                        if (formVendorId) setFormVendorId("");
-                      }}
-                      onKeyDown={vendorCombobox.handleKeyDown}
-                      autoComplete="off"
-                      disabled={workspaceIsLocked}
-                    />
-                    {!workspaceIsLocked ? (
-                      <button
-                        type="button"
-                        className={styles.vendorChevron}
-                        aria-label={selectedVendorOption ? "Clear selection" : "Open list"}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
-                          if (selectedVendorOption) {
-                            setFormVendorId("");
-                            vendorCombobox.close(false);
-                          } else {
-                            vendorInputRef.current?.focus();
-                            vendorCombobox.open("");
-                          }
-                        }}
-                      >
-                        {selectedVendorOption ? "×" : "▾"}
-                      </button>
-                    ) : null}
-                  </div>
-                  {vendorCombobox.isOpen && !workspaceIsLocked ? (
-                    <div
-                      ref={vendorMenuRef}
-                      id="vendor-combobox-listbox"
-                      className={styles.vendorMenu}
-                      role="listbox"
-                    >
-                      {vendorCombobox.filteredItems.map((item, i) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          role="option"
-                          aria-selected={String(item.id) === formVendorId}
-                          className={`${styles.vendorOption} ${vendorCombobox.highlightIndex === i ? styles.vendorOptionActive : ""}`}
-                          onMouseDown={(e) => e.preventDefault()}
-                          onMouseEnter={() => vendorCombobox.setHighlightIndex(i)}
-                          onClick={() => {
-                            setFormVendorId(String(item.id));
-                            vendorCombobox.close(true);
-                          }}
-                        >
-                          {item.name}
-                        </button>
-                      ))}
-                      {vendorCombobox.filteredItems.length === 0 && vendorCombobox.query.trim() ? (
-                        <div className={styles.vendorNoResults}>No matches.</div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-              <div className={styles.billDocBillNum}>
-                <span className={styles.billDocFieldLabel}>Bill #</span>
-                <input
-                  className={styles.billDocBillNumInput}
-                  value={formBillNumber}
-                  onChange={(event) => setFormBillNumber(event.target.value)}
-                  placeholder="e.g. INV-001"
-                  disabled={workspaceIsLocked || !selectedProjectId}
-                />
-              </div>
-            </div>
-
-            {/* Dates row */}
-            <div className={styles.billDocDates}>
-              <label className={styles.billDocDateField}>
-                <span className={styles.billDocFieldLabel}>Date</span>
-                <input
-                  type="date"
-                  value={formIssueDate}
-                  onChange={(event) => setFormIssueDate(event.target.value)}
-                  disabled={workspaceIsLocked || !selectedProjectId}
-                />
-              </label>
-              <label className={styles.billDocDateField}>
-                <span className={styles.billDocFieldLabel}>Due Date</span>
-                <input
-                  type="date"
-                  value={formDueDate}
-                  onChange={(event) => setFormDueDate(event.target.value)}
-                  disabled={workspaceIsLocked || !selectedProjectId}
-                />
-              </label>
-              <label className={styles.billDocDateField}>
-                <span className={styles.billDocFieldLabel}>Received</span>
-                <input
-                  type="date"
-                  value={formReceivedDate}
-                  onChange={(event) => setFormReceivedDate(event.target.value)}
-                  disabled={workspaceIsLocked || !selectedProjectId}
-                />
-              </label>
-            </div>
-
-            {/* Line items */}
-            {isMobile ? (
-              <div className={mobileCardStyles.cardList}>
-                {formLineItems.map((row, index) => (
-                  <MobileLineItemCard
-                    key={`line-${index}`}
-                    index={index}
-                    readOnly={workspaceIsLocked}
-                    isFirst={index === 0}
-                    isLast={index === formLineItems.length - 1}
-                    onRemove={workspaceIsLocked ? undefined : () => removeFormLineItem(index)}
-                    fields={[
-                      {
-                        label: "Description",
-                        key: "description",
-                        span: "full",
-                        render: () => (
-                          <input
-                            className={mobileCardStyles.fieldInput}
-                            value={row.description}
-                            onChange={(event) => updateFormLineItem(index, { description: event.target.value })}
-                            placeholder="Description"
-                            disabled={workspaceIsLocked}
-                          />
-                        ),
-                      },
-                      {
-                        label: "Qty",
-                        key: "quantity",
-                        render: () => (
-                          <input
-                            className={mobileCardStyles.fieldInput}
-                            value={row.quantity}
-                            onChange={(event) => updateFormLineItem(index, { quantity: event.target.value })}
-                            placeholder="1"
-                            inputMode="decimal"
-                            disabled={workspaceIsLocked}
-                          />
-                        ),
-                      },
-                      {
-                        label: "Unit Price",
-                        key: "unit_price",
-                        render: () => (
-                          <input
-                            className={mobileCardStyles.fieldInput}
-                            value={row.unit_price}
-                            onChange={(event) => updateFormLineItem(index, { unit_price: event.target.value })}
-                            placeholder="0.00"
-                            inputMode="decimal"
-                            disabled={workspaceIsLocked}
-                          />
-                        ),
-                      },
-                      {
-                        label: "Amount",
-                        key: "amount",
-                        align: "right",
-                        render: () => (
-                          <span className={`${mobileCardStyles.fieldStatic} ${mobileCardStyles.fieldStaticRight}`}>
-                            ${((Number(row.quantity) || 0) * (Number(row.unit_price) || 0)).toFixed(2)}
-                          </span>
-                        ),
-                      },
-                    ]}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className={`${creatorStyles.lineTable} ${styles.billLineTable}`}>
-                <div className={workspaceIsLocked ? creatorStyles.lineHeaderSimpleReadOnly : creatorStyles.lineHeaderSimple}>
-                  <div className={creatorStyles.lineHeaderCell}><span>Description</span></div>
-                  <div className={creatorStyles.lineHeaderCell}><span>Qty</span></div>
-                  <div className={creatorStyles.lineHeaderCell}><span>Unit Price</span></div>
-                  <div className={creatorStyles.lineHeaderCell}><span>Amount</span></div>
-                  {!workspaceIsLocked ? <div className={creatorStyles.lineHeaderCell} /> : null}
-                </div>
-                {formLineItems.map((row, index) => (
-                  <div
-                    key={`line-${index}`}
-                    className={workspaceIsLocked ? creatorStyles.lineRowSimpleReadOnly : creatorStyles.lineRowSimple}
-                  >
-                    <div className={creatorStyles.lineCell}>
-                      <input
-                        className={creatorStyles.lineInput}
-                        value={row.description}
-                        onChange={(event) => updateFormLineItem(index, { description: event.target.value })}
-                        placeholder="Description"
-                        disabled={workspaceIsLocked}
-                      />
-                    </div>
-                    <div className={creatorStyles.lineCell}>
-                      <input
-                        className={creatorStyles.lineInput}
-                        value={row.quantity}
-                        onChange={(event) => updateFormLineItem(index, { quantity: event.target.value })}
-                        placeholder="1"
-                        inputMode="decimal"
-                        disabled={workspaceIsLocked}
-                        style={{ textAlign: "right" }}
-                      />
-                    </div>
-                    <div className={creatorStyles.lineCell}>
-                      <input
-                        className={creatorStyles.lineInput}
-                        value={row.unit_price}
-                        onChange={(event) => updateFormLineItem(index, { unit_price: event.target.value })}
-                        placeholder="0.00"
-                        inputMode="decimal"
-                        disabled={workspaceIsLocked}
-                        style={{ textAlign: "right" }}
-                      />
-                    </div>
-                    <div className={creatorStyles.lineCell}>
-                      <div className={creatorStyles.amountCell}>
-                        ${((Number(row.quantity) || 0) * (Number(row.unit_price) || 0)).toFixed(2)}
-                      </div>
-                    </div>
-                    {!workspaceIsLocked ? (
-                      <div className={creatorStyles.lineCell}>
-                        <button
-                          type="button"
-                          className={creatorStyles.removeButton}
-                          onClick={() => removeFormLineItem(index)}
-                          disabled={formLineItems.length <= 1}
-                          aria-label="Remove line"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Add line + summary */}
-            {!workspaceIsLocked ? (
-              <div className={creatorStyles.lineActions}>
-                <button
-                  type="button"
-                  className={creatorStyles.secondaryButton}
-                  onClick={addFormLineItem}
-                >
-                  Add Line Item
-                </button>
-              </div>
-            ) : null}
-
-            <div className={creatorStyles.summary}>
-              <div className={creatorStyles.summaryRow}>
-                <span>Subtotal</span>
-                <span>${computedSubtotal.toFixed(2)}</span>
-              </div>
-              <div className={creatorStyles.summaryRow}>
-                <span>Tax</span>
-                <span className={creatorStyles.summaryTaxLine}>
-                  <input
-                    className={`${creatorStyles.summaryTaxInput} ${styles.billSummaryDollarInput}`}
-                    value={formTaxAmount}
-                    onChange={(event) => setFormTaxAmount(event.target.value)}
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    disabled={workspaceIsLocked}
-                  />
-                </span>
-              </div>
-              <div className={creatorStyles.summaryRow}>
-                <span>Shipping / Freight</span>
-                <span className={creatorStyles.summaryTaxLine}>
-                  <input
-                    className={`${creatorStyles.summaryTaxInput} ${styles.billSummaryDollarInput}`}
-                    value={formShippingAmount}
-                    onChange={(event) => setFormShippingAmount(event.target.value)}
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    disabled={workspaceIsLocked}
-                  />
-                </span>
-              </div>
-              <div className={`${creatorStyles.summaryRow} ${creatorStyles.summaryTotal}`}>
-                <span>Total</span>
-                <strong>${computedTotal.toFixed(2)}</strong>
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div className={styles.billDocNotes}>
-              <span className={styles.billDocFieldLabel}>Notes</span>
-              <textarea
-                className={styles.billDocNotesInput}
-                value={formNotes}
-                onChange={(event) => setFormNotes(event.target.value)}
-                disabled={workspaceIsLocked}
-                placeholder="Optional notes from the vendor bill..."
-              />
-            </div>
-
-            {/* Submit */}
-            {!workspaceIsLocked ? (
-              <div className={styles.submitRow}>
-                {formMessage ? (
-                  <p className={formTone === "error" ? styles.submitErrorText : styles.submitSuccessText} role="alert" aria-live="polite">
-                    {formMessage}
-                  </p>
-                ) : null}
-                <button
-                  type="submit"
-                  className={styles.formPrimaryButton}
-                  disabled={!canMutateVendorBills || !selectedProjectId || !formVendorId}
-                >
-                  {isEditingMode ? "Save Vendor Bill" : "Create Vendor Bill"}
-                </button>
-              </div>
-            ) : null}
-          </form>
-
-          {duplicateCandidates.length > 0 ? (
-            <div className={styles.impactCard}>
-              <p><strong>Duplicate candidates:</strong></p>
-              {duplicateCandidates.map((candidate) => (
-                <p key={candidate.id}>
-                  #{candidate.id} {candidate.vendor_name || "Expense"} / {candidate.bill_number} (
-                  {statusDisplayLabel(candidate.status)})
-                </p>
-              ))}
-              <p>Void matching bill(s) first if you need to reuse this bill number.</p>
-            </div>
-          ) : null}
-        </div>
-
-      {!canMutateVendorBills ? <p className={styles.inlineHint}>Role `{role}` can view bills but cannot create or update.</p> : null}
+      <VendorBillsWorkspacePanel
+        isMobile={isMobile}
+        canMutateVendorBills={canMutateVendorBills}
+        role={role}
+        selectedProjectId={selectedProjectId}
+        selectedVendorBill={selectedVendorBill}
+        workspaceIsLocked={workspaceIsLocked}
+        workspaceContext={workspaceContext}
+        workspaceBadgeLabel={workspaceBadgeLabel}
+        workspaceBadgeClass={workspaceBadgeClass}
+        isEditingMode={isEditingMode}
+        onStartNew={handleStartNewVendorBill}
+        onDuplicate={handleRecreateAsNewDraftTemplate}
+        onResetCreate={() => { billForm.resetCreateForm(); flashCreator(); }}
+        scanInputRef={scanInputRef}
+        isScanning={isScanning}
+        onScanFile={handleScanFile}
+        billFormRef={billFormRef}
+        onSubmit={handleSubmitVendorBillForm}
+        vendors={vendors}
+        formVendorId={formVendorId}
+        setFormVendorId={setFormVendorId}
+        formBillNumber={formBillNumber}
+        setFormBillNumber={setFormBillNumber}
+        formIssueDate={formIssueDate}
+        setFormIssueDate={setFormIssueDate}
+        formDueDate={formDueDate}
+        setFormDueDate={setFormDueDate}
+        formReceivedDate={formReceivedDate}
+        setFormReceivedDate={setFormReceivedDate}
+        formTaxAmount={formTaxAmount}
+        setFormTaxAmount={setFormTaxAmount}
+        formShippingAmount={formShippingAmount}
+        setFormShippingAmount={setFormShippingAmount}
+        formNotes={formNotes}
+        setFormNotes={setFormNotes}
+        formLineItems={formLineItems}
+        updateFormLineItem={updateFormLineItem}
+        removeFormLineItem={removeFormLineItem}
+        addFormLineItem={addFormLineItem}
+        computedSubtotal={computedSubtotal}
+        computedTotal={computedTotal}
+        duplicateCandidates={duplicateCandidates}
+        formMessage={formMessage}
+        formTone={formTone}
+        billStatusLabels={billStatusLabels}
+        scanUnmatchedVendorName={scanUnmatchedVendorName}
+        onScanUnmatchedConsumed={() => setScanUnmatchedVendorName("")}
+      />
     </section>
   );
 }
