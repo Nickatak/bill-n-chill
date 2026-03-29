@@ -467,8 +467,14 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     const cc = costCodes.find((c) => String(c.id) === lineItems[index].costCodeId);
     return sum + (cc?.taxable !== false ? value : 0);
   }, 0);
+  const contingencyRate = toNumber(formFields.contingencyPercent);
+  const contingencyAmount = subtotal * (contingencyRate / 100);
+  const overheadProfitRate = toNumber(formFields.overheadProfitPercent);
+  const overheadProfitAmount = subtotal * (overheadProfitRate / 100);
+  const insuranceRate = toNumber(formFields.insurancePercent);
+  const insuranceAmount = subtotal * (insuranceRate / 100);
   const taxAmount = taxableBase * (taxRate / 100);
-  const totalAmount = subtotal + taxAmount;
+  const totalAmount = subtotal + contingencyAmount + overheadProfitAmount + insuranceAmount + taxAmount;
   const estimateFamilies = useMemo(() => groupEstimateFamilies(estimates), [estimates]);
   const estimateStatusCounts = useMemo(() => computeEstimateStatusCounts(estimateFamilies), [estimateFamilies]);
   const visibleEstimateFamilies = useMemo(
@@ -779,6 +785,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           allow_existing_title_family: allowExistingTitleFamily,
           valid_through: formFields.validThrough || null,
           tax_percent: formFields.taxPercent,
+          contingency_percent: formFields.contingencyPercent,
+          overhead_profit_percent: formFields.overheadProfitPercent,
+          insurance_percent: formFields.insurancePercent,
           notes_text: formFields.notesText,
           line_items,
           sections,
@@ -877,6 +886,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
             title: trimmedTitle,
             valid_through: formFields.validThrough || null,
             tax_percent: formFields.taxPercent,
+            contingency_percent: formFields.contingencyPercent,
+            overhead_profit_percent: formFields.overheadProfitPercent,
+            insurance_percent: formFields.insurancePercent,
             notes_text: formFields.notesText,
             line_items,
             sections,
@@ -1199,6 +1211,12 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         termsText={formFields.termsText}
         notesText={formFields.notesText}
         taxPercent={formFields.taxPercent}
+        contingencyPercent={formFields.contingencyPercent}
+        contingencyAmount={contingencyAmount}
+        overheadProfitPercent={formFields.overheadProfitPercent}
+        overheadProfitAmount={overheadProfitAmount}
+        insurancePercent={formFields.insurancePercent}
+        insuranceAmount={insuranceAmount}
         lineItems={lineItems}
         lineTotals={lineTotals}
         subtotal={subtotal}
@@ -1216,6 +1234,9 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         onTitleChange={formFields.handleEstimateTitleChange}
         onValidThroughChange={formFields.setValidThrough}
         onTaxPercentChange={formFields.setTaxPercent}
+        onContingencyPercentChange={formFields.setContingencyPercent}
+        onOverheadProfitPercentChange={formFields.setOverheadProfitPercent}
+        onInsurancePercentChange={formFields.setInsurancePercent}
         onNotesTextChange={formFields.setNotesText}
         onLineItemChange={updateLineItem}
         onAddLineItem={addLineItem}

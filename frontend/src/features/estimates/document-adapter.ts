@@ -29,6 +29,9 @@ type EstimateFormState = {
   termsText: string;
   notesText: string;
   taxPercent: string;
+  contingencyPercent?: string;
+  overheadProfitPercent?: string;
+  insurancePercent?: string;
   subtotal: number;
   taxAmount: number;
   totalAmount: number;
@@ -121,6 +124,9 @@ export function createEstimateDocumentAdapter(
       title: form.title,
       valid_through: form.validThrough,
       tax_percent: form.taxPercent,
+      contingency_percent: form.contingencyPercent ?? "0",
+      overhead_profit_percent: form.overheadProfitPercent ?? "0",
+      insurance_percent: form.insurancePercent ?? "0",
       notes_text: form.notesText,
       line_items: form.lineItems.map((line) => ({
         cost_code: Number(line.costCodeId),
@@ -136,6 +142,9 @@ export function createEstimateDocumentAdapter(
       title: form.title,
       valid_through: form.validThrough,
       tax_percent: form.taxPercent,
+      contingency_percent: form.contingencyPercent ?? "0",
+      overhead_profit_percent: form.overheadProfitPercent ?? "0",
+      insurance_percent: form.insurancePercent ?? "0",
       notes_text: form.notesText,
       line_items: form.lineItems.map((line) => ({
         cost_code: Number(line.costCodeId),

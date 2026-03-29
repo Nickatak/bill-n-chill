@@ -88,6 +88,12 @@ type EstimateSheetV2Props = {
   termsText: string;
   notesText: string;
   taxPercent: string;
+  contingencyPercent: string;
+  contingencyAmount: number;
+  overheadProfitPercent: string;
+  overheadProfitAmount: number;
+  insurancePercent: string;
+  insuranceAmount: number;
   lineItems: EstimateLineInput[];
   lineTotals: number[];
   subtotal: number;
@@ -109,6 +115,9 @@ type EstimateSheetV2Props = {
   onTitleChange: (value: string) => void;
   onValidThroughChange: (value: string) => void;
   onTaxPercentChange: (value: string) => void;
+  onContingencyPercentChange: (value: string) => void;
+  onOverheadProfitPercentChange: (value: string) => void;
+  onInsurancePercentChange: (value: string) => void;
   onNotesTextChange: (value: string) => void;
   onLineItemChange: (
     localId: number,
@@ -136,6 +145,12 @@ export const EstimateSheetV2 = forwardRef<EstimateSheetV2Handle, EstimateSheetV2
       termsText,
       notesText,
       taxPercent,
+      contingencyPercent,
+      contingencyAmount,
+      overheadProfitPercent,
+      overheadProfitAmount,
+      insurancePercent,
+      insuranceAmount,
       lineItems,
       lineTotals,
       subtotal,
@@ -156,6 +171,9 @@ export const EstimateSheetV2 = forwardRef<EstimateSheetV2Handle, EstimateSheetV2
       onTitleChange,
       onValidThroughChange,
       onTaxPercentChange,
+      onContingencyPercentChange,
+      onOverheadProfitPercentChange,
+      onInsurancePercentChange,
       onNotesTextChange,
       onLineItemChange,
       onAddLineItem,
@@ -596,6 +614,72 @@ export const EstimateSheetV2 = forwardRef<EstimateSheetV2Handle, EstimateSheetV2
             <span>Subtotal</span>
             <span>${formatDecimal(subtotal)}</span>
           </div>
+          {(!readOnly || Number(contingencyPercent) !== 0) ? (
+            <div className={creatorStyles.summaryRow}>
+              <span>Contingency</span>
+              <div className={creatorStyles.summaryTaxLine}>
+                {!readOnly ? (
+                  <span className={creatorStyles.summaryTaxRate}>
+                    <input
+                      className={creatorStyles.summaryTaxInput}
+                      value={contingencyPercent}
+                      onChange={(event) => onContingencyPercentChange(event.target.value)}
+                      inputMode="decimal"
+                      aria-label="Contingency percent"
+                      disabled={readOnly}
+                      aria-disabled={readOnly}
+                    />
+                    <span className={creatorStyles.summaryTaxSuffix}>%</span>
+                  </span>
+                ) : null}
+                <span className={creatorStyles.summaryTaxAmount}>${formatDecimal(contingencyAmount)}</span>
+              </div>
+            </div>
+          ) : null}
+          {(!readOnly || Number(overheadProfitPercent) !== 0) ? (
+            <div className={creatorStyles.summaryRow}>
+              <span>Overhead &amp; Profit</span>
+              <div className={creatorStyles.summaryTaxLine}>
+                {!readOnly ? (
+                  <span className={creatorStyles.summaryTaxRate}>
+                    <input
+                      className={creatorStyles.summaryTaxInput}
+                      value={overheadProfitPercent}
+                      onChange={(event) => onOverheadProfitPercentChange(event.target.value)}
+                      inputMode="decimal"
+                      aria-label="Overhead and profit percent"
+                      disabled={readOnly}
+                      aria-disabled={readOnly}
+                    />
+                    <span className={creatorStyles.summaryTaxSuffix}>%</span>
+                  </span>
+                ) : null}
+                <span className={creatorStyles.summaryTaxAmount}>${formatDecimal(overheadProfitAmount)}</span>
+              </div>
+            </div>
+          ) : null}
+          {(!readOnly || Number(insurancePercent) !== 0) ? (
+            <div className={creatorStyles.summaryRow}>
+              <span>Insurance</span>
+              <div className={creatorStyles.summaryTaxLine}>
+                {!readOnly ? (
+                  <span className={creatorStyles.summaryTaxRate}>
+                    <input
+                      className={creatorStyles.summaryTaxInput}
+                      value={insurancePercent}
+                      onChange={(event) => onInsurancePercentChange(event.target.value)}
+                      inputMode="decimal"
+                      aria-label="Insurance percent"
+                      disabled={readOnly}
+                      aria-disabled={readOnly}
+                    />
+                    <span className={creatorStyles.summaryTaxSuffix}>%</span>
+                  </span>
+                ) : null}
+                <span className={creatorStyles.summaryTaxAmount}>${formatDecimal(insuranceAmount)}</span>
+              </div>
+            </div>
+          ) : null}
           <div className={creatorStyles.summaryRow}>
             <span>Sales Tax</span>
             <div className={creatorStyles.summaryTaxLine}>

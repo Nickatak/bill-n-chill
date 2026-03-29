@@ -27,6 +27,12 @@ export type EstimateRecord = {
   contract_pdf_url?: string;
   subtotal: string;
   tax_percent: string;
+  contingency_percent: string;
+  contingency_total: string;
+  overhead_profit_percent: string;
+  overhead_profit_total: string;
+  insurance_percent: string;
+  insurance_total: string;
   grand_total: string;
   public_ref?: string;
   created_at: string;

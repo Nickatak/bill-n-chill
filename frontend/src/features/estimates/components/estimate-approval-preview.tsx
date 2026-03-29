@@ -83,13 +83,19 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
     [lineItems],
   );
   const subtotal = lineTotals.reduce((sum, value) => sum + value, 0);
+  const contingencyPercent = String(estimate?.contingency_percent ?? "0");
+  const contingencyAmount = subtotal * (Number(contingencyPercent) / 100);
+  const overheadProfitPercent = String(estimate?.overhead_profit_percent ?? "0");
+  const overheadProfitAmount = subtotal * (Number(overheadProfitPercent) / 100);
+  const insurancePercent = String(estimate?.insurance_percent ?? "0");
+  const insuranceAmount = subtotal * (Number(insurancePercent) / 100);
   const taxPercent = String(estimate?.tax_percent ?? "0");
   const taxableBase = lineTotals.reduce((sum, value, index) => {
     const cc = costCodes.find((c) => String(c.id) === lineItems[index].costCodeId);
     return sum + (cc?.taxable !== false ? value : 0);
   }, 0);
   const taxAmount = taxableBase * (Number(taxPercent) / 100);
-  const totalAmount = subtotal + taxAmount;
+  const totalAmount = subtotal + contingencyAmount + overheadProfitAmount + insuranceAmount + taxAmount;
   const canDecide = estimate?.status === "sent";
   const hasDecision = estimate?.status === "approved" || estimate?.status === "rejected";
   const decisionStatusLabel = estimateStatusLabel(estimate?.status);
@@ -358,6 +364,24 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
                     <span>Subtotal</span>
                     <span>${formatDecimal(subtotal)}</span>
                   </div>
+                  {Number(contingencyPercent) !== 0 ? (
+                    <div className={frameStyles.summaryRow}>
+                      <span>Contingency ({Number(contingencyPercent).toFixed(2)}%)</span>
+                      <span>${formatDecimal(contingencyAmount)}</span>
+                    </div>
+                  ) : null}
+                  {Number(overheadProfitPercent) !== 0 ? (
+                    <div className={frameStyles.summaryRow}>
+                      <span>Overhead &amp; Profit ({Number(overheadProfitPercent).toFixed(2)}%)</span>
+                      <span>${formatDecimal(overheadProfitAmount)}</span>
+                    </div>
+                  ) : null}
+                  {Number(insurancePercent) !== 0 ? (
+                    <div className={frameStyles.summaryRow}>
+                      <span>Insurance ({Number(insurancePercent).toFixed(2)}%)</span>
+                      <span>${formatDecimal(insuranceAmount)}</span>
+                    </div>
+                  ) : null}
                   <div className={frameStyles.summaryRow}>
                     <span>Sales Tax ({Number(taxPercent || 0).toFixed(2)}%)</span>
                     <span>${formatDecimal(taxAmount)}</span>

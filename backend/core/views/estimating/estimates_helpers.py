@@ -272,6 +272,9 @@ def _apply_estimate_lines_and_totals(
     tax_percent: Decimal,
     user: AbstractUser,
     sections_data: list[dict] | None = None,
+    contingency_percent: Decimal = Decimal("0"),
+    overhead_profit_percent: Decimal = Decimal("0"),
+    insurance_percent: Decimal = Decimal("0"),
 ) -> dict | None:
     """Replace an estimate's line items, sections, and recompute all totals.
 
@@ -287,6 +290,9 @@ def _apply_estimate_lines_and_totals(
         return {"missing_cost_codes": missing}
 
     tax_percent = Decimal(str(tax_percent))
+    contingency_percent = Decimal(str(contingency_percent))
+    overhead_profit_percent = Decimal(str(overhead_profit_percent))
+    insurance_percent = Decimal(str(insurance_percent))
 
     estimate.line_items.all().delete()
     estimate.sections.all().delete()
@@ -315,8 +321,16 @@ def _apply_estimate_lines_and_totals(
             )
         )
 
+    # Bid markup totals (applied to subtotal + line-level markup)
+    bid_markup_base = quantize_money(subtotal + markup_total)
+    contingency_total = quantize_money(bid_markup_base * contingency_percent / Decimal("100"))
+    overhead_profit_total = quantize_money(bid_markup_base * overhead_profit_percent / Decimal("100"))
+    insurance_total = quantize_money(bid_markup_base * insurance_percent / Decimal("100"))
+
     tax_total = quantize_money(taxable_base * (tax_percent / Decimal("100")))
-    grand_total = quantize_money(subtotal + markup_total + tax_total)
+    grand_total = quantize_money(
+        subtotal + markup_total + contingency_total + overhead_profit_total + insurance_total + tax_total
+    )
     EstimateLineItem.objects.bulk_create(lines_to_create)
 
     if sections_data:
@@ -333,6 +347,12 @@ def _apply_estimate_lines_and_totals(
 
     estimate.subtotal = subtotal
     estimate.markup_total = markup_total
+    estimate.contingency_percent = contingency_percent
+    estimate.contingency_total = contingency_total
+    estimate.overhead_profit_percent = overhead_profit_percent
+    estimate.overhead_profit_total = overhead_profit_total
+    estimate.insurance_percent = insurance_percent
+    estimate.insurance_total = insurance_total
     estimate.tax_percent = tax_percent
     estimate.tax_total = tax_total
     estimate.grand_total = grand_total
@@ -340,6 +360,12 @@ def _apply_estimate_lines_and_totals(
         update_fields=[
             "subtotal",
             "markup_total",
+            "contingency_percent",
+            "contingency_total",
+            "overhead_profit_percent",
+            "overhead_profit_total",
+            "insurance_percent",
+            "insurance_total",
             "tax_percent",
             "tax_total",
             "grand_total",
@@ -389,12 +415,22 @@ def _handle_estimate_document_save(
         if "tax_percent" in data:
             estimate.tax_percent = data["tax_percent"]
             update_fields.append("tax_percent")
+        if "contingency_percent" in data:
+            estimate.contingency_percent = data["contingency_percent"]
+            update_fields.append("contingency_percent")
+        if "overhead_profit_percent" in data:
+            estimate.overhead_profit_percent = data["overhead_profit_percent"]
+            update_fields.append("overhead_profit_percent")
+        if "insurance_percent" in data:
+            estimate.insurance_percent = data["insurance_percent"]
+            update_fields.append("insurance_percent")
         if "notes_text" in data:
             estimate.notes_text = (data["notes_text"] or "").strip()
             update_fields.append("notes_text")
         if len(update_fields) > 1:
             estimate.save(update_fields=update_fields)
 
+        bid_percent_fields = {"tax_percent", "contingency_percent", "overhead_profit_percent", "insurance_percent"}
         if "line_items" in data:
             if apply_error := _apply_estimate_lines_and_totals(
                 estimate=estimate,
@@ -402,6 +438,9 @@ def _handle_estimate_document_save(
                 tax_percent=data.get("tax_percent", estimate.tax_percent),
                 user=request.user,
                 sections_data=data.get("sections"),
+                contingency_percent=data.get("contingency_percent", estimate.contingency_percent),
+                overhead_profit_percent=data.get("overhead_profit_percent", estimate.overhead_profit_percent),
+                insurance_percent=data.get("insurance_percent", estimate.insurance_percent),
             ):
                 transaction.set_rollback(True)
                 return Response(
@@ -414,7 +453,7 @@ def _handle_estimate_document_save(
                     },
                     status=400,
                 )
-        elif "tax_percent" in data:
+        elif bid_percent_fields & data.keys():
             current_line_dicts = [
                 {
                     "cost_code": line.cost_code_id,
@@ -437,6 +476,9 @@ def _handle_estimate_document_save(
                 tax_percent=estimate.tax_percent,
                 user=request.user,
                 sections_data=current_sections,
+                contingency_percent=estimate.contingency_percent,
+                overhead_profit_percent=estimate.overhead_profit_percent,
+                insurance_percent=estimate.insurance_percent,
             )
 
     estimate.refresh_from_db()

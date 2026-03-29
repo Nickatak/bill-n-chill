@@ -105,6 +105,9 @@ export function useEstimateFormFields({
   const [termsText, setTermsText] = useState("");
   const [notesText, setNotesText] = useState("");
   const [taxPercent, setTaxPercent] = useState("0");
+  const [contingencyPercent, setContingencyPercent] = useState("0");
+  const [overheadProfitPercent, setOverheadProfitPercent] = useState("0");
+  const [insurancePercent, setInsurancePercent] = useState("0");
   const [familyCollisionPrompt, setFamilyCollisionPrompt] =
     useState<EstimateFamilyCollisionPrompt | null>(null);
   const [confirmedFamilyTitleKey, setConfirmedFamilyTitleKey] = useState("");
@@ -122,6 +125,9 @@ export function useEstimateFormFields({
     setTermsText(estimateTerms || organizationDefaults?.estimate_terms_and_conditions || "");
     setNotesText(estimate.notes_text || "");
     setTaxPercent(String(estimate.tax_percent ?? "0"));
+    setContingencyPercent(String(estimate.contingency_percent ?? "0"));
+    setOverheadProfitPercent(String(estimate.overhead_profit_percent ?? "0"));
+    setInsurancePercent(String(estimate.insurance_percent ?? "0"));
     setValidThrough(estimate.valid_through ?? "");
     const mapped = mapEstimateLineItemsToInputs(estimate.line_items ?? []);
     setLineItems(mapped);
@@ -147,6 +153,9 @@ export function useEstimateFormFields({
     setTermsText(estimateTerms || organizationDefaults?.estimate_terms_and_conditions || "");
     setNotesText(estimate.notes_text || "");
     setTaxPercent(String(estimate.tax_percent ?? "0"));
+    setContingencyPercent(String(estimate.contingency_percent ?? "0"));
+    setOverheadProfitPercent(String(estimate.overhead_profit_percent ?? "0"));
+    setInsurancePercent(String(estimate.insurance_percent ?? "0"));
     setValidThrough(estimate.valid_through ?? "");
     const mapped = mapEstimateLineItemsToInputs(estimate.line_items ?? []);
     setLineItems(mapped);
@@ -172,6 +181,9 @@ export function useEstimateFormFields({
     setTermsText(organizationDefaults?.estimate_terms_and_conditions || "");
     setNotesText("");
     setTaxPercent("0");
+    setContingencyPercent("0");
+    setOverheadProfitPercent("0");
+    setInsurancePercent("0");
     resetLines();
     setEstimateDate(nextEstimateDate);
     setValidThrough(nextValidThrough);
@@ -219,6 +231,9 @@ export function useEstimateFormFields({
     termsText,
     notesText,
     taxPercent,
+    contingencyPercent,
+    overheadProfitPercent,
+    insurancePercent,
     familyCollisionPrompt,
     confirmedFamilyTitleKey,
     titleLocked,
@@ -233,6 +248,9 @@ export function useEstimateFormFields({
     setTermsText,
     setNotesText,
     setTaxPercent,
+    setContingencyPercent,
+    setOverheadProfitPercent,
+    setInsurancePercent,
     setFamilyCollisionPrompt,
     setConfirmedFamilyTitleKey,
     setTitleLocked,

@@ -90,6 +90,12 @@ class EstimateSerializer(serializers.ModelSerializer):
             "contract_pdf_url",
             "subtotal",
             "markup_total",
+            "contingency_percent",
+            "contingency_total",
+            "overhead_profit_percent",
+            "overhead_profit_total",
+            "insurance_percent",
+            "insurance_total",
             "tax_percent",
             "tax_total",
             "grand_total",
@@ -108,6 +114,9 @@ class EstimateSerializer(serializers.ModelSerializer):
             "sender_logo_url",
             "subtotal",
             "markup_total",
+            "contingency_total",
+            "overhead_profit_total",
+            "insurance_total",
             "tax_total",
             "grand_total",
             "line_items",
@@ -199,6 +208,9 @@ class EstimateWriteSerializer(serializers.Serializer):
     terms_text = serializers.CharField(max_length=10000, required=False, allow_blank=True)
     notes_text = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
     tax_percent = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, default=0)
+    contingency_percent = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, default=0)
+    overhead_profit_percent = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, default=0)
+    insurance_percent = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, default=0)
     line_items = EstimateLineItemInputSerializer(many=True, required=False)
     sections = EstimateSectionInputSerializer(many=True, required=False, default=[])
 

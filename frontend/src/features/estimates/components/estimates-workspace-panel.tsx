@@ -75,6 +75,12 @@ export type EstimatesWorkspacePanelProps = {
   termsText: string;
   notesText: string;
   taxPercent: string;
+  contingencyPercent: string;
+  contingencyAmount: number;
+  overheadProfitPercent: string;
+  overheadProfitAmount: number;
+  insurancePercent: string;
+  insuranceAmount: number;
   lineItems: EstimateLineInput[];
   lineTotals: number[];
   subtotal: number;
@@ -92,6 +98,9 @@ export type EstimatesWorkspacePanelProps = {
   onTitleChange: (title: string) => void;
   onValidThroughChange: (value: string) => void;
   onTaxPercentChange: (value: string) => void;
+  onContingencyPercentChange: (value: string) => void;
+  onOverheadProfitPercentChange: (value: string) => void;
+  onInsurancePercentChange: (value: string) => void;
   onNotesTextChange: (value: string) => void;
   onLineItemChange: (localId: number, key: keyof Omit<EstimateLineInput, "localId">, value: string) => void;
   onAddLineItem: () => void;
@@ -132,6 +141,12 @@ export function EstimatesWorkspacePanel({
   termsText,
   notesText,
   taxPercent,
+  contingencyPercent,
+  contingencyAmount,
+  overheadProfitPercent,
+  overheadProfitAmount,
+  insurancePercent,
+  insuranceAmount,
   lineItems,
   lineTotals,
   subtotal,
@@ -149,6 +164,9 @@ export function EstimatesWorkspacePanel({
   onTitleChange,
   onValidThroughChange,
   onTaxPercentChange,
+  onContingencyPercentChange,
+  onOverheadProfitPercentChange,
+  onInsurancePercentChange,
   onNotesTextChange,
   onLineItemChange,
   onAddLineItem,
@@ -252,6 +270,12 @@ export function EstimatesWorkspacePanel({
           termsText={termsText}
           notesText={notesText}
           taxPercent={taxPercent}
+          contingencyPercent={contingencyPercent}
+          contingencyAmount={contingencyAmount}
+          overheadProfitPercent={overheadProfitPercent}
+          overheadProfitAmount={overheadProfitAmount}
+          insurancePercent={insurancePercent}
+          insuranceAmount={insuranceAmount}
           lineItems={lineItems}
           lineTotals={lineTotals}
           subtotal={subtotal}
@@ -271,6 +295,9 @@ export function EstimatesWorkspacePanel({
           onTitleChange={onTitleChange}
           onValidThroughChange={onValidThroughChange}
           onTaxPercentChange={onTaxPercentChange}
+          onContingencyPercentChange={onContingencyPercentChange}
+          onOverheadProfitPercentChange={onOverheadProfitPercentChange}
+          onInsurancePercentChange={onInsurancePercentChange}
           onNotesTextChange={onNotesTextChange}
           onLineItemChange={onLineItemChange}
           onAddLineItem={onAddLineItem}

@@ -582,6 +582,9 @@ def project_estimates_view(request, project_id):
                 sender_address=organization.formatted_billing_address,
                 sender_logo_url=sender_logo_url,
                 tax_percent=data.get("tax_percent", Decimal("0")),
+                contingency_percent=data.get("contingency_percent", Decimal("0")),
+                overhead_profit_percent=data.get("overhead_profit_percent", Decimal("0")),
+                insurance_percent=data.get("insurance_percent", Decimal("0")),
             )
 
             if apply_error := _apply_estimate_lines_and_totals(
@@ -590,6 +593,9 @@ def project_estimates_view(request, project_id):
                 tax_percent=data.get("tax_percent", Decimal("0")),
                 user=request.user,
                 sections_data=data.get("sections"),
+                contingency_percent=data.get("contingency_percent", Decimal("0")),
+                overhead_profit_percent=data.get("overhead_profit_percent", Decimal("0")),
+                insurance_percent=data.get("insurance_percent", Decimal("0")),
             ):
                 transaction.set_rollback(True)
                 return Response(
@@ -721,7 +727,7 @@ def estimate_detail_view(request, estimate_id):
                 status=400,
             )
         is_locked = estimate.status != Estimate.Status.DRAFT
-        mutating_fields = {"title", "valid_through", "tax_percent", "line_items", "sections", "notes_text"}
+        mutating_fields = {"title", "valid_through", "tax_percent", "contingency_percent", "overhead_profit_percent", "insurance_percent", "line_items", "sections", "notes_text"}
         if is_locked and any(field in data for field in mutating_fields):
             return Response(
                 {

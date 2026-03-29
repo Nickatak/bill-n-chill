@@ -174,6 +174,9 @@ describe("createEstimateDocumentAdapter", () => {
         title: "Kitchen remodel",
         valid_through: "2026-03-01",
         tax_percent: "8.25",
+        contingency_percent: "0",
+        overhead_profit_percent: "0",
+        insurance_percent: "0",
         notes_text: "",
         line_items: [
           {
