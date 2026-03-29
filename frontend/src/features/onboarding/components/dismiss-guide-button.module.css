@@ -1,16 +1,16 @@
 .button {
   padding: var(--space-xs) var(--space-md);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   font-family: inherit;
   font-size: var(--font-sm);
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--status-red-text);
   cursor: pointer;
+  transition: border-color 150ms ease;
 }
 
 .button:hover {
-  border-color: var(--text-secondary);
-  color: var(--text-primary);
+  border-color: var(--status-red-border);
 }

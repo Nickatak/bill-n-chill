@@ -1,5 +1,11 @@
 /* Onboarding route page styles (checklist styles live in features/onboarding/) */
 
+.eyebrowRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .returnHint {
   margin: 0;
   font-size: 0.82rem;

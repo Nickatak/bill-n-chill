@@ -13,11 +13,11 @@ export default function OnboardingPage() {
   return (
     <PageShell narrow>
       <header className={shell.hero}>
-        <div className={shell.heroTop} style={{ position: "relative" }}>
-          <div style={{ position: "absolute", top: 0, right: 0 }}>
+        <div className={shell.heroTop}>
+          <div className={styles.eyebrowRow}>
+            <p className={shell.eyebrow}>Get Started</p>
             <DismissGuideButton />
           </div>
-          <p className={shell.eyebrow}>Get Started</p>
           <h1 className={shell.title}>Set up your first project in minutes</h1>
           <p className={shell.copy}>
             Follow these steps to go from zero to your first invoice. Once you create a project,
