@@ -478,7 +478,8 @@ def _handle_co_status_transition(
 
     # Email notification (outside transaction, async)
     email_sent = False
-    if next_status == ChangeOrder.Status.SENT and (
+    notify_customer = data.get("notify_customer", True)
+    if notify_customer and next_status == ChangeOrder.Status.SENT and (
         previous_status != ChangeOrder.Status.SENT or is_resend
     ):
         customer_email = (change_order.project.customer.email or "").strip()

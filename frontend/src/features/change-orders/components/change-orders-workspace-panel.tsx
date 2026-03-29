@@ -661,7 +661,7 @@ export function ChangeOrdersWorkspacePanel({
                   <span>{senderEmail || "Help email not set"}</span>
                   <span>
                     {selectedChangeOrder
-                      ? `CO-${selectedChangeOrder.family_key}`
+                      ? `Change Order: ${selectedChangeOrder.title || "Untitled"}`
                       : "Change Order"}
                   </span>
                 </div>

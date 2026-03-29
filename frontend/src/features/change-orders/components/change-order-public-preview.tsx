@@ -221,8 +221,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
                   <p className={frameStyles.identityEyebrow}>Change Order</p>
                   <h2 className={frameStyles.identityTitle}>{changeOrder.title || "Untitled Change Order"}</h2>
                   <p className={frameStyles.identitySubhead}>
-                    {(changeOrder.project_context?.name || "Project") +
-                      ` · CO-${changeOrder.family_key}`}
+                    {changeOrder.project_context?.name || "Project"}
                   </p>
                 </div>
                 <div className={frameStyles.identityMetaRow}>
@@ -448,7 +447,7 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
                 documentType="change_order"
                 documentSummary={{
                   type: "Change Order",
-                  title: changeOrder.title || `CO-${changeOrder.family_key}`,
+                  title: changeOrder.title || "Untitled",
                   total: `$${formatDecimal(parseAmount(changeOrder.amount_delta))}`,
                 }}
                 customerEmailAvailable={Boolean(changeOrder.project_context?.customer_email)}

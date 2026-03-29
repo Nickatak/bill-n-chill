@@ -59,7 +59,6 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import { formatDecimal } from "@/shared/money-format";
 import {
-  coLabel,
   defaultChangeOrderTitle,
   readChangeOrderApiError,
 } from "../helpers";
@@ -179,7 +178,7 @@ export function ChangeOrdersConsole({
   const defaultChangeOrderTerms = (projectData.organizationDefaults?.change_order_terms_and_conditions || "").trim();
 
   const workspaceContext = viewer.selectedChangeOrder
-    ? `${coLabel(viewer.selectedChangeOrder)} · ${viewer.selectedChangeOrder.title || "Untitled"}`
+    ? (viewer.selectedChangeOrder.title || "Untitled")
     : "New change order draft";
   const workspaceBadgeLabel = !viewer.selectedChangeOrder
     ? "CREATING"
@@ -423,7 +422,7 @@ export function ChangeOrdersConsole({
       return;
     }
     form.populateCreateFromChangeOrder(selected);
-    projectData.setFeedback(`Copied ${coLabel(selected)} into create form.`, "success");
+    projectData.setFeedback(`Copied "${selected.title || "Untitled"}" into create form.`, "success");
     flashCreate();
   }
 
@@ -481,14 +480,14 @@ export function ChangeOrdersConsole({
         const persisted = rows.find((row) => row.id === updated.id);
         form.hydrateEditForm(persisted ?? updated);
         await projectData.loadChangeOrderStatusEvents(updated.id);
-        projectData.setFeedback(`Saved change order ${coLabel(updated)} (${statusLabel(updated.status, changeOrderStatusLabels)}).`, "success");
+        projectData.setFeedback(`Saved change order "${updated.title || "Untitled"}" (${statusLabel(updated.status, changeOrderStatusLabels)}).`, "success");
       } else {
         projectData.setChangeOrders((current) =>
           current.map((row) => (row.id === updated.id ? updated : row)),
         );
         form.hydrateEditForm(updated);
         await projectData.loadChangeOrderStatusEvents(updated.id);
-        projectData.setFeedback(`Saved change order ${coLabel(updated)} (${statusLabel(updated.status, changeOrderStatusLabels)}).`, "success");
+        projectData.setFeedback(`Saved change order "${updated.title || "Untitled"}" (${statusLabel(updated.status, changeOrderStatusLabels)}).`, "success");
       }
     } catch {
       projectData.setFeedback("Could not reach change order detail endpoint.", "error");
@@ -496,7 +495,7 @@ export function ChangeOrdersConsole({
   }
 
   /** Apply a quick status transition (or resend) to the selected viewer change order. Returns the updated record on success, null on failure. */
-  async function handleQuickUpdateStatus(): Promise<ChangeOrderRecord | null> {
+  async function handleQuickUpdateStatus(notifyCustomer?: boolean): Promise<ChangeOrderRecord | null> {
     if (!viewer.canMutateChangeOrders) {
       projectData.setFeedback(`Role ${role} is read-only for change order mutations.`, "error");
       return null;
@@ -521,7 +520,7 @@ export function ChangeOrdersConsole({
         {
           method: "PATCH",
           headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
-          body: JSON.stringify({ status: form.quickStatus, status_note: form.quickStatusNote }),
+          body: JSON.stringify({ status: form.quickStatus, status_note: form.quickStatusNote, notify_customer: notifyCustomer }),
         },
       );
       const payload: ApiResponse = await response.json();
@@ -544,16 +543,17 @@ export function ChangeOrdersConsole({
         await projectData.loadChangeOrderStatusEvents(updated.id);
       }
       const emailNote = form.quickStatus === "sent" && payload.email_sent === false ? " No email sent — customer has no email on file." : "";
+      const title = `"${updated.title || "Untitled"}"`;
       const actionFeedback: Record<string, string> = {
         sent: isResend
-          ? `Re-sent ${coLabel(updated)} for approval.${emailNote}`
-          : `Sent ${coLabel(updated)} for approval.${emailNote}`,
-        approved: `Marked ${coLabel(updated)} as accepted.`,
-        rejected: `Marked ${coLabel(updated)} as rejected.`,
-        void: `Voided ${coLabel(updated)}.`,
+          ? `Re-sent ${title} for approval.${emailNote}`
+          : `Sent ${title} for approval.${emailNote}`,
+        approved: `Marked ${title} as accepted.`,
+        rejected: `Marked ${title} as rejected.`,
+        void: `Voided ${title}.`,
       };
       projectData.setFeedback(
-        actionFeedback[updated.status] ?? `Updated ${coLabel(updated)}. History updated.`,
+        actionFeedback[updated.status] ?? `Updated ${title}. History updated.`,
         "success",
       );
       form.setQuickStatus("");
@@ -615,7 +615,7 @@ export function ChangeOrdersConsole({
         await projectData.loadChangeOrderStatusEvents(updated.id);
       }
       form.setQuickStatusNote("");
-      projectData.setFeedback(`Added status note on ${coLabel(updated)}. History updated.`, "success");
+      projectData.setFeedback(`Added status note on "${updated.title || "Untitled"}". History updated.`, "success");
     } catch {
       projectData.setFeedback("Could not reach change order detail endpoint.", "error");
     }

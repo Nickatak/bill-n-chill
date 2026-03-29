@@ -95,7 +95,7 @@ export function createChangeOrderDocumentAdapter(
     getDocumentStatus: (document) => document?.status ?? statusPolicy.defaultCreateStatus,
 
     getMetaFields: (document): CreatorMetaField[] => [
-      { key: "co_id", label: "Change Order #", value: document ? `CO-${document.id}` : "Draft" },
+      { key: "co_id", label: "Change Order", value: document ? (document.title || "Untitled") : "Draft" },
       {
         key: "origin_estimate",
         label: "Original Estimate",

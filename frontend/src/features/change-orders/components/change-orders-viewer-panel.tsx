@@ -15,9 +15,6 @@ import Link from "next/link";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 import { PaginationControls } from "@/shared/components/pagination-controls";
 import {
-  coLabel,
-} from "../helpers";
-import {
   statusLabel,
   formatEventDateTime,
   eventActorLabel,
@@ -120,15 +117,15 @@ function coConfirmationMessage(
   customerName: string,
   currentStatus?: string,
 ): string {
-  const label = coLabel(co);
+  const title = `"${co.title || "Untitled"}"`;
   const isResend = statusValue === "sent" && currentStatus === "sent";
   if (statusValue === "sent") {
-    return `${isResend ? "Re-send" : "Send"} ${label} to ${customerName || "customer"} for approval.`;
+    return `${isResend ? "Re-send" : "Send"} ${title} to ${customerName || "customer"} for approval.`;
   }
-  if (statusValue === "approved") return `Mark ${label} as accepted.`;
-  if (statusValue === "rejected") return `Mark ${label} as rejected.`;
-  if (statusValue === "void") return `Void ${label}.`;
-  return `Transition ${label} to ${statusValue}.`;
+  if (statusValue === "approved") return `Mark ${title} as accepted.`;
+  if (statusValue === "rejected") return `Mark ${title} as rejected.`;
+  if (statusValue === "void") return `Void ${title}.`;
+  return `Transition ${title} to ${statusValue}.`;
 }
 
 function coEmailNotice(customerEmail: string, customerId?: number | null) {
@@ -170,7 +167,7 @@ function ChangeOrderActionPanel({
   setQuickStatusNote: (note: string) => void;
   actionMessage: string;
   actionTone: string;
-  onQuickUpdateStatus: () => Promise<ChangeOrderRecord | null>;
+  onQuickUpdateStatus: (notifyCustomer?: boolean) => Promise<ChangeOrderRecord | null>;
   onAddChangeOrderStatusNote: () => void;
   canMutateChangeOrders: boolean;
   changeOrderStatusLabels: Record<string, string>;
@@ -179,7 +176,9 @@ function ChangeOrderActionPanel({
   const [shareMessage, setShareMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const customerEmail = (selectedProjectCustomerEmail || "").trim();
+  const hasEmail = customerEmail.length > 0;
   const customerName = selectedProjectName || "";
+  const [notifyCustomer, setNotifyCustomer] = useState(hasEmail);
 
   function handleActionClick(statusValue: string) {
     setShareMessage("");
@@ -190,13 +189,16 @@ function ChangeOrderActionPanel({
     }
     setPendingAction(statusValue);
     setQuickStatus(statusValue);
+    setNotifyCustomer(hasEmail);
   }
 
   async function handleConfirm() {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const updated = await onQuickUpdateStatus();
+      const updated = await onQuickUpdateStatus(
+        pendingAction === "sent" ? notifyCustomer : undefined,
+      );
       if (!updated) return;
       setPendingAction(null);
 
@@ -208,7 +210,7 @@ function ChangeOrderActionPanel({
 
         if (typeof navigator.share === "function") {
           try {
-            await navigator.share({ title: coLabel(updated), text: shareText });
+            await navigator.share({ title: updated.title || "Change Order", text: shareText });
           } catch { /* cancelled */ }
         } else {
           try {
@@ -278,9 +280,22 @@ function ChangeOrderActionPanel({
             />
           </label>
           {pendingAction === "sent" ? (
-            <p className={styles.actionConfirmDetail}>
-              {coEmailNotice(customerEmail, selectedProjectCustomerId)}
-            </p>
+            <>
+              <label className={styles.notifyCheckbox}>
+                <input
+                  type="checkbox"
+                  checked={notifyCustomer}
+                  disabled={!hasEmail}
+                  onChange={(e) => setNotifyCustomer(e.target.checked)}
+                />
+                <span>Email customer{hasEmail ? ` (${customerEmail})` : ""}</span>
+              </label>
+              {!hasEmail ? (
+                <p className={styles.actionConfirmDetail}>
+                  {coEmailNotice(customerEmail, selectedProjectCustomerId)}
+                </p>
+              ) : null}
+            </>
           ) : null}
           <div className={styles.actionConfirmActions}>
             <button
@@ -387,7 +402,7 @@ export type ChangeOrdersViewerPanelProps = {
   setQuickStatus: (status: string) => void;
   quickStatusNote: string;
   setQuickStatusNote: (note: string) => void;
-  onQuickUpdateStatus: () => Promise<ChangeOrderRecord | null>;
+  onQuickUpdateStatus: (notifyCustomer?: boolean) => Promise<ChangeOrderRecord | null>;
   onAddChangeOrderStatusNote: () => void;
 
   // Action feedback
@@ -482,7 +497,7 @@ export function ChangeOrdersViewerPanel({
                     <span className={styles.viewerRailTitle}>
                       {estimate.title}
                       <span className={styles.viewerRailVersion}>
-                        Estimate #{estimate.id} · {relatedCount} COs
+                        v{estimate.version} · {relatedCount} COs
                       </span>
                     </span>
                     <span className={styles.viewerRailSubtext}>
@@ -535,14 +550,14 @@ export function ChangeOrdersViewerPanel({
                         >
                           <span className={styles.coCardTitleRow}>
                             <span className={styles.coCardTitle}>
-                              {changeOrder.title || "Untitled"} · {coLabel(changeOrder)}
+                              {changeOrder.title || "Untitled"}
                             </span>
                             <span className={`${styles.coCardStatusBadge} ${coStatusClass(changeOrder.status)}`}>
                               {statusLabel(changeOrder.status, changeOrderStatusLabels)}
                             </span>
                           </span>
                           <span className={styles.coCardMeta}>
-                            ${changeOrder.line_total_delta} · {coLabel(changeOrder)}
+                            ${changeOrder.line_total_delta}
                           </span>
                           <span className={styles.coCardDate}>
                             {lastStatusEvent
