@@ -55,6 +55,7 @@ export type CostCodeOption = {
   code: string;
   name: string;
   is_active: boolean;
+  taxable: boolean;
 };
 
 export type ChangeOrderLineRecord = {

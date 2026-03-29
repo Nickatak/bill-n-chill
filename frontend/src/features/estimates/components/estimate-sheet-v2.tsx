@@ -400,7 +400,14 @@ export const EstimateSheetV2 = forwardRef<EstimateSheetV2Handle, EstimateSheetV2
               disabled={readOnly} required />
           </div>
           <div className={`${lineStyles.field} ${lineStyles.fieldCostCode} ${rowIssues.length ? lineStyles.fieldInvalid : ""}`}>
-            <span className={lineStyles.fieldLabel}>Cost Code</span>
+            <span className={lineStyles.fieldLabel}>
+              Cost Code
+              {line.costCodeId ? (
+                <span className={costCodes.find((c) => String(c.id) === line.costCodeId)?.taxable !== false ? lineStyles.taxBadgeTaxable : lineStyles.taxBadgeExempt}>
+                  {costCodes.find((c) => String(c.id) === line.costCodeId)?.taxable !== false ? "TAX" : "NO TAX"}
+                </span>
+              ) : null}
+            </span>
             <CostCodeCombobox costCodes={costCodes} value={line.costCodeId}
               onChange={(v) => onLineItemChange(line.localId, "costCodeId", v)}
               ariaLabel="Cost code" disabled={readOnly} placeholder="Search cost code" />
