@@ -69,8 +69,16 @@ export type ChangeOrderLineRecord = {
   adjustment_reason: string;
   amount_delta: string;
   days_delta: number;
+  order?: number;
   created_at: string;
   updated_at: string;
+};
+
+export type ChangeOrderSectionRecord = {
+  id: number;
+  name: string;
+  order: number;
+  subtotal: string;
 };
 
 export type ChangeOrderRecord = {
@@ -95,6 +103,7 @@ export type ChangeOrderRecord = {
   approved_by_email: string | null;
   approved_at: string | null;
   line_items: ChangeOrderLineRecord[];
+  sections?: ChangeOrderSectionRecord[];
   line_total_delta: string;
   created_at: string;
   updated_at: string;

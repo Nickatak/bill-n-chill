@@ -26,11 +26,12 @@ class ChangeOrderLine(models.Model):
     adjustment_reason = models.CharField(max_length=64, blank=True, default="")
     amount_delta = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     days_delta = models.IntegerField(default=0)
+    order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["id"]
+        ordering = ["order", "id"]
 
     def __str__(self) -> str:
         return f"CO-{self.change_order.family_key} line {self.id} ({self.amount_delta})"

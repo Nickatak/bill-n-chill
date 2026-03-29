@@ -1,0 +1,215 @@
+/* Responsive CO line item: row on desktop, card on mobile. */
+
+.list {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Drag handle */
+.dragGrip {
+  font-size: 1rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.row {
+  position: relative;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  background: var(--surface);
+  display: grid;
+  gap: 8px;
+  /* Desktop: index row, then fields inline */
+  grid-template-columns: 2fr 1.5fr 100px 80px;
+  grid-template-areas:
+    "idx idx idx idx"
+    "desc costcode delta days";
+  align-items: end;
+  transition: transform 0.15s ease-out;
+}
+
+.rowInvalid {
+  border-left: 3px solid var(--tone-error-border);
+}
+
+.rowIndex {
+  grid-area: idx;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rowIndex:active {
+  cursor: grabbing;
+}
+
+.field {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fieldCostCode { grid-area: costcode; }
+.fieldDesc { grid-area: desc; }
+.fieldDelta { grid-area: delta; }
+.fieldDays { grid-area: days; }
+
+.fieldInvalid select,
+.fieldInvalid input {
+  border-color: var(--tone-error-border);
+}
+
+.fieldLabel {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.fieldInput {
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.fieldInput[disabled] {
+  background: var(--input-readonly-bg);
+  color: var(--input-readonly-text);
+  border-color: var(--input-border);
+  -webkit-text-fill-color: var(--input-readonly-text);
+  cursor: not-allowed;
+}
+
+/* Desktop: hover-to-reveal X button */
+.removeX {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: var(--tone-error-bg);
+  color: var(--tone-error-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 1;
+}
+
+.row:hover .removeX,
+.sectionHeader:hover .removeX {
+  opacity: 1;
+}
+
+.removeX:hover {
+  background: var(--tone-error-border);
+}
+
+/* Section header row */
+.sectionHeader {
+  position: relative;
+  border-bottom: 2px solid var(--border-accent);
+  padding: var(--space-sm) var(--space-md);
+  margin-top: var(--space-sm);
+}
+
+.sectionHeader:first-child {
+  margin-top: 0;
+}
+
+.sectionNameRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sectionDragHandle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  margin: -8px 0;
+}
+
+.sectionDragHandle:active {
+  cursor: grabbing;
+}
+
+.sectionTotal {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text-primary);
+  margin-left: auto;
+  padding-right: 28px;
+}
+
+.sectionNameInput {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  width: 100%;
+  padding: 4px 0;
+}
+
+.sectionNameInput:focus {
+  outline: none;
+  border-bottom: 1px solid var(--accent-primary);
+}
+
+.sectionNameInput[disabled] {
+  color: var(--text-primary);
+  -webkit-text-fill-color: var(--text-primary);
+  cursor: default;
+}
+
+/* Mobile: stack into card layout */
+@media (max-width: 850px) {
+  .row {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "idx idx"
+      "desc desc"
+      "costcode costcode"
+      "delta days";
+  }
+
+  .fieldInput {
+    padding: 10px;
+    font-size: 1rem;
+    min-height: 44px;
+  }
+
+  /* Always show remove button on mobile (no hover) */
+  .removeX {
+    opacity: 1;
+  }
+}

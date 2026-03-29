@@ -396,7 +396,7 @@ def project_change_orders_view(request, project_id):
     if request.method == "GET":
         change_orders = (
             ChangeOrder.objects.filter(project=project)
-            .prefetch_related("line_items", "line_items__cost_code")
+            .prefetch_related("line_items", "line_items__cost_code", "sections")
             .order_by("-created_at")
         )
         return Response(
@@ -502,6 +502,7 @@ def project_change_orders_view(request, project_id):
                         change_order=change_order,
                         line_items=incoming_line_items,
                         cost_code_map=cost_code_map,
+                        sections_data=data.get("sections"),
                     )
         except ValidationError as exc:
             fields = exc.message_dict if hasattr(exc, "message_dict") else {"non_field_errors": exc.messages}
@@ -596,7 +597,7 @@ def change_order_detail_view(request, change_order_id):
                 if permission_error:
                     return Response(permission_error, status=403)
 
-        content_fields = {"title", "reason", "amount_delta", "days_delta", "origin_estimate", "line_items"}
+        content_fields = {"title", "reason", "amount_delta", "days_delta", "origin_estimate", "line_items", "sections"}
         attempted_content_fields = sorted(field for field in content_fields if field in data)
 
         if change_order.status != ChangeOrder.Status.DRAFT:

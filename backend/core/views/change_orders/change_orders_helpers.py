@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from core.models import (
     ChangeOrder,
     ChangeOrderLine,
+    ChangeOrderSection,
     ChangeOrderSnapshot,
     ChangeOrderStatusEvent,
     CostCode,
@@ -62,6 +63,7 @@ def _prefetch_change_order_qs(queryset: QuerySet) -> QuerySet:
     ).prefetch_related(
         "line_items",
         "line_items__cost_code",
+        "sections",
     )
 
 
@@ -116,28 +118,85 @@ def _validate_change_order_lines(
     return cost_code_map, line_total_delta, None
 
 
+def _compute_co_section_subtotals(
+    sections_data: list[dict],
+    line_items_with_deltas: list[dict],
+) -> list[dict]:
+    """Compute each section's subtotal from the line items that follow it.
+
+    A section's subtotal is the sum of ``amount_delta`` for all line items
+    whose ``order`` falls between this section's ``order`` and the next
+    section's ``order`` (or end of list). Returns sections with ``subtotal``
+    populated. Note: subtotals can be negative since CO deltas are signed.
+    """
+    if not sections_data:
+        return []
+
+    sorted_sections = sorted(sections_data, key=lambda s: s["order"])
+    deltas_by_order = {
+        item["order"]: item["amount_delta"] for item in line_items_with_deltas
+    }
+    all_line_orders = sorted(deltas_by_order.keys())
+
+    result = []
+    for i, section in enumerate(sorted_sections):
+        section_order = section["order"]
+        next_boundary = sorted_sections[i + 1]["order"] if i + 1 < len(sorted_sections) else float("inf")
+
+        subtotal = MONEY_ZERO
+        for line_order in all_line_orders:
+            if line_order > section_order and line_order < next_boundary:
+                subtotal = quantize_money(subtotal + deltas_by_order[line_order])
+
+        result.append({**section, "subtotal": subtotal})
+
+    return result
+
+
 def _sync_change_order_lines(
     *,
     change_order: ChangeOrder,
     line_items: list[dict],
     cost_code_map: dict[int, CostCode],
+    sections_data: list[dict] | None = None,
 ) -> None:
-    """Replace all line items on a change order with the provided set.
+    """Replace all line items (and optionally sections) on a change order.
 
     Deletes existing lines and creates new ones from the input dicts,
-    resolving cost codes from the pre-validated map.
+    resolving cost codes from the pre-validated map. When ``sections_data``
+    is provided, old sections are replaced with new ones whose subtotals
+    are computed from the line items via forward-scan.
     """
     ChangeOrderLine.objects.filter(change_order=change_order).delete()
+
+    computed_line_items = []
     for line_item_data in line_items:
         cost_code = cost_code_map.get(int(line_item_data["cost_code"])) if line_item_data.get("cost_code") else None
+        order = int(line_item_data.get("order", 0))
+        amount = quantize_money(line_item_data["amount_delta"])
         ChangeOrderLine.objects.create(
             change_order=change_order,
             cost_code=cost_code,
             description=line_item_data.get("description", ""),
             adjustment_reason=str(line_item_data.get("adjustment_reason", "")).strip(),
-            amount_delta=quantize_money(line_item_data["amount_delta"]),
+            amount_delta=amount,
             days_delta=line_item_data.get("days_delta", 0),
+            order=order,
         )
+        computed_line_items.append({"order": order, "amount_delta": amount})
+
+    if sections_data is not None:
+        ChangeOrderSection.objects.filter(change_order=change_order).delete()
+        computed_sections = _compute_co_section_subtotals(sections_data, computed_line_items)
+        ChangeOrderSection.objects.bulk_create([
+            ChangeOrderSection(
+                change_order=change_order,
+                name=section["name"],
+                order=section["order"],
+                subtotal=section["subtotal"],
+            )
+            for section in computed_sections
+        ])
 
 
 def _next_change_order_family_key(*, project: Project) -> str:
@@ -259,6 +318,8 @@ def _handle_co_document_save(
         change_order.status = data["status"]
         update_fields.append("status")
 
+    sections_data = data.get("sections")
+
     try:
         with transaction.atomic():
             if len(update_fields) > 1:
@@ -268,7 +329,25 @@ def _handle_co_document_save(
                     change_order=change_order,
                     line_items=incoming_line_items,
                     cost_code_map=cost_code_map,
+                    sections_data=sections_data,
                 )
+            elif sections_data is not None:
+                # Sections changed without line items — recompute from existing lines.
+                existing_lines = [
+                    {"order": line.order, "amount_delta": line.amount_delta}
+                    for line in change_order.line_items.all()
+                ]
+                ChangeOrderSection.objects.filter(change_order=change_order).delete()
+                computed_sections = _compute_co_section_subtotals(sections_data, existing_lines)
+                ChangeOrderSection.objects.bulk_create([
+                    ChangeOrderSection(
+                        change_order=change_order,
+                        name=section["name"],
+                        order=section["order"],
+                        subtotal=section["subtotal"],
+                    )
+                    for section in computed_sections
+                ])
     except ValidationError as exc:
         fields = exc.message_dict if hasattr(exc, "message_dict") else {"non_field_errors": exc.messages}
         return Response(

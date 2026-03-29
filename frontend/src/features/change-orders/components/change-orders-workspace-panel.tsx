@@ -13,8 +13,7 @@ import { FormEvent, RefObject } from "react";
 import { formatDecimal } from "@/shared/money-format";
 import { DocumentCreator } from "@/shared/document-creator";
 import type { DocumentCreatorAdapter, CreatorLineDraft } from "@/shared/document-creator/types";
-import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
-import { CostCodeCombobox } from "@/features/estimates/components/cost-code-combobox";
+import { ChangeOrderSheetV2, type ChangeOrderSheetV2Handle } from "./change-order-sheet-v2";
 import { ReadOnlyLineTable, readOnlyLineTableStyles as roTableStyles } from "@/shared/document-viewer/read-only-line-table";
 import type {
   ChangeOrderLineInput,
@@ -27,7 +26,6 @@ import styles from "./change-orders-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import changeOrderCreatorStyles from "@/shared/document-creator/change-order-creator.module.css";
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
-import mobileCardStyles from "@/shared/document-creator/mobile-line-card.module.css";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,8 +37,9 @@ type LineValidationResult = {
 };
 
 export type ChangeOrdersWorkspacePanelProps = {
-  // Layout
-  isMobile: boolean;
+  // Sheet refs (imperative handles for DnD order payloads)
+  createSheetRef: RefObject<ChangeOrderSheetV2Handle | null>;
+  editSheetRef: RefObject<ChangeOrderSheetV2Handle | null>;
 
   // Project/estimate context
   selectedProjectId: string;
@@ -92,7 +91,6 @@ export type ChangeOrdersWorkspacePanelProps = {
   onAddNewLine: () => void;
   onRemoveNewLine: (localId: number) => void;
   onUpdateNewLine: (localId: number, updates: Partial<ChangeOrderLineInput>) => void;
-  onMoveNewLine: (localId: number, direction: "up" | "down") => void;
 
   // Edit form
   editCreatorRef: RefObject<HTMLDivElement | null>;
@@ -111,7 +109,6 @@ export type ChangeOrdersWorkspacePanelProps = {
   onAddEditLine: () => void;
   onRemoveEditLine: (localId: number) => void;
   onUpdateEditLine: (localId: number, updates: Partial<ChangeOrderLineInput>) => void;
-  onMoveEditLine: (localId: number, direction: "up" | "down") => void;
 
   // Contract breakdown
   approvedCOsForSelectedEstimate: ChangeOrderRecord[];
@@ -126,7 +123,8 @@ export type ChangeOrdersWorkspacePanelProps = {
 // ---------------------------------------------------------------------------
 
 export function ChangeOrdersWorkspacePanel({
-  isMobile,
+  createSheetRef,
+  editSheetRef,
   selectedProjectId,
   selectedViewerEstimateId,
   selectedViewerEstimate,
@@ -166,7 +164,6 @@ export function ChangeOrdersWorkspacePanel({
   onAddNewLine,
   onRemoveNewLine,
   onUpdateNewLine,
-  onMoveNewLine,
   editCreatorRef,
   editChangeOrderCreatorFormState,
   editTitle,
@@ -183,7 +180,6 @@ export function ChangeOrdersWorkspacePanel({
   onAddEditLine,
   onRemoveEditLine,
   onUpdateEditLine,
-  onMoveEditLine,
   approvedCOsForSelectedEstimate,
   isOriginLineItemsSectionOpen,
   setIsOriginLineItemsSectionOpen,
@@ -402,208 +398,19 @@ export function ChangeOrdersWorkspacePanel({
                       required
                     />
                   </label>
-                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${changeOrderCreatorStyles.coFieldWide}`}>
-                    <span className={changeOrderCreatorStyles.coMetaLabel}>Reason</span>
-                    <textarea
-                      className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput}`}
-                      value={newReason}
-                      onChange={(event) => onNewReasonChange(event.target.value)}
-                      rows={3}
-                      placeholder="Describe why this change order is needed"
-                    />
-                  </label>
                 </div>
 
-                <div className={changeOrderCreatorStyles.coLineSectionIntro}>
-                  <h3>Line Items</h3>
-                </div>
-
-                {isMobile ? (
-                  <div className={mobileCardStyles.cardList}>
-                    {newLineItems.map((line, index) => {
-                      const rowIssues = newLineValidation.issuesByLocalId.get(line.localId) ?? [];
-                      return (
-                        <MobileLineItemCard
-                          key={line.localId}
-                          index={index}
-                          isFirst={index === 0}
-                          isLast={index === newLineItems.length - 1}
-                          onRemove={() => onRemoveNewLine(line.localId)}
-                          onMoveUp={() => onMoveNewLine(line.localId, "up")}
-                          onMoveDown={() => onMoveNewLine(line.localId, "down")}
-                          validationError={rowIssues.length ? `Row ${index + 1}: ${rowIssues.join(" ")}` : undefined}
-                          fields={[
-                            {
-                              label: "Cost Code",
-                              key: "costCode",
-                              span: "full",
-                              render: () => (
-                                <CostCodeCombobox
-                                  costCodes={costCodes}
-                                  value={line.costCodeId}
-                                  onChange={(nextValue) =>
-                                    onUpdateNewLine(line.localId, { costCodeId: nextValue })
-                                  }
-                                  ariaLabel="Cost code"
-                                  placeholder="Search cost code"
-                                />
-                              ),
-                            },
-                            {
-                              label: "Description",
-                              key: "description",
-                              span: "full",
-                              render: () => (
-                                <input
-                                  className={mobileCardStyles.fieldInput}
-                                  value={line.description}
-                                  placeholder="Optional CO scope note"
-                                  onChange={(event) =>
-                                    onUpdateNewLine(line.localId, { description: event.target.value })
-                                  }
-                                />
-                              ),
-                            },
-                            {
-                              label: "CO Delta ($)",
-                              key: "amountDelta",
-                              render: () => (
-                                <input
-                                  className={mobileCardStyles.fieldInput}
-                                  value={line.amountDelta}
-                                  placeholder="0.00 (USD)"
-                                  onChange={(event) =>
-                                    onUpdateNewLine(line.localId, { amountDelta: event.target.value })
-                                  }
-                                  inputMode="decimal"
-                                />
-                              ),
-                            },
-                            {
-                              label: "Schedule (days)",
-                              key: "daysDelta",
-                              render: () => (
-                                <input
-                                  className={mobileCardStyles.fieldInput}
-                                  value={line.daysDelta}
-                                  placeholder="0 days"
-                                  onChange={(event) =>
-                                    onUpdateNewLine(line.localId, { daysDelta: event.target.value })
-                                  }
-                                  inputMode="numeric"
-                                />
-                              ),
-                            },
-                          ]}
-                        />
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className={creatorStyles.lineTable}>
-                    <div className={changeOrderCreatorStyles.coLineHeader}>
-                      <span>Cost code</span>
-                      <span>Description</span>
-                      <span>CO delta ($)</span>
-                      <span>Schedule delta (days)</span>
-                      <span>Actions</span>
-                    </div>
-                    {newLineItems.map((line, index) => {
-                      const rowIssues = newLineValidation.issuesByLocalId.get(line.localId) ?? [];
-                      return (
-                        <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
-                          <div
-                            className={`${changeOrderCreatorStyles.coLineRow} ${index % 2 === 1 ? changeOrderCreatorStyles.coLineRowAlt : ""} ${
-                              rowIssues.length ? changeOrderCreatorStyles.coLineRowInvalid : ""
-                            }`}
-                          >
-                            <div>
-                              <span className={creatorStyles.printOnly}>
-                                {costCodes.find((c) => String(c.id) === line.costCodeId)?.code || "—"}
-                              </span>
-                              <span className={creatorStyles.screenOnly}>
-                                <CostCodeCombobox
-                                  costCodes={costCodes}
-                                  value={line.costCodeId}
-                                  onChange={(nextValue) =>
-                                    onUpdateNewLine(line.localId, { costCodeId: nextValue })
-                                  }
-                                  ariaLabel="Cost code"
-                                  placeholder="Search cost code"
-                                />
-                              </span>
-                            </div>
-                            <input
-                              className={creatorStyles.lineInput}
-                              value={line.description}
-                              placeholder="Optional CO scope note"
-                              onChange={(event) =>
-                                onUpdateNewLine(line.localId, { description: event.target.value })
-                              }
-                            />
-                            <input
-                              className={creatorStyles.lineInput}
-                              value={line.amountDelta}
-                              placeholder="0.00 (USD)"
-                              onChange={(event) =>
-                                onUpdateNewLine(line.localId, { amountDelta: event.target.value })
-                              }
-                              inputMode="decimal"
-                            />
-                            <input
-                              className={creatorStyles.lineInput}
-                              value={line.daysDelta}
-                              placeholder="0 days"
-                              onChange={(event) =>
-                                onUpdateNewLine(line.localId, { daysDelta: event.target.value })
-                              }
-                              inputMode="numeric"
-                            />
-                            <div className={changeOrderCreatorStyles.coLineRowActions}>
-                              <button
-                                type="button"
-                                className={`${creatorStyles.smallButton} ${index === 0 ? creatorStyles.actionDisabled : ""}`}
-                                onClick={() => onMoveNewLine(line.localId, "up")}
-                                disabled={index === 0}
-                              >
-                                Up
-                              </button>
-                              <button
-                                type="button"
-                                className={`${creatorStyles.smallButton} ${index === newLineItems.length - 1 ? creatorStyles.actionDisabled : ""}`}
-                                onClick={() => onMoveNewLine(line.localId, "down")}
-                                disabled={index === newLineItems.length - 1}
-                              >
-                                Down
-                              </button>
-                              <button
-                                type="button"
-                                className={creatorStyles.smallButton}
-                                onClick={() => onRemoveNewLine(line.localId)}
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          </div>
-                          {rowIssues.length ? (
-                            <p className={changeOrderCreatorStyles.coLineIssue}>
-                              Row {index + 1}: {rowIssues.join(" ")}
-                            </p>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                <div className={changeOrderCreatorStyles.coLineActions}>
-                  <button
-                    type="button"
-                    className={`${creatorStyles.secondaryButton} ${changeOrderCreatorStyles.coLineAddButton}`}
-                    onClick={onAddNewLine}
-                  >
-                    Add Line Item
-                  </button>
-                </div>
+                <ChangeOrderSheetV2
+                  ref={createSheetRef}
+                  changeOrderId=""
+                  lineItems={newLineItems}
+                  costCodes={costCodes}
+                  readOnly={false}
+                  lineValidation={newLineValidation}
+                  onLineItemChange={onUpdateNewLine}
+                  onAddLineItem={onAddNewLine}
+                  onRemoveLineItem={onRemoveNewLine}
+                />
 
                 {renderContractBreakdown({ style: { marginTop: "var(--space-md)" } })}
 
@@ -652,6 +459,17 @@ export function ChangeOrdersWorkspacePanel({
                       </div>
                     </div>
                   </div>
+                </div>
+
+                <div className={creatorStyles.terms}>
+                  <h4>Reason</h4>
+                  <textarea
+                    className={creatorStyles.termsInput}
+                    value={newReason}
+                    onChange={(e) => onNewReasonChange(e.target.value)}
+                    placeholder="Describe why this change order is needed"
+                    rows={3}
+                  />
                 </div>
 
                 <div className={creatorStyles.terms}>
@@ -747,222 +565,20 @@ export function ChangeOrdersWorkspacePanel({
                       required
                     />
                   </label>
-                  <label className={`${creatorStyles.inlineField} ${changeOrderCreatorStyles.coMetaField} ${changeOrderCreatorStyles.coFieldWide}`}>
-                    <span className={changeOrderCreatorStyles.coMetaLabel}>Reason</span>
-                    <textarea
-                      className={`${creatorStyles.fieldInput} ${changeOrderCreatorStyles.coMetaInput} ${changeOrderCreatorStyles.lockableControl}`}
-                      value={editReason}
-                      onChange={(event) => onEditReasonChange(event.target.value)}
-                      rows={3}
-                      placeholder="Describe why this change order revision is needed"
-                      disabled={!isSelectedChangeOrderEditable}
-                    />
-                  </label>
                 </div>
 
-                <div className={changeOrderCreatorStyles.coLineSectionIntro}>
-                  <h3>Line Items</h3>
-                </div>
-
-                {isMobile ? (
-                  <div className={mobileCardStyles.cardList}>
-                    {editLineItems.map((line, index) => {
-                      const rowIssues = editLineValidation.issuesByLocalId.get(line.localId) ?? [];
-                      return (
-                        <MobileLineItemCard
-                          key={line.localId}
-                          index={index}
-                          readOnly={!isSelectedChangeOrderEditable}
-                          isFirst={index === 0}
-                          isLast={index === editLineItems.length - 1}
-                          onRemove={isSelectedChangeOrderEditable ? () => onRemoveEditLine(line.localId) : undefined}
-                          onMoveUp={isSelectedChangeOrderEditable ? () => onMoveEditLine(line.localId, "up") : undefined}
-                          onMoveDown={isSelectedChangeOrderEditable ? () => onMoveEditLine(line.localId, "down") : undefined}
-                          validationError={rowIssues.length ? `Row ${index + 1}: ${rowIssues.join(" ")}` : undefined}
-                          fields={[
-                            {
-                              label: "Cost Code",
-                              key: "costCode",
-                              span: "full",
-                              render: () => (
-                                <CostCodeCombobox
-                                  costCodes={costCodes}
-                                  value={line.costCodeId}
-                                  onChange={(nextValue) =>
-                                    onUpdateEditLine(line.localId, { costCodeId: nextValue })
-                                  }
-                                  ariaLabel="Cost code"
-                                  disabled={!isSelectedChangeOrderEditable}
-                                  placeholder="Search cost code"
-                                />
-                              ),
-                            },
-                            {
-                              label: "Description",
-                              key: "description",
-                              span: "full",
-                              render: () => (
-                                <input
-                                  className={mobileCardStyles.fieldInput}
-                                  value={line.description}
-                                  placeholder="Optional CO scope note"
-                                  onChange={(event) =>
-                                    onUpdateEditLine(line.localId, { description: event.target.value })
-                                  }
-                                  disabled={!isSelectedChangeOrderEditable}
-                                />
-                              ),
-                            },
-                            {
-                              label: "CO Delta ($)",
-                              key: "amountDelta",
-                              render: () => (
-                                <input
-                                  className={mobileCardStyles.fieldInput}
-                                  value={line.amountDelta}
-                                  placeholder="0.00 (USD)"
-                                  onChange={(event) =>
-                                    onUpdateEditLine(line.localId, { amountDelta: event.target.value })
-                                  }
-                                  inputMode="decimal"
-                                  disabled={!isSelectedChangeOrderEditable}
-                                />
-                              ),
-                            },
-                            {
-                              label: "Schedule (days)",
-                              key: "daysDelta",
-                              render: () => (
-                                <input
-                                  className={mobileCardStyles.fieldInput}
-                                  value={line.daysDelta}
-                                  placeholder="0 days"
-                                  onChange={(event) =>
-                                    onUpdateEditLine(line.localId, { daysDelta: event.target.value })
-                                  }
-                                  inputMode="numeric"
-                                  disabled={!isSelectedChangeOrderEditable}
-                                />
-                              ),
-                            },
-                          ]}
-                        />
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className={creatorStyles.lineTable}>
-                    <div className={`${changeOrderCreatorStyles.coLineHeader} ${!isSelectedChangeOrderEditable ? changeOrderCreatorStyles.coLineHeaderLocked : ""}`}>
-                      <span>Cost code</span>
-                      <span>Description</span>
-                      <span>CO delta ($)</span>
-                      <span>Schedule delta (days)</span>
-                      {isSelectedChangeOrderEditable ? <span>Actions</span> : null}
-                    </div>
-                    {editLineItems.map((line, index) => {
-                      const rowIssues = editLineValidation.issuesByLocalId.get(line.localId) ?? [];
-                      return (
-                        <div key={line.localId} className={changeOrderCreatorStyles.coLineRowGroup}>
-                          <div
-                            className={`${changeOrderCreatorStyles.coLineRow} ${!isSelectedChangeOrderEditable ? changeOrderCreatorStyles.coLineRowLocked : ""} ${index % 2 === 1 ? changeOrderCreatorStyles.coLineRowAlt : ""} ${
-                              rowIssues.length ? changeOrderCreatorStyles.coLineRowInvalid : ""
-                            }`}
-                          >
-                            <div>
-                              <span className={creatorStyles.printOnly}>
-                                {costCodes.find((c) => String(c.id) === line.costCodeId)?.code || "—"}
-                              </span>
-                              <span className={creatorStyles.screenOnly}>
-                                <CostCodeCombobox
-                                  costCodes={costCodes}
-                                  value={line.costCodeId}
-                                  onChange={(nextValue) =>
-                                    onUpdateEditLine(line.localId, { costCodeId: nextValue })
-                                  }
-                                  ariaLabel="Cost code"
-                                  disabled={!isSelectedChangeOrderEditable}
-                                  placeholder="Search cost code"
-                                />
-                              </span>
-                            </div>
-                            <input
-                              className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
-                              value={line.description}
-                              placeholder="Optional CO scope note"
-                              onChange={(event) =>
-                                onUpdateEditLine(line.localId, { description: event.target.value })
-                              }
-                              disabled={!isSelectedChangeOrderEditable}
-                            />
-                            <input
-                              className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
-                              value={line.amountDelta}
-                              placeholder="0.00 (USD)"
-                              onChange={(event) =>
-                                onUpdateEditLine(line.localId, { amountDelta: event.target.value })
-                              }
-                              inputMode="decimal"
-                              disabled={!isSelectedChangeOrderEditable}
-                            />
-                            <input
-                              className={`${creatorStyles.lineInput} ${changeOrderCreatorStyles.lockableControl}`}
-                              value={line.daysDelta}
-                              placeholder="0 days"
-                              onChange={(event) =>
-                                onUpdateEditLine(line.localId, { daysDelta: event.target.value })
-                              }
-                              inputMode="numeric"
-                              disabled={!isSelectedChangeOrderEditable}
-                            />
-                            {isSelectedChangeOrderEditable ? (
-                              <div className={changeOrderCreatorStyles.coLineRowActions}>
-                                <button
-                                  type="button"
-                                  className={`${creatorStyles.smallButton} ${index === 0 ? creatorStyles.actionDisabled : ""}`}
-                                  onClick={() => onMoveEditLine(line.localId, "up")}
-                                  disabled={index === 0}
-                                >
-                                  Up
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`${creatorStyles.smallButton} ${index === editLineItems.length - 1 ? creatorStyles.actionDisabled : ""}`}
-                                  onClick={() => onMoveEditLine(line.localId, "down")}
-                                  disabled={index === editLineItems.length - 1}
-                                >
-                                  Down
-                                </button>
-                                <button
-                                  type="button"
-                                  className={creatorStyles.smallButton}
-                                  onClick={() => onRemoveEditLine(line.localId)}
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            ) : null}
-                          </div>
-                          {rowIssues.length ? (
-                            <p className={changeOrderCreatorStyles.coLineIssue}>
-                              Row {index + 1}: {rowIssues.join(" ")}
-                            </p>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {isSelectedChangeOrderEditable ? (
-                  <div className={changeOrderCreatorStyles.coLineActions}>
-                    <button
-                      type="button"
-                      className={`${creatorStyles.secondaryButton} ${changeOrderCreatorStyles.coLineAddButton}`}
-                      onClick={onAddEditLine}
-                    >
-                      Add Line Item
-                    </button>
-                  </div>
-                ) : null}
+                <ChangeOrderSheetV2
+                  ref={editSheetRef}
+                  changeOrderId={selectedChangeOrder ? String(selectedChangeOrder.id) : ""}
+                  lineItems={editLineItems}
+                  costCodes={costCodes}
+                  readOnly={!isSelectedChangeOrderEditable}
+                  lineValidation={editLineValidation}
+                  apiSections={selectedChangeOrder?.sections}
+                  onLineItemChange={onUpdateEditLine}
+                  onAddLineItem={onAddEditLine}
+                  onRemoveLineItem={onRemoveEditLine}
+                />
 
                 {renderContractBreakdown({ style: { marginTop: "var(--space-md)" } })}
 
@@ -1010,6 +626,24 @@ export function ChangeOrdersWorkspacePanel({
                       ) : null}
                     </div>
                   </div>
+                </div>
+
+                <div className={creatorStyles.terms}>
+                  <h4>Reason</h4>
+                  {!isSelectedChangeOrderEditable ? (
+                    (editReason || "None")
+                      .split("\n")
+                      .filter((line) => line.trim())
+                      .map((line, index) => <p key={`reason-${index}`}>{line}</p>)
+                  ) : (
+                    <textarea
+                      className={creatorStyles.termsInput}
+                      value={editReason}
+                      onChange={(e) => onEditReasonChange(e.target.value)}
+                      placeholder="Describe why this change order is needed"
+                      rows={3}
+                    />
+                  )}
                 </div>
 
                 <div className={creatorStyles.terms}>

@@ -8,7 +8,7 @@
  * Parent: app/change-order/[publicRef]/page.tsx
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import Image from "next/image";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
@@ -253,15 +253,60 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
               { order: 2, span: "half" },   // Amount Delta
               { order: 3, span: "half" },   // Days Delta
             ]}
-            rows={(changeOrder.line_items ?? []).map((line) => ({
-              key: line.id,
-              cells: [
-                line.cost_code_code || "—",
-                line.description || "—",
-                `$${formatDecimal(parseAmount(line.amount_delta))}`,
-                line.days_delta,
-              ],
-            }))}
+            rows={(() => {
+              const sections = [...(changeOrder.sections ?? [])].sort((a, b) => a.order - b.order);
+              const rawItems = changeOrder.line_items ?? [];
+
+              function buildLineRow(line: typeof rawItems[number]) {
+                return {
+                  key: line.id,
+                  cells: [
+                    line.cost_code_code || "—",
+                    line.description || "—",
+                    `$${formatDecimal(parseAmount(line.amount_delta))}`,
+                    line.days_delta,
+                  ],
+                };
+              }
+
+              if (!sections.length) {
+                return rawItems.map((line) => buildLineRow(line));
+              }
+
+              const result: { key: string | number; cells: ReactNode[]; variant?: "section-header" | "section-subtotal" }[] = [];
+
+              for (let i = 0; i < rawItems.length; i++) {
+                if ((rawItems[i].order ?? i) < sections[0].order) {
+                  result.push(buildLineRow(rawItems[i]));
+                }
+              }
+
+              for (let s = 0; s < sections.length; s++) {
+                const section = sections[s];
+                const nextOrder = s + 1 < sections.length ? sections[s + 1].order : Infinity;
+
+                result.push({
+                  key: `section-${section.id}`,
+                  variant: "section-header",
+                  cells: [section.name],
+                });
+
+                for (let i = 0; i < rawItems.length; i++) {
+                  const order = rawItems[i].order ?? i;
+                  if (order > section.order && order < nextOrder) {
+                    result.push(buildLineRow(rawItems[i]));
+                  }
+                }
+
+                result.push({
+                  key: `section-sub-${section.id}`,
+                  variant: "section-subtotal",
+                  cells: [`${section.name} Subtotal — $${formatDecimal(parseAmount(section.subtotal))}`],
+                });
+              }
+
+              return result;
+            })()}
             afterLineSection={
               <>
                 <div className={frameStyles.panelGrid}>

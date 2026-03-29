@@ -3,6 +3,8 @@ from core.serializers.auth import LoginSerializer, RegisterSerializer
 from core.serializers.change_orders import (
     ChangeOrderLineInputSerializer,
     ChangeOrderLineSerializer,
+    ChangeOrderSectionInputSerializer,
+    ChangeOrderSectionSerializer,
     ChangeOrderSerializer,
     ChangeOrderStatusEventSerializer,
     ChangeOrderWriteSerializer,
@@ -94,6 +96,8 @@ __all__ = [
     "ChangeOrderSerializer",
     "ChangeOrderLineSerializer",
     "ChangeOrderLineInputSerializer",
+    "ChangeOrderSectionSerializer",
+    "ChangeOrderSectionInputSerializer",
     "ChangeOrderStatusEventSerializer",
     "ChangeOrderWriteSerializer",
     "InvoiceLineSerializer",

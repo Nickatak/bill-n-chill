@@ -5,7 +5,7 @@ from decimal import Decimal
 from django.db.models import Sum
 from rest_framework import serializers
 
-from core.models import ChangeOrder, ChangeOrderLine, ChangeOrderStatusEvent
+from core.models import ChangeOrder, ChangeOrderLine, ChangeOrderSection, ChangeOrderStatusEvent
 from core.serializers.mixins import resolve_public_actor_customer_id, resolve_public_actor_display
 
 
@@ -27,10 +27,24 @@ class ChangeOrderLineSerializer(serializers.ModelSerializer):
             "adjustment_reason",
             "amount_delta",
             "days_delta",
+            "order",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["id", "change_order", "created_at", "updated_at"]
+
+
+class ChangeOrderSectionSerializer(serializers.ModelSerializer):
+    """Read-only change order section with stored subtotal."""
+
+    class Meta:
+        model = ChangeOrderSection
+        fields = [
+            "id",
+            "name",
+            "order",
+            "subtotal",
+        ]
 
 
 class ChangeOrderSerializer(serializers.ModelSerializer):
@@ -40,6 +54,7 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
     approved_by_email = serializers.EmailField(source="approved_by.email", read_only=True)
     public_ref = serializers.CharField(read_only=True)
     line_items = ChangeOrderLineSerializer(many=True, read_only=True)
+    sections = ChangeOrderSectionSerializer(many=True, read_only=True)
     line_total_delta = serializers.SerializerMethodField()
 
     def get_line_total_delta(self, obj) -> str:
@@ -71,6 +86,7 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
             "approved_by_email",
             "approved_at",
             "line_items",
+            "sections",
             "line_total_delta",
             "created_at",
             "updated_at",
@@ -88,6 +104,7 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
             "approved_by_email",
             "approved_at",
             "line_items",
+            "sections",
             "line_total_delta",
             "created_at",
             "updated_at",
@@ -107,6 +124,14 @@ class ChangeOrderLineInputSerializer(serializers.Serializer):
     )
     amount_delta = serializers.DecimalField(max_digits=12, decimal_places=2)
     days_delta = serializers.IntegerField(required=False, default=0)
+    order = serializers.IntegerField(required=False, default=0)
+
+
+class ChangeOrderSectionInputSerializer(serializers.Serializer):
+    """Write serializer for a single change order section in a create/update payload."""
+
+    name = serializers.CharField(max_length=200)
+    order = serializers.IntegerField()
 
 
 class ChangeOrderWriteSerializer(serializers.Serializer):
@@ -120,6 +145,7 @@ class ChangeOrderWriteSerializer(serializers.Serializer):
     reason = serializers.CharField(max_length=5000, required=False, allow_blank=True)
     terms_text = serializers.CharField(max_length=10000, required=False, allow_blank=True)
     line_items = ChangeOrderLineInputSerializer(many=True, required=False)
+    sections = ChangeOrderSectionInputSerializer(many=True, required=False, default=[])
     origin_estimate = serializers.IntegerField(required=False, allow_null=True)
 
 

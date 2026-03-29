@@ -1,6 +1,6 @@
 from core.models.accounts_payable import VendorBill, VendorBillLine
 from core.models.accounts_receivable import Invoice, InvoiceLine
-from core.models.change_orders import ChangeOrder, ChangeOrderLine
+from core.models.change_orders import ChangeOrder, ChangeOrderLine, ChangeOrderSection
 from core.models.estimating import Estimate, EstimateLineItem, EstimateSection
 from core.models.financial_auditing import (
     AccountingSyncRecord,
@@ -57,6 +57,7 @@ __all__ = [
     "CustomerRecord",
     "ChangeOrder",
     "ChangeOrderLine",
+    "ChangeOrderSection",
     "AccountingSyncEvent",
     "AccountingSyncRecord",
     "VendorBillSnapshot",

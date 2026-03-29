@@ -55,7 +55,7 @@
  */
 
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import { formatDecimal } from "@/shared/money-format";
 import {
@@ -77,7 +77,6 @@ import {
   CHANGE_ORDER_ALLOWED_STATUS_TRANSITIONS_FALLBACK,
   CHANGE_ORDER_MIN_LINE_ITEMS_ERROR,
   statusLabel,
-  toLinePayload,
 } from "./change-orders-display";
 import { usePrintable } from "@/shared/shell/printable-context";
 import styles from "./change-orders-console.module.css";
@@ -91,6 +90,7 @@ import {
 import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import { ChangeOrdersViewerPanel } from "./change-orders-viewer-panel";
 import { ChangeOrdersWorkspacePanel } from "./change-orders-workspace-panel";
+import type { ChangeOrderSheetV2Handle } from "./change-order-sheet-v2";
 import { useChangeOrderProjectData } from "../hooks/use-change-order-project-data";
 import { useChangeOrderForm } from "../hooks/use-change-order-form";
 import { useChangeOrderViewer } from "../hooks/use-change-order-viewer";
@@ -159,6 +159,8 @@ export function ChangeOrdersConsole({
 
   const { ref: createCreatorRef, flash: flashCreate } = useCreatorFlash();
   const { ref: editCreatorRef, flash: flashEdit } = useCreatorFlash();
+  const createSheetRef = useRef<ChangeOrderSheetV2Handle>(null);
+  const editSheetRef = useRef<ChangeOrderSheetV2Handle>(null);
   const { setPrintable } = usePrintable();
 
   // UI section toggles (thin — kept in console)
@@ -321,6 +323,28 @@ export function ChangeOrdersConsole({
     flashCreate();
   }
 
+  /** Build line_items with order + sections from a sheet ref's order payload. */
+  function buildOrderedPayload(
+    lines: typeof form.newLineItems,
+    sheetRef: React.RefObject<ChangeOrderSheetV2Handle | null>,
+  ) {
+    const orderPayload = sheetRef.current?.getOrderPayload();
+    const linePayload = lines
+      .filter((line) => line.costCodeId.trim() !== "")
+      .map((line) => ({
+        cost_code: Number(line.costCodeId),
+        description: line.description,
+        adjustment_reason: line.adjustmentReason,
+        amount_delta: line.amountDelta.trim() || "0",
+        days_delta: Number(line.daysDelta.trim() || "0"),
+        order: orderPayload?.lineItemOrders.get(line.localId) ?? 0,
+      }));
+    return {
+      line_items: linePayload,
+      sections: orderPayload?.sections ?? [],
+    };
+  }
+
   /** Handle form submission for creating a new change order draft. */
   async function handleCreateChangeOrder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -358,7 +382,7 @@ export function ChangeOrdersConsole({
             amount_delta: formatDecimal(form.newLineDeltaTotal),
             days_delta: form.newLineDaysTotal,
             origin_estimate: projectData.selectedViewerEstimateId ? Number(projectData.selectedViewerEstimateId) : null,
-            line_items: toLinePayload(form.newLineItems),
+            ...buildOrderedPayload(form.newLineItems, createSheetRef),
           }),
         },
       );
@@ -440,7 +464,7 @@ export function ChangeOrdersConsole({
             amount_delta: formatDecimal(form.editLineDeltaTotal),
             days_delta: form.editLineDaysTotal,
             status: viewer.selectedChangeOrder.status,
-            line_items: toLinePayload(form.editLineItems),
+            ...buildOrderedPayload(form.editLineItems, editSheetRef),
           }),
         },
       );
@@ -703,7 +727,8 @@ export function ChangeOrdersConsole({
       ) : (
       <>
       <ChangeOrdersWorkspacePanel
-        isMobile={isMobile}
+        createSheetRef={createSheetRef}
+        editSheetRef={editSheetRef}
         selectedProjectId={projectData.selectedProjectId}
         selectedViewerEstimateId={projectData.selectedViewerEstimateId}
         selectedViewerEstimate={viewer.selectedViewerEstimate}
@@ -743,7 +768,6 @@ export function ChangeOrdersConsole({
         onAddNewLine={addNewLine}
         onRemoveNewLine={removeNewLine}
         onUpdateNewLine={form.updateNewLine}
-        onMoveNewLine={form.moveNewLine}
         editCreatorRef={editCreatorRef}
         editChangeOrderCreatorFormState={form.editChangeOrderCreatorFormState}
         editTitle={form.editTitle}
@@ -760,7 +784,6 @@ export function ChangeOrdersConsole({
         onAddEditLine={addEditLine}
         onRemoveEditLine={removeEditLine}
         onUpdateEditLine={form.updateEditLine}
-        onMoveEditLine={form.moveEditLine}
         approvedCOsForSelectedEstimate={viewer.approvedCOsForSelectedEstimate}
         isOriginLineItemsSectionOpen={isOriginLineItemsSectionOpen}
         setIsOriginLineItemsSectionOpen={setIsOriginLineItemsSectionOpen}
