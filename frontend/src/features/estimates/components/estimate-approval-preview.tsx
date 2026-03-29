@@ -8,7 +8,7 @@
  * Parent: app/estimate/[publicRef]/page.tsx
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import {
   PublicDocumentFrame,
@@ -281,30 +281,76 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
               { order: 4, span: "half", hidden: true },   // Unit Price (folded into Amount)
               { order: 2, span: "full", align: "right" }, // Amount (shows breakdown)
             ]}
-            rows={lineItems.map((line, index) => {
-              const qty = Number(line.quantity || 0);
-              const unitPrice = Number(line.unitCost || 0);
-              const unit = line.unit || "ea";
-              return {
-                key: line.localId,
-                cells: [
-                  qty.toFixed(2),
-                  line.description || "No description",
-                  <>
-                    <span className={creatorStyles.printOnly}>{findCostCodeShort(line.costCodeId)}</span>
-                    <span className={creatorStyles.screenOnly}>{findCostCodeLabel(line.costCodeId)}</span>
-                  </>,
-                  unit,
-                  `$${unitPrice.toFixed(2)}`,
-                  <>
-                    <span className={frameStyles.mobileBreakdown}>
-                      {qty.toFixed(2)} {unit} × ${unitPrice.toFixed(2)}
-                    </span>
-                    <span>${formatDecimal(lineTotals[index] ?? 0)}</span>
-                  </>,
-                ],
-              };
-            })}
+            rows={(() => {
+              const sections = [...(estimate.sections ?? [])].sort((a, b) => a.order - b.order);
+              const rawItems = estimate.line_items ?? [];
+
+              function buildLineRow(index: number) {
+                const line = lineItems[index];
+                const qty = Number(line.quantity || 0);
+                const unitPrice = Number(line.unitCost || 0);
+                const unit = line.unit || "ea";
+                return {
+                  key: line.localId,
+                  cells: [
+                    qty.toFixed(2),
+                    line.description || "No description",
+                    <>
+                      <span className={creatorStyles.printOnly}>{findCostCodeShort(line.costCodeId)}</span>
+                      <span className={creatorStyles.screenOnly}>{findCostCodeLabel(line.costCodeId)}</span>
+                    </>,
+                    unit,
+                    `$${unitPrice.toFixed(2)}`,
+                    <>
+                      <span className={frameStyles.mobileBreakdown}>
+                        {qty.toFixed(2)} {unit} × ${unitPrice.toFixed(2)}
+                      </span>
+                      <span>${formatDecimal(lineTotals[index] ?? 0)}</span>
+                    </>,
+                  ],
+                };
+              }
+
+              // No sections — flat rendering
+              if (!sections.length) {
+                return lineItems.map((_, index) => buildLineRow(index));
+              }
+
+              const result: { key: string | number; cells: ReactNode[]; variant?: "section-header" | "section-subtotal" }[] = [];
+
+              // Orphan line items before first section
+              for (let i = 0; i < rawItems.length; i++) {
+                if ((rawItems[i].order ?? i) < sections[0].order) {
+                  result.push(buildLineRow(i));
+                }
+              }
+
+              for (let s = 0; s < sections.length; s++) {
+                const section = sections[s];
+                const nextOrder = s + 1 < sections.length ? sections[s + 1].order : Infinity;
+
+                result.push({
+                  key: `section-${section.id}`,
+                  variant: "section-header",
+                  cells: [section.name],
+                });
+
+                for (let i = 0; i < rawItems.length; i++) {
+                  const order = rawItems[i].order ?? i;
+                  if (order > section.order && order < nextOrder) {
+                    result.push(buildLineRow(i));
+                  }
+                }
+
+                result.push({
+                  key: `section-sub-${section.id}`,
+                  variant: "section-subtotal",
+                  cells: [`${section.name} Subtotal — $${formatDecimal(Number(section.subtotal))}`],
+                });
+              }
+
+              return result;
+            })()}
             afterTable={
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <div className={frameStyles.summaryBox}>

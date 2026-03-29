@@ -37,6 +37,11 @@ type PublicDocumentViewerClassNames = {
 type PublicDocumentTableRow = {
   key: string | number;
   cells: ReactNode[];
+  /**
+   * Full-width row variant. Only `cells[0]` is rendered in a single
+   * `<td colSpan>`. Used for section dividers in sectioned documents.
+   */
+  variant?: "section-header" | "section-subtotal";
 };
 
 /** Per-column mobile card layout hint. One entry per column index. */
@@ -138,25 +143,34 @@ export function PublicDocumentFrame({
             </thead>
             <tbody>
               {rows.length ? (
-                rows.map((row) => (
-                  <tr key={row.key}>
-                    {row.cells.map((cell, index) => {
-                      const hint = mobileColumnLayout?.[index];
-                      return (
-                        <td
-                          key={`${row.key}-${index}`}
-                          data-label={columns[index]}
-                          data-span={hint?.span || "half"}
-                          data-align={hint?.align || "left"}
-                          data-hidden={hint?.hidden ? "true" : undefined}
-                          style={hint ? { order: hint.order } : undefined}
-                        >
-                          {cell}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))
+                rows.map((row) => {
+                  if (row.variant) {
+                    return (
+                      <tr key={row.key} data-variant={row.variant}>
+                        <td colSpan={columns.length}>{row.cells[0]}</td>
+                      </tr>
+                    );
+                  }
+                  return (
+                    <tr key={row.key}>
+                      {row.cells.map((cell, index) => {
+                        const hint = mobileColumnLayout?.[index];
+                        return (
+                          <td
+                            key={`${row.key}-${index}`}
+                            data-label={columns[index]}
+                            data-span={hint?.span || "half"}
+                            data-align={hint?.align || "left"}
+                            data-hidden={hint?.hidden ? "true" : undefined}
+                            style={hint ? { order: hint.order } : undefined}
+                          >
+                            {cell}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan={columns.length}>

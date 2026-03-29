@@ -322,6 +322,25 @@
   font-size: 1rem;
 }
 
+/* Section variant rows — full-width dividers inside the line-items table */
+
+.table tr[data-variant="section-header"] td {
+  background: var(--pub-accent-bg);
+  font-weight: 700;
+  font-size: 0.88rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pub-accent-heading);
+}
+
+.table tr[data-variant="section-subtotal"] td {
+  text-align: right;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border);
+}
+
 .emptyHint {
   margin: 0;
   color: var(--text-secondary);
@@ -558,6 +577,39 @@
   /* Hidden columns on mobile */
   .table tbody td[data-hidden="true"] {
     display: none;
+  }
+
+  /* Section variant rows — flat banners, not cards */
+  .table tbody tr[data-variant] {
+    display: block;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    margin-bottom: 4px;
+    background: transparent;
+    counter-increment: none;
+  }
+
+  .table tbody tr[data-variant]::before {
+    display: none;
+  }
+
+  .table tbody tr[data-variant] td {
+    display: block;
+    padding: 10px 14px;
+  }
+
+  .table tbody tr[data-variant] td::before {
+    display: none;
+  }
+
+  .table tbody tr[data-variant="section-header"] td {
+    border-radius: 8px;
+  }
+
+  .table tbody tr[data-variant="section-subtotal"] td {
+    padding-top: 4px;
+    padding-bottom: 12px;
   }
 
   /* Right-aligned fields */
