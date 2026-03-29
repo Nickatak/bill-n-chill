@@ -28,7 +28,5 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no deploy@"$DEPLOY_HOST" '
             cd ~/bill-n-chill &&
             git pull &&
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml build &&
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate &&
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T backend python manage.py migrate --noinput
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate
           '
