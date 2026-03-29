@@ -383,7 +383,9 @@ describe("EstimatesConsole", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Send to Customer" }));
 
-    expect(screen.getByText(/Email notification will be sent to jane@example.com/)).toBeInTheDocument();
+    const checkbox = screen.getByRole("checkbox", { name: /email customer/i });
+    expect(checkbox).toBeChecked();
+    expect(screen.getByText(/jane@example\.com/)).toBeInTheDocument();
   });
 
   it("closes confirmation panel when Cancel is clicked", async () => {

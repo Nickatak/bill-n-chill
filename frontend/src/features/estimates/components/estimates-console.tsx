@@ -1026,7 +1026,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   }
 
   /** Apply a status transition to the selected estimate. Returns the updated record on success, null on failure. */
-  async function handleUpdateEstimateStatus(): Promise<EstimateRecord | null> {
+  async function handleUpdateEstimateStatus(notifyCustomer = true): Promise<EstimateRecord | null> {
     const estimateId = Number(selectedEstimateId);
     if (!estimateId) {
       setActionMessage("Select an estimate first.");
@@ -1038,7 +1038,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       const response = await fetch(`${apiBaseUrl}/estimates/${estimateId}/`, {
         method: "PATCH",
         headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
-        body: JSON.stringify({ status: selectedStatus, status_note: statusNote }),
+        body: JSON.stringify({ status: selectedStatus, status_note: statusNote, notify_customer: notifyCustomer }),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -1058,8 +1058,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setSelectedStatus("");
       setStatusNote("");
       await loadStatusEvents({ estimateId: updated.id, quiet: true });
-      const emailNote = updated.status === "sent" && payload.email_sent === false ? " No email sent — customer has no email on file." : "";
       const label = `${updated.title || "Untitled"} v${updated.version}`;
+      const emailNote = updated.status === "sent" && payload.email_sent ? " Email sent." : "";
       const actionFeedback: Record<string, string> = {
         sent: `Sent ${label}.${emailNote}`,
         approved: `Marked ${label} as approved.`,

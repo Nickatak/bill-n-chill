@@ -97,12 +97,11 @@ function actionConfirmationMessage(
   return `Transition ${docLabel} to ${optionLabel.toLowerCase()}.`;
 }
 
-/** Build the email notice for send/re-send actions. */
-function emailNotice(customerEmail: string, customerId?: number) {
-  if (customerEmail) return `Email notification will be sent to ${customerEmail}.`;
+/** No-email hint with link to edit customer. */
+function noEmailHint(customerId?: number) {
   return (
     <>
-      No email on file — customer won&apos;t be notified automatically.{" "}
+      No email on file.{" "}
       {customerId ? <Link href={`/customers?customer=${customerId}`}>Edit customer to add email &rarr;</Link> : null}
     </>
   );
@@ -132,7 +131,7 @@ function EstimateActionPanel({
   setStatusNote: (note: string) => void;
   actionMessage: string;
   actionTone: string;
-  handleUpdateEstimateStatus: () => Promise<EstimateRecord | null>;
+  handleUpdateEstimateStatus: (notifyCustomer?: boolean) => Promise<EstimateRecord | null>;
   handleAddEstimateStatusNote: () => void;
   canSubmitStatusNote: boolean;
 }) {
@@ -141,6 +140,8 @@ function EstimateActionPanel({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const customerName = selectedProject?.customer_display_name || "";
   const customerEmail = (selectedProject?.customer_email || "").trim();
+  const hasEmail = customerEmail.length > 0;
+  const [notifyCustomer, setNotifyCustomer] = useState(hasEmail);
 
   function handleActionClick(statusValue: string) {
     setShareMessage("");
@@ -151,13 +152,14 @@ function EstimateActionPanel({
     }
     setPendingAction(statusValue);
     setSelectedStatus(statusValue);
+    setNotifyCustomer(hasEmail);
   }
 
   async function handleConfirm() {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-    const updated = await handleUpdateEstimateStatus();
+    const updated = await handleUpdateEstimateStatus(pendingAction === "sent" ? notifyCustomer : undefined);
     if (!updated) return; // failed — error message shown by handler
     setPendingAction(null);
 
@@ -255,9 +257,22 @@ function EstimateActionPanel({
             />
           </label>
           {(pendingAction === "sent") ? (
-            <p className={styles.actionConfirmDetail}>
-              {emailNotice(customerEmail, selectedProject?.customer)}
-            </p>
+            <>
+              <label className={styles.notifyCheckbox}>
+                <input
+                  type="checkbox"
+                  checked={notifyCustomer}
+                  disabled={!hasEmail}
+                  onChange={(e) => setNotifyCustomer(e.target.checked)}
+                />
+                <span>Email customer{hasEmail ? ` (${customerEmail})` : ""}</span>
+              </label>
+              {!hasEmail ? (
+                <p className={styles.actionConfirmDetail}>
+                  {noEmailHint(selectedProject?.customer)}
+                </p>
+              ) : null}
+            </>
           ) : null}
           <div className={styles.actionConfirmActions}>
             <button
@@ -367,7 +382,7 @@ export type EstimatesViewerPanelProps = {
   actionMessage: string;
   actionTone: string;
   canSubmitStatusNote: boolean;
-  handleUpdateEstimateStatus: () => Promise<EstimateRecord | null>;
+  handleUpdateEstimateStatus: (notifyCustomer?: boolean) => Promise<EstimateRecord | null>;
   handleAddEstimateStatusNote: () => void;
   statusEvents: EstimateStatusEventRecord[];
 };

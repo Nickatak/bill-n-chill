@@ -460,7 +460,8 @@ def _handle_estimate_status_transition(
 
     # Email notification (outside transaction, async)
     email_sent = False
-    if next_status == Estimate.Status.SENT and (
+    notify_customer = data.get("notify_customer", True)
+    if notify_customer and next_status == Estimate.Status.SENT and (
         previous_status != Estimate.Status.SENT or is_resend
     ):
         customer_email = (estimate.project.customer.email or "").strip()

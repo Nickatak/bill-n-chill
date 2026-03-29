@@ -155,6 +155,7 @@ class EstimateWriteSerializer(serializers.Serializer):
     allow_existing_title_family = serializers.BooleanField(required=False, default=False)
     status = serializers.ChoiceField(choices=Estimate.Status.choices, required=False)
     status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True, default="")
+    notify_customer = serializers.BooleanField(required=False, default=True)
     valid_through = serializers.DateField(required=False, allow_null=True)
     terms_text = serializers.CharField(max_length=10000, required=False, allow_blank=True)
     notes_text = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")

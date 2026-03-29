@@ -17,3 +17,5 @@ Source: PM demo session. First real ICP feedback.
 9. [ ] **Billing Schedule** — Payment schedule by % and amount with details, on estimates/invoices. *Larger — needs child model + UI.*
 
 
+Other things:
+Made email sending optional on send/re-send via a checkbox.
