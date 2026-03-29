@@ -196,16 +196,17 @@ export const EstimateSheetV2 = forwardRef<EstimateSheetV2Handle, EstimateSheetV2
       ? apiSections.map((s) => `${s.id}:${s.name}:${s.order}`).join("|")
       : "";
     const lastHydratedKey = useRef("");
+    const hydrationPending = useRef(false);
     useEffect(() => {
       const hydrateKey = `${estimateId}::${apiSectionsFingerprint}`;
       if (hydrateKey === lastHydratedKey.current) return;
       lastHydratedKey.current = hydrateKey;
 
       if (!apiSections?.length) {
-        // No sections — reset to just line items in order.
         setSections(new Map());
         sectionIdRef.current = 1;
         setEntryOrder(lineItems.map((l) => `item-${l.localId}`));
+        hydrationPending.current = true;
         return;
       }
 
@@ -239,11 +240,19 @@ export const EstimateSheetV2 = forwardRef<EstimateSheetV2Handle, EstimateSheetV2
       setSections(nextSections);
       sectionIdRef.current = maxSectionId + 1;
       setEntryOrder(sortedEntries);
+      hydrationPending.current = true;
     }, [estimateId, apiSectionsFingerprint, apiSections, lineItems]);
 
-    // Sync entryOrder when line items are added or removed from props.
+    // Sync entryOrder when line items are added or removed via user action.
+    // Skip the render immediately after hydration — the hydration effect
+    // already set the correct entryOrder but the sections state update
+    // hasn't flushed yet, so the closure here sees the old Map.
     const lineKeys = new Set(lineItems.map((l) => `item-${l.localId}`));
     useEffect(() => {
+      if (hydrationPending.current) {
+        hydrationPending.current = false;
+        return;
+      }
       setEntryOrder((prev) => {
         const existing = new Set(prev);
         const toAdd = lineItems
