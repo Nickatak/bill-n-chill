@@ -692,7 +692,7 @@
 }
 
 .mobilePaymentCard {
-  background: var(--surface-secondary);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-top: none;
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
