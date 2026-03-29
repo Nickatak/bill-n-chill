@@ -236,3 +236,78 @@
     opacity: 1;
   }
 }
+
+@media print {
+  /* Force desktop grid, flatten cards to rows */
+  .row {
+    grid-template-columns: 2fr 1.5fr 100px 80px;
+    grid-template-areas:
+      "idx idx idx idx"
+      "desc costcode delta days";
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    break-inside: avoid;
+  }
+
+  /* Flatten inputs to plain text */
+  .fieldInput {
+    border: 0;
+    background: transparent;
+    padding: 2px 0;
+    min-height: 0;
+    font-size: 0.78rem;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .fieldLabel {
+    font-size: 0.55rem;
+    color: #6b7280;
+    -webkit-text-fill-color: #6b7280;
+  }
+
+  .rowIndex {
+    font-size: 0.58rem;
+    color: #6b7280;
+    -webkit-text-fill-color: #6b7280;
+    cursor: default;
+  }
+
+  /* Hide interactive elements */
+  .removeX,
+  .dragGrip,
+  .sectionDragHandle {
+    display: none !important;
+  }
+
+  /* Section headers */
+  .sectionHeader {
+    border-bottom-color: #9ca3af;
+    padding: 4px 10px;
+    margin-top: 6px;
+    break-inside: avoid;
+  }
+
+  .sectionNameInput {
+    font-size: 0.95rem;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .sectionTotal {
+    font-size: 0.82rem;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  /* Tax badges — print-friendly */
+  .taxBadgeTaxable,
+  .taxBadgeExempt {
+    background: transparent;
+    border: 1px solid #9ca3af;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+}

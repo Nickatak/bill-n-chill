@@ -724,6 +724,49 @@
     table-layout: fixed;
   }
 
+  /* Undo mobile card transforms — restore proper table layout for print */
+  .table thead {
+    display: table-header-group;
+  }
+
+  .table tbody {
+    counter-reset: none;
+  }
+
+  .table tbody tr {
+    display: table-row;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    counter-increment: none;
+  }
+
+  .table tbody tr::before {
+    display: none;
+  }
+
+  .table tbody td {
+    display: table-cell;
+  }
+
+  .table tbody td::before {
+    display: none;
+  }
+
+  .table tbody td[data-hidden="true"] {
+    display: table-cell;
+  }
+
+  .mobileBreakdown {
+    display: none;
+  }
+
+  .tableWrap {
+    overflow: visible;
+  }
+
   .table th,
   .table td {
     white-space: normal;
@@ -733,6 +776,30 @@
 
   .table th {
     background: var(--surface);
+  }
+
+  /* Section variant rows in print */
+  .table tr[data-variant="section-header"] td {
+    background: transparent;
+    border-bottom: 1px solid #9ca3af;
+    color: var(--pub-accent-heading) !important;
+    -webkit-text-fill-color: var(--pub-accent-heading) !important;
+  }
+
+  .table tr[data-variant="section-subtotal"] td {
+    text-align: right;
+    font-weight: 600;
+    border-bottom: 2px solid #9ca3af;
+  }
+
+  /* Undo mobile variant row resets */
+  .table tbody tr[data-variant] {
+    display: table-row;
+  }
+
+  .table tbody tr[data-variant] td {
+    display: table-cell;
+    padding: var(--space-sm) 6px;
   }
 
   .header {

@@ -1136,90 +1136,20 @@
   }
 }
 
-@media (max-width: 640px) {
-
 /* ── Print ────────────────────────────────────────────────────── */
 
 @media print {
+  /* Hide the entire viewer panel — only the workspace/document prints */
+  .viewer {
+    display: none !important;
+  }
+
   .formToolbar,
   .formToolbarActions,
   .roleReadOnlyNote,
-  .viewerHeader,
-  .viewerHint,
-  .viewerRail,
-  .viewerHistoryRail,
-  .viewerCardLinkBar,
-  .quickStatusPills,
-  .viewerStatusActionRow,
-  .viewerEventList,
+  .primaryCreateButton,
   .cloneRevisionButton,
-  .showAllToggle,
-  .primaryCreateButton {
-    display: none !important;
-  }
-
-  /* Hide all viewer sections (status, history, line preview) — the CO sheet is the print target */
-  .viewerSection,
-  .viewerSectionToggle,
-  .viewerSectionContent {
-    display: none !important;
-  }
-
-  /* Strip viewer chrome */
-  .viewer {
-    margin: 0;
-    border: 0;
-    border-radius: 0;
-    padding: 0;
-    background: var(--surface);
-  }
-
-  .viewerDetail {
-    border: 0;
-    border-radius: 0;
-    padding: 0;
-    background: var(--surface);
-  }
-
-  .viewerGrid {
-    display: block;
-  }
-
   .viewerSection {
-    border: 0;
-    border-radius: 0;
-    padding: 0;
-    background: transparent;
-  }
-
-  /* Line table */
-  .lineTableWrap {
-    border: 1px solid #9ca3af;
-    border-radius: 0;
-    overflow: visible;
-  }
-
-  .lineTable th {
-    background: #f3f4f6;
-    color: #000000;
-    -webkit-text-fill-color: #000000;
-  }
-
-  .lineTable td {
-    color: #000000;
-    -webkit-text-fill-color: #000000;
-    break-inside: avoid;
-  }
-
-  /* Text colors */
-  .viewerSectionHeading {
-    color: #1e40af;
-    -webkit-text-fill-color: #1e40af;
-  }
-
-  .viewerMetaRow,
-  .viewerMetaLabel {
-    color: #000000;
-    -webkit-text-fill-color: #000000;
+    display: none !important;
   }
 }

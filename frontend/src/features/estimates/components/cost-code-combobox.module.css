@@ -132,6 +132,26 @@
   text-decoration: underline;
 }
 
+@media print {
+  .input {
+    border: 0;
+    background: transparent;
+    padding: 2px 0;
+    min-height: 0;
+    font-size: 0.78rem;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .inputWrap .clearButton {
+    display: none;
+  }
+
+  .menu {
+    display: none;
+  }
+}
+
 @media (max-width: 850px) {
   .input {
     min-height: 44px;
