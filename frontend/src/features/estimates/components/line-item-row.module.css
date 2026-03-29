@@ -324,6 +324,7 @@
 
   .fieldAmount {
     text-align: right;
+    justify-items: end;
   }
 
   /* Always show remove button on mobile (no hover) */
