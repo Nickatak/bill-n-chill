@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { HealthResult } from "@/shared/api/health";
@@ -51,6 +51,16 @@ type HomeRegisterConsoleProps = {
 };
 
 import { defaultApiBaseUrl } from "@/shared/api/base";
+
+function TermsConsent(): ReactNode {
+  return (
+    <p className={styles.termsConsent}>
+      By creating an account, you agree to our{" "}
+      <Link href="/terms" target="_blank">Terms of Service</Link> and{" "}
+      <Link href="/privacy" target="_blank">Privacy Policy</Link>.
+    </p>
+  );
+}
 
 /**
  * Map the register endpoint's snake_case organization payload to the
@@ -485,6 +495,7 @@ export function HomeRegisterConsole({ health, inviteToken }: HomeRegisterConsole
               {message}
             </p>
           )}
+          <TermsConsent />
           <div className={styles.formHintRow}>
             <div className={styles.buttonRow}>
               <button className={styles.button} type="submit" disabled={isSubmitting}>

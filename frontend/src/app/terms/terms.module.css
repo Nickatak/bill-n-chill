@@ -1,0 +1,54 @@
+.page {
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  padding: 3rem 2rem;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.content {
+  max-width: 680px;
+  width: 100%;
+}
+
+.content h1 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin: 0 0 0.25rem;
+  color: var(--text-primary);
+}
+
+.effective {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0 0 2rem;
+}
+
+.content h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 1.75rem 0 0.5rem;
+  color: var(--text-primary);
+}
+
+.content p {
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  margin: 0 0 0.75rem;
+}
+
+.content a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.content section {
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 0.5rem;
+}
+
+.content section:last-of-type {
+  border-bottom: none;
+}

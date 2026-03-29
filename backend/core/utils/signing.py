@@ -9,8 +9,6 @@ import json
 # ---------------------------------------------------------------------------
 
 CEREMONY_CONSENT_TEXT = (
-    "[DRAFT — REQUIRES ATTORNEY REVIEW BEFORE PRODUCTION USE]\n"
-    "\n"
     "By typing my name and checking this box, I confirm that:\n"
     "1. I have reviewed the document above in its entirety.\n"
     "2. I intend this action to serve as my electronic signature.\n"

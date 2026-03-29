@@ -148,3 +148,13 @@
 .footerDot {
   opacity: 0.4;
 }
+
+.footerLink {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.footerLink:hover {
+  color: var(--text-secondary);
+  text-decoration: underline;
+}

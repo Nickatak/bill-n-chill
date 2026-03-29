@@ -33,7 +33,7 @@ export type DecisionOption = {
 export type CeremonyPayload = {
   session_token: string;
   signer_name: string;
-  consent_accepted: true;
+  consent_accepted: boolean;
   note: string;
 };
 
@@ -196,7 +196,7 @@ export function SigningCeremony({
       await onDecision(decision, {
         session_token: sessionToken,
         signer_name: signerName.trim(),
-        consent_accepted: true,
+        consent_accepted: consentChecked,
         note: "",
       });
     } catch {
@@ -328,8 +328,7 @@ export function SigningCeremony({
       </label>
 
       <div className={styles.consentBox}>
-        <span className={styles.draftBanner}>DRAFT — NOT YET LEGALLY REVIEWED</span>
-        <p className={styles.consentText}>{consentText.replace("[DRAFT — REQUIRES ATTORNEY REVIEW BEFORE PRODUCTION USE]\n\n", "")}</p>
+        <p className={styles.consentText}>{consentText}</p>
         <div className={styles.consentCheckRow}>
           <input
             type="checkbox"

@@ -514,7 +514,7 @@ class CeremonyDecisionValidationTests(TestCase):
         self.assertTrue(record.email_verified)
         self.assertEqual(len(record.content_hash), 64)
         self.assertEqual(record.consent_text_version, CEREMONY_CONSENT_TEXT_VERSION)
-        self.assertIn("[DRAFT", record.consent_text_snapshot)
+        self.assertIn("electronic signature", record.consent_text_snapshot)
 
     def test_decision_without_session_token_returns_403(self):
         response = self.client.post(
