@@ -141,25 +141,15 @@ export function useEstimateFormFields({
   /**
    * Pre-fill the create form from an existing estimate (duplicate-as-new).
    *
-   * When the source family is non-terminal, the title is locked so the new
-   * estimate joins the same family. When the source family is terminal
-   * (has an approved member), the title gets a "(Copy)" suffix and remains
-   * editable so the user starts a new family.
+   * Always starts a new family with an editable title and "(Copy)" suffix.
+   * Use "New Revision" (via the viewer panel) to add a version to the
+   * same family instead.
    */
-  const populateCreateFromEstimate = useCallback((estimate: EstimateRecord, familyIsTerminal = false) => {
+  const populateCreateFromEstimate = useCallback((estimate: EstimateRecord) => {
     const estimateTerms = (estimate.terms_text || "").trim();
-    if (familyIsTerminal) {
-      setEstimateTitle(`${estimate.title || "Untitled"} (Copy)`);
-      setTitleLocked(false);
-      setDuplicateHint(
-        "The original estimate was approved and can\u2019t be revised. "
-        + "This will start a new estimate \u2014 give it a distinct title.",
-      );
-    } else {
-      setEstimateTitle(estimate.title || "Untitled");
-      setTitleLocked(true);
-      setDuplicateHint("");
-    }
+    setEstimateTitle(`${estimate.title || "Untitled"} (Copy)`);
+    setTitleLocked(false);
+    setDuplicateHint("This will start a new estimate family — change the title to distinguish it.");
     setTermsText(estimateTerms || organizationDefaults?.estimate_terms_and_conditions || "");
     setNotesText(estimate.notes_text || "");
     setTaxPercent(String(estimate.tax_percent ?? "0"));
@@ -198,6 +188,7 @@ export function useEstimateFormFields({
   /** Update the title and clear stale family-collision prompts when the title diverges. */
   function handleEstimateTitleChange(value: string) {
     setEstimateTitle(value);
+    if (duplicateHint) setDuplicateHint("");
     const nextKey = normalizeFamilyTitle(value);
     if (confirmedFamilyTitleKey && confirmedFamilyTitleKey !== nextKey) {
       setConfirmedFamilyTitleKey("");

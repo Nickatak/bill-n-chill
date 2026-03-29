@@ -1097,6 +1097,15 @@
   display: grid;
 }
 
+.duplicateDialog .lifecycleActions {
+  flex-direction: row;
+}
+
+.duplicateDialog .lifecycleActionButton {
+  flex: 1 1 0;
+  text-align: center;
+}
+
 .duplicateDialog::backdrop {
   background: rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(3px);

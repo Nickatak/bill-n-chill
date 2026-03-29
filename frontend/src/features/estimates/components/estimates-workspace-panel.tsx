@@ -9,7 +9,7 @@
  */
 "use client";
 
-import { RefObject } from "react";
+import { RefObject, useEffect, useRef } from "react";
 import type { LineValidationResult } from "../helpers";
 import { EstimateSheet, OrganizationDocumentDefaults } from "./estimate-sheet";
 import type {
@@ -164,6 +164,18 @@ export function EstimatesWorkspacePanel({
   onSortLineItems,
   onSubmit,
 }: EstimatesWorkspacePanelProps) {
+  const collisionDialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = collisionDialogRef.current;
+    if (!dialog) return;
+    if (familyCollisionPrompt && !dialog.open) {
+      dialog.showModal();
+    } else if (!familyCollisionPrompt && dialog.open) {
+      dialog.close();
+    }
+  }, [familyCollisionPrompt]);
+
   return (
     <>
       <section className={styles.composerPrep}>
@@ -196,37 +208,41 @@ export function EstimatesWorkspacePanel({
           </div>
         </div>
         {actionMessage && actionTone !== "success" ? <p className={`${styles.actionError} ${styles.composerPrepMessage}`}>{actionMessage}</p> : null}
-        {familyCollisionPrompt ? (
-          <div className={`${styles.duplicatePanel} ${styles.composerPrepPanel}`}>
-            <p className={styles.inlineHint}>
-              A family titled <strong>{familyCollisionPrompt.title}</strong> already exists
-              {familyCollisionPrompt.latestVersion
-                ? ` (latest v${familyCollisionPrompt.latestVersion})`
-                : ""}
-              . Creating now will add a new version to that family.
-            </p>
-            <div className={styles.lifecycleActions}>
-              <button
-                type="button"
-                onClick={() => {
-                  const projectId = Number(selectedProjectId);
-                  const trimmedTitle = estimateTitle.trim();
-                  if (projectId && trimmedTitle) {
-                    onConfirmCollision(projectId, trimmedTitle);
-                  }
-                }}
-              >
-                Create Revision In Existing Family
-              </button>
-              <button
-                type="button"
-                onClick={onDismissCollision}
-              >
-                Use Different Title
-              </button>
-            </div>
-          </div>
-        ) : null}
+        <dialog ref={collisionDialogRef} className={styles.duplicateDialog}>
+          {familyCollisionPrompt ? (
+            <>
+              <p className={styles.inlineHint}>
+                A family titled <strong>{familyCollisionPrompt.title}</strong> already exists
+                {familyCollisionPrompt.latestVersion
+                  ? ` (latest v${familyCollisionPrompt.latestVersion})`
+                  : ""}
+                . Creating now will add a new version to that family.
+              </p>
+              <div className={styles.lifecycleActions}>
+                <button
+                  type="button"
+                  className={`${styles.lifecycleActionButton} ${styles.lifecycleActionButtonPrimary}`}
+                  onClick={() => {
+                    const projectId = Number(selectedProjectId);
+                    const trimmedTitle = estimateTitle.trim();
+                    if (projectId && trimmedTitle) {
+                      onConfirmCollision(projectId, trimmedTitle);
+                    }
+                  }}
+                >
+                  Create Revision In Existing Family
+                </button>
+                <button
+                  type="button"
+                  className={styles.lifecycleActionButton}
+                  onClick={onDismissCollision}
+                >
+                  Use Different Title
+                </button>
+              </div>
+            </>
+          ) : null}
+        </dialog>
       </section>
 
       {!canMutateEstimates ? (

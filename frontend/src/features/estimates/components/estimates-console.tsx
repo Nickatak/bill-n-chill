@@ -435,11 +435,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
 
   /** Pre-fill the create form from an existing estimate (duplicate-as-new). */
   function handleDuplicateAsNew(sourceEstimate: EstimateRecord) {
-    const sourceKey = normalizeFamilyTitle(sourceEstimate.title);
-    const familyIsTerminal = estimates.some(
-      (e) => normalizeFamilyTitle(e.title) === sourceKey && e.status === "approved",
-    );
-    formFields.populateCreateFromEstimate(sourceEstimate, familyIsTerminal);
+    formFields.populateCreateFromEstimate(sourceEstimate);
     setSelectedEstimateId("");
     selectedEstimateIdRef.current = "";
     flashCreator();
