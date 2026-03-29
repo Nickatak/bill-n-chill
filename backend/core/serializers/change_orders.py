@@ -56,12 +56,22 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
     line_items = ChangeOrderLineSerializer(many=True, read_only=True)
     sections = ChangeOrderSectionSerializer(many=True, read_only=True)
     line_total_delta = serializers.SerializerMethodField()
+    contract_pdf_url = serializers.SerializerMethodField()
 
     def get_line_total_delta(self, obj) -> str:
         """Return the sum of all line item amount deltas as a decimal string."""
         if not hasattr(obj, "_prefetched_objects_cache") or "line_items" not in obj._prefetched_objects_cache:
             return str(obj.line_items.all().aggregate(total=Sum("amount_delta")).get("total") or Decimal("0.00"))
         return str(sum((line.amount_delta for line in obj.line_items.all()), Decimal("0.00")))
+
+    def get_contract_pdf_url(self, obj: ChangeOrder) -> str:
+        """Return the absolute URL for the uploaded contract PDF, or empty string."""
+        if not obj.contract_pdf:
+            return ""
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.contract_pdf.url)
+        return ""
 
     class Meta:
         model = ChangeOrder
@@ -79,6 +89,7 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
             "sender_name",
             "sender_address",
             "sender_logo_url",
+            "contract_pdf_url",
             "origin_estimate",
             "requested_by",
             "requested_by_email",

@@ -11,6 +11,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ContractPdfUpload } from "@/shared/document-creator/contract-pdf-upload";
 import { formatDateTimeDisplay } from "@/shared/date-format";
 import { formatDecimal } from "@/shared/money-format";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
@@ -385,6 +386,11 @@ export type EstimatesViewerPanelProps = {
   handleUpdateEstimateStatus: (notifyCustomer?: boolean) => Promise<EstimateRecord | null>;
   handleAddEstimateStatusNote: () => void;
   statusEvents: EstimateStatusEventRecord[];
+
+  // Contract PDF
+  authToken: string;
+  readOnly: boolean;
+  onContractPdfUpdate: (newUrl: string) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -426,6 +432,9 @@ export function EstimatesViewerPanel({
   handleUpdateEstimateStatus,
   handleAddEstimateStatusNote,
   statusEvents,
+  authToken,
+  readOnly,
+  onContractPdfUpdate,
 }: EstimatesViewerPanelProps) {
   return (
     <section className={styles.lifecycle}>
@@ -625,6 +634,16 @@ export function EstimatesViewerPanel({
               handleUpdateEstimateStatus={handleUpdateEstimateStatus}
               handleAddEstimateStatusNote={handleAddEstimateStatusNote}
               canSubmitStatusNote={canSubmitStatusNote}
+            />
+          ) : null}
+
+          {selectedEstimateId && selectedEstimate ? (
+            <ContractPdfUpload
+              contractPdfUrl={selectedEstimate.contract_pdf_url ?? ""}
+              documentPath={`estimates/${selectedEstimate.id}`}
+              authToken={authToken}
+              readOnly={readOnly}
+              onUpdate={onContractPdfUpdate}
             />
           ) : null}
 

@@ -32,6 +32,9 @@ from core.views.helpers import _promote_prospect_to_active, _resolve_cost_codes_
 # Constants (imported by views)
 # ---------------------------------------------------------------------------
 
+CONTRACT_PDF_MAX_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
+CONTRACT_PDF_ALLOWED_CONTENT_TYPES = {"application/pdf"}
+
 ESTIMATE_DECISION_TO_STATUS: dict[str, str] = {
     "approve": Estimate.Status.APPROVED,
     "approved": Estimate.Status.APPROVED,
@@ -437,7 +440,7 @@ def _handle_estimate_document_save(
             )
 
     estimate.refresh_from_db()
-    return Response({"data": EstimateSerializer(estimate).data, "email_sent": False})
+    return Response({"data": EstimateSerializer(estimate, context={"request": request}).data, "email_sent": False})
 
 
 def _handle_estimate_status_transition(
@@ -543,7 +546,7 @@ def _handle_estimate_status_transition(
             email_sent = True
 
     estimate.refresh_from_db()
-    return Response({"data": EstimateSerializer(estimate).data, "email_sent": email_sent})
+    return Response({"data": EstimateSerializer(estimate, context={"request": request}).data, "email_sent": email_sent})
 
 
 def _handle_estimate_status_note(
@@ -568,4 +571,4 @@ def _handle_estimate_status_note(
         )
 
     estimate.refresh_from_db()
-    return Response({"data": EstimateSerializer(estimate).data, "email_sent": False})
+    return Response({"data": EstimateSerializer(estimate, context={"request": request}).data, "email_sent": False})

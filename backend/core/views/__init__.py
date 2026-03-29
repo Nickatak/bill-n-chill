@@ -17,6 +17,7 @@ from core.views.shared_operations.organization_management import (
 )
 from core.views.auth import accept_invite_view, check_invite_by_email_view, forgot_password_view, health_view, impersonate_exit_view, impersonate_start_view, impersonate_users_view, login_view, me_view, register_view, resend_verification_view, reset_password_view, verify_email_view, verify_invite_view
 from core.views.change_orders.change_orders import (
+    change_order_contract_pdf_upload_view,
     change_order_contract_view,
     change_order_detail_view,
     change_order_status_events_view,
@@ -29,6 +30,7 @@ from core.views.shared_operations.cost_codes import (
     cost_codes_list_create_view,
 )
 from core.views.estimating.estimates import (
+    estimate_contract_pdf_upload_view,
     estimate_contract_view,
     estimate_detail_view,
     estimate_status_events_view,
@@ -132,6 +134,7 @@ __all__ = [
     "cost_codes_list_create_view",
     "cost_code_detail_view",
     "project_estimates_view",
+    "estimate_contract_pdf_upload_view",
     "estimate_contract_view",
     "public_estimate_detail_view",
     "public_estimate_decision_view",
@@ -140,6 +143,7 @@ __all__ = [
     "estimate_detail_view",
     "estimate_status_events_view",
     "project_change_orders_view",
+    "change_order_contract_pdf_upload_view",
     "change_order_contract_view",
     "change_order_detail_view",
     "public_change_order_detail_view",

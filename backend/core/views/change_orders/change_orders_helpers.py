@@ -35,6 +35,9 @@ from core.utils.money import MONEY_ZERO, quantize_money
 # Constants (imported by views)
 # ---------------------------------------------------------------------------
 
+CONTRACT_PDF_MAX_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
+CONTRACT_PDF_ALLOWED_CONTENT_TYPES = {"application/pdf"}
+
 CO_DECISION_TO_STATUS: dict[str, str] = {
     "approve": ChangeOrder.Status.APPROVED,
     "approved": ChangeOrder.Status.APPROVED,
@@ -356,7 +359,7 @@ def _handle_co_document_save(
         )
 
     refreshed = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
-    return Response({"data": ChangeOrderSerializer(refreshed).data, "email_sent": False})
+    return Response({"data": ChangeOrderSerializer(refreshed, context={"request": request}).data, "email_sent": False})
 
 
 def _handle_co_status_transition(
@@ -495,7 +498,7 @@ def _handle_co_status_transition(
             email_sent = True
 
     refreshed = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
-    return Response({"data": ChangeOrderSerializer(refreshed).data, "email_sent": email_sent})
+    return Response({"data": ChangeOrderSerializer(refreshed, context={"request": request}).data, "email_sent": email_sent})
 
 
 def _handle_co_status_note(
@@ -520,4 +523,4 @@ def _handle_co_status_note(
         )
 
     refreshed = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
-    return Response({"data": ChangeOrderSerializer(refreshed).data, "email_sent": False})
+    return Response({"data": ChangeOrderSerializer(refreshed, context={"request": request}).data, "email_sent": False})

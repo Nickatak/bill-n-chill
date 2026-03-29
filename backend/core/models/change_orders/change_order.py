@@ -70,6 +70,7 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
         db_index=True,
     )
     public_token = models.CharField(max_length=24, unique=True, null=True, blank=True)
+    contract_pdf = models.FileField(upload_to="contracts/change-orders/", blank=True, default="")
     amount_delta = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     days_delta = models.IntegerField(default=0)
     reason = models.TextField(blank=True)

@@ -62,6 +62,16 @@ class EstimateSerializer(serializers.ModelSerializer):
     line_items = EstimateLineItemSerializer(many=True, read_only=True)
     sections = EstimateSectionSerializer(many=True, read_only=True)
     public_ref = serializers.CharField(read_only=True)
+    contract_pdf_url = serializers.SerializerMethodField()
+
+    def get_contract_pdf_url(self, obj: Estimate) -> str:
+        """Return the absolute URL for the uploaded contract PDF, or empty string."""
+        if not obj.contract_pdf:
+            return ""
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.contract_pdf.url)
+        return ""
 
     class Meta:
         model = Estimate
@@ -77,6 +87,7 @@ class EstimateSerializer(serializers.ModelSerializer):
             "sender_name",
             "sender_address",
             "sender_logo_url",
+            "contract_pdf_url",
             "subtotal",
             "markup_total",
             "tax_percent",

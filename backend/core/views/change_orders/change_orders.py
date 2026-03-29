@@ -31,6 +31,8 @@ from core.utils.request import get_client_ip
 from core.utils.signing import compute_document_content_hash
 from core.views.change_orders.change_orders_helpers import (
     CO_DECISION_TO_STATUS,
+    CONTRACT_PDF_ALLOWED_CONTENT_TYPES,
+    CONTRACT_PDF_MAX_SIZE_BYTES,
     _handle_co_document_save,
     _handle_co_status_note,
     _handle_co_status_transition,
@@ -341,6 +343,118 @@ def change_order_contract_view(_request):
     return Response({"data": get_change_order_policy_contract()})
 
 
+@api_view(["POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+def change_order_contract_pdf_upload_view(request, change_order_id):
+    """Upload, replace, or delete the contract PDF attached to a change order.
+
+    POST accepts ``multipart/form-data`` with a single ``contract_pdf`` file
+    field.  Validates content type (PDF only) and size (10 MB max).  If a
+    previous file exists it is deleted before saving the new one.
+
+    DELETE removes the attached contract PDF if one exists.
+
+    Flow:
+        1. Capability gate: ``change_orders.edit``.
+        2. Validate change order is in the user's org.
+        3. (POST) Validate file presence, content type, and size.
+        4. Delete previous file if one exists.
+        5. Save new file (POST) or clear field (DELETE).
+
+    URL: ``POST/DELETE /api/v1/change-orders/<change_order_id>/contract-pdf/``
+
+    Request body (POST): ``multipart/form-data`` with ``contract_pdf`` file field.
+
+    Success 200::
+
+        { "data": { ... } }
+
+    Errors:
+        - 400: No file provided, unsupported content type, or file too large.
+        - 403: Missing ``change_orders.edit`` capability.
+        - 404: Change order not found.
+    """
+    permission_error, _ = _capability_gate(request.user, "change_orders", "edit")
+    if permission_error:
+        return Response(permission_error, status=403)
+
+    membership = _ensure_org_membership(request.user)
+    try:
+        change_order = ChangeOrder.objects.get(
+            id=change_order_id,
+            project__organization_id=membership.organization_id,
+        )
+    except ChangeOrder.DoesNotExist:
+        return Response(
+            {"error": {"code": "not_found", "message": "Change order not found.", "fields": {}}},
+            status=404,
+        )
+
+    previous_url = request.build_absolute_uri(change_order.contract_pdf.url) if change_order.contract_pdf else ""
+
+    if request.method == "DELETE":
+        if change_order.contract_pdf:
+            change_order.contract_pdf = ""
+            change_order.save(update_fields=["contract_pdf", "updated_at"])
+            ChangeOrderStatusEvent.record(
+                change_order=change_order,
+                from_status=change_order.status,
+                to_status=change_order.status,
+                note=f"Contract PDF removed (previous: {previous_url}).",
+                changed_by=request.user,
+            )
+        return Response({"data": ChangeOrderSerializer(change_order, context={"request": request}).data})
+
+    # POST — upload/replace
+    pdf_file = request.FILES.get("contract_pdf")
+    if not pdf_file:
+        return Response(
+            {"error": {"code": "validation_error", "message": "No contract PDF file provided.", "fields": {}}},
+            status=400,
+        )
+
+    if pdf_file.content_type not in CONTRACT_PDF_ALLOWED_CONTENT_TYPES:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": f"Unsupported file type: {pdf_file.content_type}. Only PDF files are accepted.",
+                    "fields": {},
+                }
+            },
+            status=400,
+        )
+
+    if pdf_file.size > CONTRACT_PDF_MAX_SIZE_BYTES:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Contract PDF exceeds 10 MB size limit.",
+                    "fields": {},
+                }
+            },
+            status=400,
+        )
+
+    change_order.contract_pdf = pdf_file
+    change_order.save(update_fields=["contract_pdf", "updated_at"])
+
+    if previous_url:
+        note = f"Contract PDF replaced: {pdf_file.name} (previous: {previous_url})."
+    else:
+        note = f"Contract PDF attached: {pdf_file.name}."
+    ChangeOrderStatusEvent.record(
+        change_order=change_order,
+        from_status=change_order.status,
+        to_status=change_order.status,
+        note=note,
+        changed_by=request.user,
+    )
+
+    return Response({"data": ChangeOrderSerializer(change_order, context={"request": request}).data})
+
+
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_change_orders_view(request, project_id):
@@ -400,7 +514,7 @@ def project_change_orders_view(request, project_id):
             .order_by("-created_at")
         )
         return Response(
-            {"data": ChangeOrderSerializer(change_orders, many=True).data}
+            {"data": ChangeOrderSerializer(change_orders, many=True, context={"request": request}).data}
         )
 
     elif request.method == "POST":
@@ -519,7 +633,7 @@ def project_change_orders_view(request, project_id):
             changed_by=request.user,
         )
         created = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
-        return Response({"data": ChangeOrderSerializer(created).data}, status=201)
+        return Response({"data": ChangeOrderSerializer(created, context={"request": request}).data}, status=201)
 
 
 @api_view(["GET", "PATCH"])
@@ -574,7 +688,7 @@ def change_order_detail_view(request, change_order_id):
         )
 
     if request.method == "GET":
-        return Response({"data": ChangeOrderSerializer(change_order).data})
+        return Response({"data": ChangeOrderSerializer(change_order, context={"request": request}).data})
 
     elif request.method == "PATCH":
         permission_error, _ = _capability_gate(request.user, "change_orders", "edit")

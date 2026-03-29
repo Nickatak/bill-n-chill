@@ -96,6 +96,7 @@ export type ChangeOrderRecord = {
   sender_name: string;
   sender_address: string;
   sender_logo_url: string;
+  contract_pdf_url?: string;
   origin_estimate: number | null;
   origin_estimate_version?: number | null;
   requested_by: number;

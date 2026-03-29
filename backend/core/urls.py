@@ -7,6 +7,7 @@ from core.views import (
     impersonate_exit_view,
     impersonate_start_view,
     impersonate_users_view,
+    change_order_contract_pdf_upload_view,
     change_order_contract_view,
     change_order_detail_view,
     change_order_status_events_view,
@@ -21,6 +22,7 @@ from core.views import (
     customer_detail_view,
     customer_project_create_view,
     customers_list_view,
+    estimate_contract_pdf_upload_view,
     estimate_contract_view,
     estimate_detail_view,
     estimate_status_events_view,
@@ -228,6 +230,11 @@ urlpatterns = [
     ),
     path("estimates/<int:estimate_id>/", estimate_detail_view, name="estimate-detail"),
     path(
+        "estimates/<int:estimate_id>/contract-pdf/",
+        estimate_contract_pdf_upload_view,
+        name="estimate-contract-pdf-upload",
+    ),
+    path(
         "public/estimates/<str:public_token>/",
         public_estimate_detail_view,
         name="public-estimate-detail",
@@ -277,6 +284,11 @@ urlpatterns = [
         "change-orders/<int:change_order_id>/",
         change_order_detail_view,
         name="change-order-detail",
+    ),
+    path(
+        "change-orders/<int:change_order_id>/contract-pdf/",
+        change_order_contract_pdf_upload_view,
+        name="change-order-contract-pdf-upload",
     ),
     path(
         "change-orders/<int:change_order_id>/status-events/",

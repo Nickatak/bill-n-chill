@@ -84,6 +84,7 @@ class Estimate(StatusTransitionMixin, models.Model):
     sender_address = models.TextField(blank=True, default="")
     sender_logo_url = models.URLField(blank=True, default="")
     public_token = models.CharField(max_length=24, unique=True, null=True, blank=True)
+    contract_pdf = models.FileField(upload_to="contracts/estimates/", blank=True, default="")
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     markup_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     tax_percent = models.DecimalField(max_digits=6, decimal_places=2, default=0)

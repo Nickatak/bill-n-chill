@@ -14,6 +14,7 @@ import { formatDecimal } from "@/shared/money-format";
 import { DocumentCreator } from "@/shared/document-creator";
 import type { DocumentCreatorAdapter, CreatorLineDraft } from "@/shared/document-creator/types";
 import { ChangeOrderSheetV2, type ChangeOrderSheetV2Handle } from "./change-order-sheet-v2";
+import { ContractPdfUpload } from "@/shared/document-creator/contract-pdf-upload";
 import { ReadOnlyLineTable, readOnlyLineTableStyles as roTableStyles } from "@/shared/document-viewer/read-only-line-table";
 import type {
   ChangeOrderLineInput,
@@ -116,6 +117,10 @@ export type ChangeOrdersWorkspacePanelProps = {
   setIsOriginLineItemsSectionOpen: React.Dispatch<React.SetStateAction<boolean>>;
   currentAcceptedTotal: string | null;
   originalEstimateTotal: string | null;
+
+  // Contract PDF
+  authToken: string;
+  onContractPdfUpdate: (newUrl: string) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -185,6 +190,8 @@ export function ChangeOrdersWorkspacePanel({
   setIsOriginLineItemsSectionOpen,
   currentAcceptedTotal,
   originalEstimateTotal,
+  authToken,
+  onContractPdfUpdate,
 }: ChangeOrdersWorkspacePanelProps) {
 
   // -------------------------------------------------------------------------
@@ -669,6 +676,15 @@ export function ChangeOrdersWorkspacePanel({
             ),
           }}
         />
+        {selectedChangeOrder ? (
+          <ContractPdfUpload
+            contractPdfUrl={selectedChangeOrder.contract_pdf_url ?? ""}
+            documentPath={`change-orders/${selectedChangeOrder.id}`}
+            authToken={authToken}
+            readOnly={!isSelectedChangeOrderEditable}
+            onUpdate={onContractPdfUpdate}
+          />
+        ) : null}
         {selectedChangeOrder && (selectedChangeOrder.status === "approved" || selectedChangeOrder.status === "rejected") ? (
           <div
             className={`${stampStyles.decisionStamp} ${

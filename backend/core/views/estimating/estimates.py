@@ -24,6 +24,8 @@ from django_q.tasks import async_task
 from core.utils.request import get_client_ip
 from core.utils.signing import compute_document_content_hash
 from core.views.estimating.estimates_helpers import (
+    CONTRACT_PDF_ALLOWED_CONTENT_TYPES,
+    CONTRACT_PDF_MAX_SIZE_BYTES,
     ESTIMATE_DECISION_TO_STATUS,
     _apply_estimate_lines_and_totals,
     _archive_estimate_family,
@@ -263,6 +265,113 @@ def estimate_contract_view(_request):
     return Response({"data": get_estimate_policy_contract()})
 
 
+@api_view(["POST", "DELETE"])
+@permission_classes([IsAuthenticated])
+def estimate_contract_pdf_upload_view(request, estimate_id):
+    """Upload, replace, or delete the contract PDF attached to an estimate.
+
+    POST accepts ``multipart/form-data`` with a single ``contract_pdf`` file
+    field.  Validates content type (PDF only) and size (10 MB max).  If a
+    previous file exists it is deleted before saving the new one.
+
+    DELETE removes the attached contract PDF if one exists.
+
+    Flow:
+        1. Capability gate: ``estimates.edit``.
+        2. Validate estimate is in the user's org.
+        3. (POST) Validate file presence, content type, and size.
+        4. Delete previous file if one exists.
+        5. Save new file (POST) or clear field (DELETE).
+
+    URL: ``POST/DELETE /api/v1/estimates/<estimate_id>/contract-pdf/``
+
+    Request body (POST): ``multipart/form-data`` with ``contract_pdf`` file field.
+
+    Success 200::
+
+        { "data": { ... } }
+
+    Errors:
+        - 400: No file provided, unsupported content type, or file too large.
+        - 403: Missing ``estimates.edit`` capability.
+        - 404: Estimate not found.
+    """
+    permission_error, _ = _capability_gate(request.user, "estimates", "edit")
+    if permission_error:
+        return Response(permission_error, status=403)
+
+    estimate = _validate_estimate_for_user(estimate_id, request.user)
+    if not estimate:
+        return Response(
+            {"error": {"code": "not_found", "message": "Estimate not found.", "fields": {}}},
+            status=404,
+        )
+
+    previous_url = request.build_absolute_uri(estimate.contract_pdf.url) if estimate.contract_pdf else ""
+
+    if request.method == "DELETE":
+        if estimate.contract_pdf:
+            estimate.contract_pdf = ""
+            estimate.save(update_fields=["contract_pdf", "updated_at"])
+            EstimateStatusEvent.record(
+                estimate=estimate,
+                from_status=estimate.status,
+                to_status=estimate.status,
+                note=f"Contract PDF removed (previous: {previous_url}).",
+                changed_by=request.user,
+            )
+        return Response({"data": EstimateSerializer(estimate, context={"request": request}).data})
+
+    # POST — upload/replace
+    pdf_file = request.FILES.get("contract_pdf")
+    if not pdf_file:
+        return Response(
+            {"error": {"code": "validation_error", "message": "No contract PDF file provided.", "fields": {}}},
+            status=400,
+        )
+
+    if pdf_file.content_type not in CONTRACT_PDF_ALLOWED_CONTENT_TYPES:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": f"Unsupported file type: {pdf_file.content_type}. Only PDF files are accepted.",
+                    "fields": {},
+                }
+            },
+            status=400,
+        )
+
+    if pdf_file.size > CONTRACT_PDF_MAX_SIZE_BYTES:
+        return Response(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Contract PDF exceeds 10 MB size limit.",
+                    "fields": {},
+                }
+            },
+            status=400,
+        )
+
+    estimate.contract_pdf = pdf_file
+    estimate.save(update_fields=["contract_pdf", "updated_at"])
+
+    if previous_url:
+        note = f"Contract PDF replaced: {pdf_file.name} (previous: {previous_url})."
+    else:
+        note = f"Contract PDF attached: {pdf_file.name}."
+    EstimateStatusEvent.record(
+        estimate=estimate,
+        from_status=estimate.status,
+        to_status=estimate.status,
+        note=note,
+        changed_by=request.user,
+    )
+
+    return Response({"data": EstimateSerializer(estimate, context={"request": request}).data})
+
+
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def project_estimates_view(request, project_id):
@@ -321,7 +430,7 @@ def project_estimates_view(request, project_id):
         estimates = _prefetch_estimate_qs(
             Estimate.objects.filter(project=project)
         ).order_by("-version")
-        return Response({"data": EstimateSerializer(estimates, many=True).data})
+        return Response({"data": EstimateSerializer(estimates, many=True, context={"request": request}).data})
 
     elif request.method == "POST":
         permission_error, _ = _capability_gate(request.user, "estimates", "create")
@@ -510,7 +619,7 @@ def project_estimates_view(request, project_id):
                 note=f"Archived because estimate #{estimate.id} superseded this version.",
             )
         return Response(
-            {"data": EstimateSerializer(estimate).data},
+            {"data": EstimateSerializer(estimate, context={"request": request}).data},
             status=201,
         )
 
@@ -560,7 +669,7 @@ def estimate_detail_view(request, estimate_id):
         )
 
     if request.method == "GET":
-        return Response({"data": EstimateSerializer(estimate).data})
+        return Response({"data": EstimateSerializer(estimate, context={"request": request}).data})
 
     elif request.method == "PATCH":
         permission_error, _ = _capability_gate(request.user, "estimates", "edit")

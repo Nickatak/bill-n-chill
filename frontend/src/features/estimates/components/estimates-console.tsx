@@ -1147,6 +1147,16 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         handleUpdateEstimateStatus={handleUpdateEstimateStatus}
         handleAddEstimateStatusNote={handleAddEstimateStatusNote}
         statusEvents={statusEvents}
+        authToken={authToken}
+        readOnly={!canMutateEstimates}
+        onContractPdfUpdate={(newUrl) => {
+          if (!selectedEstimate) return;
+          const updated = { ...selectedEstimate, contract_pdf_url: newUrl };
+          setEstimates((current) =>
+            current.map((e) => (e.id === updated.id ? updated : e)),
+          );
+          void loadStatusEvents({ estimateId: selectedEstimate.id, quiet: true });
+        }}
       />
 
       <EstimatesWorkspacePanel

@@ -1,0 +1,109 @@
+.container {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-lg);
+  padding-bottom: var(--space-lg);
+  color: var(--text-secondary);
+  display: grid;
+  gap: 8px;
+}
+
+.heading {
+  margin: 0;
+  color: var(--accent-text);
+  font-size: 1rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.fileRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fileLink {
+  color: var(--accent-text);
+  text-decoration: underline;
+  word-break: break-all;
+  font-size: 0.875rem;
+}
+
+.emptyLabel {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.fileInput {
+  display: none;
+}
+
+.uploadButton {
+  justify-self: start;
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.uploadButton:hover:not(:disabled) {
+  background: var(--surface-secondary);
+}
+
+.uploadButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.removeButton {
+  padding: 4px 10px;
+  border: 1px solid var(--tone-error-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--tone-error-text);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.removeButton:hover:not(:disabled) {
+  background: var(--tone-error-bg);
+}
+
+.removeButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.error {
+  margin: 0;
+  color: var(--tone-error-text);
+  font-size: 0.8rem;
+}
+
+@media print {
+  .uploadButton,
+  .removeButton,
+  .fileInput {
+    display: none !important;
+  }
+
+  .container {
+    border-top-color: #9ca3af;
+  }
+
+  .heading {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .fileLink {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .emptyLabel {
+    display: none;
+  }
+}
