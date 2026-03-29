@@ -205,7 +205,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     items: lineItems, setItems: setLineItems,
     setNextId: setNextLineId,
     add: addLineRaw, remove: removeLineRaw,
-    update: updateLineRaw, move: moveLineRaw,
+    update: updateLineRaw, move: moveLineRaw, reorder: reorderLineRaw,
     duplicate: duplicateLineRaw, reset: resetLines,
   } = useLineItems<EstimateLineInput>({ createEmpty: emptyLine });
 
@@ -383,7 +383,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     ? Boolean(statusNote.trim())
     : false;
   const workspaceContext = selectedEstimate
-    ? `${selectedEstimate.title || "Untitled"} · #${selectedEstimate.id} v${selectedEstimate.version}`
+    ? `${selectedEstimate.title || "Untitled"} · v${selectedEstimate.version}`
     : "New estimate draft";
   const workspaceContextLabel = !selectedEstimate
     ? "Creating"
@@ -725,6 +725,12 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     formFields.setLineSortDirection("asc");
   }
 
+  function reorderLineItems(activeId: number, overId: number) {
+    reorderLineRaw(activeId, overId);
+    formFields.setLineSortKey(null);
+    formFields.setLineSortDirection("asc");
+  }
+
   function removeLineItem(localId: number) {
     if (!removeLineRaw(localId)) {
       setFormErrorMessage(ESTIMATE_MIN_LINE_ITEMS_ERROR);
@@ -819,6 +825,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           allow_existing_title_family: allowExistingTitleFamily,
           valid_through: formFields.validThrough || null,
           tax_percent: formFields.taxPercent,
+          notes_text: formFields.notesText,
           line_items: lineItems.map((line) => ({
             cost_code: Number(line.costCodeId),
             description: line.description,
@@ -862,7 +869,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       handleSelectEstimate(created);
       setStatusEvents([]);
       setFormErrorMessage("");
-      setFormSuccessMessage(`Created estimate #${created.id} v${created.version}.`);
+      setFormSuccessMessage(`Created ${created.title || "Untitled"} v${created.version}.`);
         loadEstimateIntoForm(created);
       formFields.setFamilyCollisionPrompt(null);
       formFields.setConfirmedFamilyTitleKey("");
@@ -921,6 +928,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
             title: trimmedTitle,
             valid_through: formFields.validThrough || null,
             tax_percent: formFields.taxPercent,
+            notes_text: formFields.notesText,
             line_items: lineItems.map((line) => ({
               cost_code: Number(line.costCodeId),
               description: line.description,
@@ -944,7 +952,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         );
         loadEstimateIntoForm(updated);
         setFormErrorMessage("");
-        setFormSuccessMessage(`Saved draft estimate #${updated.id}.`);
+        setFormSuccessMessage(`Saved draft ${updated.title || "Untitled"} v${updated.version}.`);
         flashCreator();
       } catch {
         setFormErrorMessage("Could not reach estimate update endpoint.");
@@ -1055,13 +1063,14 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setStatusNote("");
       await loadStatusEvents({ estimateId: updated.id, quiet: true });
       const emailNote = updated.status === "sent" && payload.email_sent === false ? " No email sent — customer has no email on file." : "";
+      const label = `${updated.title || "Untitled"} v${updated.version}`;
       const actionFeedback: Record<string, string> = {
-        sent: `Sent estimate #${updated.id}.${emailNote}`,
-        approved: `Marked estimate #${updated.id} as approved.`,
-        rejected: `Marked estimate #${updated.id} as rejected.`,
-        void: `Voided estimate #${updated.id}.`,
+        sent: `Sent ${label}.${emailNote}`,
+        approved: `Marked ${label} as approved.`,
+        rejected: `Marked ${label} as rejected.`,
+        void: `Voided ${label}.`,
       };
-      setActionMessage(actionFeedback[updated.status] ?? `Updated estimate #${updated.id}.${emailNote}`);
+      setActionMessage(actionFeedback[updated.status] ?? `Updated ${label}.${emailNote}`);
       setActionTone("success");
       return updated;
     } catch {
@@ -1105,7 +1114,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setSelectedStatus("");
       setStatusNote("");
       await loadStatusEvents({ estimateId: updated.id, quiet: true });
-      setActionMessage(`Added status note on estimate #${updated.id}. History updated.`);
+      setActionMessage(`Added status note on ${updated.title || "Untitled"} v${updated.version}. History updated.`);
       setActionTone("success");
     } catch {
       setActionMessage("Could not reach estimate status note endpoint.");
@@ -1234,6 +1243,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         estimateDate={formFields.estimateDate}
         validThrough={formFields.validThrough}
         termsText={formFields.termsText}
+        notesText={formFields.notesText}
         taxPercent={formFields.taxPercent}
         lineItems={lineItems}
         lineTotals={lineTotals}
@@ -1253,9 +1263,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         onTitleChange={formFields.handleEstimateTitleChange}
         onValidThroughChange={formFields.setValidThrough}
         onTaxPercentChange={formFields.setTaxPercent}
+        onNotesTextChange={formFields.setNotesText}
         onLineItemChange={updateLineItem}
         onAddLineItem={addLineItem}
         onMoveLineItem={moveLineItem}
+        onReorderLineItems={reorderLineItems}
         onDuplicateLineItem={duplicateLineItem}
         onRemoveLineItem={removeLineItem}
         onSortLineItems={handleSortLineItems}

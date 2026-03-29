@@ -27,6 +27,7 @@ type EstimateFormState = {
   title: string;
   validThrough: string;
   termsText: string;
+  notesText: string;
   taxPercent: string;
   subtotal: number;
   taxAmount: number;
@@ -88,7 +89,6 @@ export function createEstimateDocumentAdapter(
     getDocumentStatus: (document) => document?.status ?? statusPolicy.defaultCreateStatus,
 
     getMetaFields: (document): CreatorMetaField[] => [
-      { key: "estimate_id", label: "Estimate #", value: document ? `#${document.id}` : "Draft" },
       { key: "version", label: "Version", value: document ? `v${document.version}` : "v1" },
       { key: "valid_through", label: "Valid Through", value: document?.valid_through || "Not set" },
     ],
@@ -121,6 +121,7 @@ export function createEstimateDocumentAdapter(
       title: form.title,
       valid_through: form.validThrough,
       tax_percent: form.taxPercent,
+      notes_text: form.notesText,
       line_items: form.lineItems.map((line) => ({
         cost_code: Number(line.costCodeId),
         description: line.description,
@@ -135,6 +136,7 @@ export function createEstimateDocumentAdapter(
       title: form.title,
       valid_through: form.validThrough,
       tax_percent: form.taxPercent,
+      notes_text: form.notesText,
       line_items: form.lineItems.map((line) => ({
         cost_code: Number(line.costCodeId),
         description: line.description,

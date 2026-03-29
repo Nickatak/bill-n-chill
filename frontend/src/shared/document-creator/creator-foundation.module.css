@@ -560,6 +560,38 @@
   background: var(--table-row-alt);
 }
 
+/* --- Draggable variants (desktop only) --- */
+
+.dragHandle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+  user-select: none;
+  touch-action: none;
+  gap: 4px;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.dragHandleGrip {
+  opacity: 0.5;
+}
+
+.lineHeaderDraggable {
+  composes: lineHeader;
+  grid-template-columns: 28px 70px 1.4fr 160px 80px 110px 100px 110px 120px;
+}
+
+.lineRowDraggable {
+  composes: lineRow;
+  grid-template-columns: 28px 70px 1.4fr 160px 80px 110px 100px 110px 120px;
+}
+
 .lineRowInvalid {
   border-left: 3px solid var(--tone-error-border);
 }
@@ -1432,6 +1464,20 @@
     -webkit-text-fill-color: #000000;
     gap: 4px;
     padding: 6px 10px;
+  }
+
+  .dragHandle {
+    display: none;
+  }
+
+  .lineHeaderDraggable {
+    grid-template-columns: 38px 1.6fr 1fr 42px 68px 62px 72px;
+    min-width: 0;
+  }
+
+  .lineRowDraggable {
+    grid-template-columns: 38px 1.6fr 1fr 42px 68px 62px 72px;
+    min-width: 0;
   }
 
   .lineHeaderSimple,

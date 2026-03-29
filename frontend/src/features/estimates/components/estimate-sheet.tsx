@@ -5,13 +5,17 @@
  *
  * Parent: EstimatesWorkspacePanel
  */
+"use client";
 
 import { FormEvent } from "react";
 
+import { DndContext, closestCenter, DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { formatDateDisplay } from "@/shared/date-format";
 import { formatDecimal } from "@/shared/money-format";
 import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
+import { SortableLineRow } from "@/shared/document-creator/sortable-line-row";
 import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
 import mobileCardStyles from "@/shared/document-creator/mobile-line-card.module.css";
 import { CostCode, EstimateLineInput, ProjectRecord } from "../types";
@@ -42,6 +46,7 @@ type EstimateSheetProps = {
   estimateDate: string;
   validThrough: string;
   termsText: string;
+  notesText: string;
   taxPercent: string;
   lineItems: EstimateLineInput[];
   lineTotals: number[];
@@ -66,6 +71,7 @@ type EstimateSheetProps = {
   onTitleChange: (value: string) => void;
   onValidThroughChange: (value: string) => void;
   onTaxPercentChange: (value: string) => void;
+  onNotesTextChange: (value: string) => void;
   onLineItemChange: (
     localId: number,
     key: keyof Omit<EstimateLineInput, "localId">,
@@ -73,6 +79,7 @@ type EstimateSheetProps = {
   ) => void;
   onAddLineItem: () => void;
   onMoveLineItem: (localId: number, direction: "up" | "down") => void;
+  onReorderLineItems: (activeId: number, overId: number) => void;
   onDuplicateLineItem: (localId: number) => void;
   onRemoveLineItem: (localId: number) => void;
   onSortLineItems: (key: LineSortKey) => void;
@@ -112,6 +119,7 @@ export function EstimateSheet({
   estimateDate,
   validThrough,
   termsText,
+  notesText,
   taxPercent,
   lineItems,
   lineTotals,
@@ -136,9 +144,11 @@ export function EstimateSheet({
   onTitleChange,
   onValidThroughChange,
   onTaxPercentChange,
+  onNotesTextChange,
   onLineItemChange,
   onAddLineItem,
   onMoveLineItem,
+  onReorderLineItems,
   onDuplicateLineItem,
   onRemoveLineItem,
   onSortLineItems,
@@ -202,12 +212,20 @@ export function EstimateSheet({
     title: estimateTitle,
     validThrough,
     termsText,
+    notesText,
     taxPercent,
     subtotal,
     taxAmount,
     totalAmount,
     lineItems,
   };
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      onReorderLineItems(active.id as number, over.id as number);
+    }
+  }
+
   const adapter = createEstimateDocumentAdapter(ESTIMATE_COMPOSER_FALLBACK_POLICY, []);
 
   return (
@@ -304,10 +322,6 @@ export function EstimateSheet({
                     ) : null}
                   </>
                 ) : null}
-                <div className={creatorStyles.metaLine}>
-                  <span>Estimate #</span>
-                  <span>{estimateId ? `#${estimateId}` : "Draft"}</span>
-                </div>
                 <div className={creatorStyles.metaLine}>
                   <span>Estimate date</span>
                   {showReadOnlyText ? (
@@ -495,12 +509,15 @@ export function EstimateSheet({
                 })}
               </div>
             ) : (
+              <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={lineItems.map((l) => l.localId)} strategy={verticalListSortingStrategy}>
               <div className={creatorStyles.lineTable}>
                 <div
-                  className={`${creatorStyles.lineHeader} ${readOnly ? creatorStyles.lineHeaderReadOnly : ""} ${
+                  className={`${!readOnly ? creatorStyles.lineHeaderDraggable : creatorStyles.lineHeader} ${readOnly ? creatorStyles.lineHeaderReadOnly : ""} ${
                     readOnly && !showMarkupColumn ? creatorStyles.lineHeaderNoMarkup : ""
                   }`}
                 >
+                  {!readOnly ? <div className={creatorStyles.lineHeaderCell}><span>#</span></div> : null}
                   <div className={creatorStyles.lineHeaderCell}>{renderSortableHeader("Qty", "quantity")}</div>
                   <div className={creatorStyles.lineHeaderCell}>
                     <span>Description</span>
@@ -526,13 +543,16 @@ export function EstimateSheet({
                 </div>
                 {lineItems.map((line, index) => {
                   const rowIssues = lineValidation?.issuesByLocalId.get(line.localId) ?? [];
+                  const rowClass = `${!readOnly ? creatorStyles.lineRowDraggable : creatorStyles.lineRow} ${readOnly ? creatorStyles.lineRowReadOnly : ""} ${
+                    readOnly && !showMarkupColumn ? creatorStyles.lineRowNoMarkup : ""
+                  } ${rowIssues.length ? creatorStyles.lineRowInvalid : ""}`;
                   return (
-                  <div
-                    key={line.localId}
-                    className={`${creatorStyles.lineRow} ${readOnly ? creatorStyles.lineRowReadOnly : ""} ${
-                      readOnly && !showMarkupColumn ? creatorStyles.lineRowNoMarkup : ""
-                    } ${rowIssues.length ? creatorStyles.lineRowInvalid : ""}`}
-                  >
+                  <SortableLineRow key={line.localId} id={line.localId} index={index} className={rowClass} disabled={readOnly}>
+                    {(dragHandle) => (
+                    <>
+                    {!readOnly ? (
+                      <div className={creatorStyles.lineCell}>{dragHandle}</div>
+                    ) : null}
                     <div className={creatorStyles.lineCell}>
                       {showReadOnlyText ? (
                         <span className={creatorStyles.staticCellValue}>{line.quantity || "0"}</span>
@@ -645,26 +665,6 @@ export function EstimateSheet({
                         <div className={creatorStyles.lineActionsCell}>
                           <button
                             type="button"
-                            className={`${creatorStyles.smallButton} ${
-                              readOnly || index === 0 ? creatorStyles.actionDisabled : ""
-                            }`}
-                            onClick={() => onMoveLineItem(line.localId, "up")}
-                            disabled={readOnly || index === 0}
-                          >
-                            Up
-                          </button>
-                          <button
-                            type="button"
-                            className={`${creatorStyles.smallButton} ${
-                              readOnly || index === lineItems.length - 1 ? creatorStyles.actionDisabled : ""
-                            }`}
-                            onClick={() => onMoveLineItem(line.localId, "down")}
-                            disabled={readOnly || index === lineItems.length - 1}
-                          >
-                            Down
-                          </button>
-                          <button
-                            type="button"
                             className={`${creatorStyles.smallButton} ${readOnly ? creatorStyles.actionDisabled : ""}`}
                             onClick={() => onDuplicateLineItem(line.localId)}
                             disabled={readOnly}
@@ -682,10 +682,14 @@ export function EstimateSheet({
                         </div>
                       </div>
                     ) : null}
-                  </div>
+                    </>
+                    )}
+                  </SortableLineRow>
                   );
                 })}
               </div>
+                </SortableContext>
+              </DndContext>
             )}
 
             {!showReadOnlyText ? (
@@ -757,6 +761,25 @@ export function EstimateSheet({
         footer: () => (
           <>
             <div className={creatorStyles.terms}>
+              <h4>Notes &amp; Exclusions</h4>
+              {readOnly ? (
+                (notesText || "None")
+                  .split("\n")
+                  .filter((line) => line.trim())
+                  .map((line, index) => (
+                    <p key={`notes-${index}`}>{line}</p>
+                  ))
+              ) : (
+                <textarea
+                  className={creatorStyles.termsInput}
+                  value={notesText}
+                  onChange={(e) => onNotesTextChange(e.target.value)}
+                  placeholder="General notes, scope exclusions, assumptions..."
+                  rows={3}
+                />
+              )}
+            </div>
+            <div className={creatorStyles.terms}>
               <h4>Terms and Conditions</h4>
               {(termsText || organizationDefaults?.estimate_terms_and_conditions || "Not set")
                 .split("\n")
@@ -769,7 +792,7 @@ export function EstimateSheet({
             <div className={creatorStyles.footer}>
               <span>{senderName || "Your Company"}</span>
               <span>{senderEmail || "Help email not set"}</span>
-              <span>{estimateId ? `Estimate #${estimateId}` : "Draft estimate"}</span>
+              <span>{estimateId ? "Estimate" : "Draft estimate"}</span>
             </div>
           </>
         ),

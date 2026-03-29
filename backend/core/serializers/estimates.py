@@ -55,6 +55,7 @@ class EstimateSerializer(serializers.ModelSerializer):
             "title",
             "valid_through",
             "terms_text",
+            "notes_text",
             "sender_name",
             "sender_address",
             "sender_logo_url",
@@ -156,6 +157,7 @@ class EstimateWriteSerializer(serializers.Serializer):
     status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True, default="")
     valid_through = serializers.DateField(required=False, allow_null=True)
     terms_text = serializers.CharField(max_length=10000, required=False, allow_blank=True)
+    notes_text = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
     tax_percent = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, default=0)
     line_items = EstimateLineItemInputSerializer(many=True, required=False)
 

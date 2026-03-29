@@ -108,7 +108,6 @@ describe("createEstimateDocumentAdapter", () => {
     it("returns meta fields for existing document", () => {
       const fields = adapter.getMetaFields(estimateRecord);
       expect(fields).toEqual([
-        { key: "estimate_id", label: "Estimate #", value: "#42" },
         { key: "version", label: "Version", value: "v2" },
         { key: "valid_through", label: "Valid Through", value: "2026-03-01" },
       ]);
@@ -117,7 +116,6 @@ describe("createEstimateDocumentAdapter", () => {
     it("returns draft defaults for null document", () => {
       const fields = adapter.getMetaFields(null as never);
       expect(fields).toEqual([
-        { key: "estimate_id", label: "Estimate #", value: "Draft" },
         { key: "version", label: "Version", value: "v1" },
         { key: "valid_through", label: "Valid Through", value: "Not set" },
       ]);
@@ -176,6 +174,7 @@ describe("createEstimateDocumentAdapter", () => {
         title: "Kitchen remodel",
         valid_through: "2026-03-01",
         tax_percent: "8.25",
+        notes_text: "",
         line_items: [
           {
             cost_code: 10,

@@ -73,6 +73,7 @@ export type EstimatesWorkspacePanelProps = {
   estimateDate: string;
   validThrough: string;
   termsText: string;
+  notesText: string;
   taxPercent: string;
   lineItems: EstimateLineInput[];
   lineTotals: number[];
@@ -92,9 +93,11 @@ export type EstimatesWorkspacePanelProps = {
   onTitleChange: (title: string) => void;
   onValidThroughChange: (value: string) => void;
   onTaxPercentChange: (value: string) => void;
+  onNotesTextChange: (value: string) => void;
   onLineItemChange: (localId: number, key: keyof Omit<EstimateLineInput, "localId">, value: string) => void;
   onAddLineItem: () => void;
   onMoveLineItem: (localId: number, direction: "up" | "down") => void;
+  onReorderLineItems: (activeId: number, overId: number) => void;
   onDuplicateLineItem: (localId: number) => void;
   onRemoveLineItem: (localId: number) => void;
   onSortLineItems: (key: LineSortKey) => void;
@@ -131,6 +134,7 @@ export function EstimatesWorkspacePanel({
   estimateDate,
   validThrough,
   termsText,
+  notesText,
   taxPercent,
   lineItems,
   lineTotals,
@@ -150,9 +154,11 @@ export function EstimatesWorkspacePanel({
   onTitleChange,
   onValidThroughChange,
   onTaxPercentChange,
+  onNotesTextChange,
   onLineItemChange,
   onAddLineItem,
   onMoveLineItem,
+  onReorderLineItems,
   onDuplicateLineItem,
   onRemoveLineItem,
   onSortLineItems,
@@ -236,6 +242,7 @@ export function EstimatesWorkspacePanel({
           estimateDate={estimateDate}
           validThrough={validThrough}
           termsText={termsText}
+          notesText={notesText}
           taxPercent={taxPercent}
           lineItems={lineItems}
           lineTotals={lineTotals}
@@ -257,9 +264,11 @@ export function EstimatesWorkspacePanel({
           onTitleChange={onTitleChange}
           onValidThroughChange={onValidThroughChange}
           onTaxPercentChange={onTaxPercentChange}
+          onNotesTextChange={onNotesTextChange}
           onLineItemChange={onLineItemChange}
           onAddLineItem={onAddLineItem}
           onMoveLineItem={onMoveLineItem}
+          onReorderLineItems={onReorderLineItems}
           onDuplicateLineItem={onDuplicateLineItem}
           onRemoveLineItem={onRemoveLineItem}
           onSortLineItems={onSortLineItems}

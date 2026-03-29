@@ -468,6 +468,7 @@ def project_estimates_view(request, project_id):
                 title=data.get("title", ""),
                 valid_through=resolved_valid_through,
                 terms_text=terms_text,
+                notes_text=(data.get("notes_text", "") or "").strip(),
                 sender_name=(organization.display_name or "").strip(),
                 sender_address=organization.formatted_billing_address,
                 sender_logo_url=sender_logo_url,
@@ -610,7 +611,7 @@ def estimate_detail_view(request, estimate_id):
                 status=400,
             )
         is_locked = estimate.status != Estimate.Status.DRAFT
-        mutating_fields = {"title", "valid_through", "tax_percent", "line_items"}
+        mutating_fields = {"title", "valid_through", "tax_percent", "line_items", "notes_text"}
         if is_locked and any(field in data for field in mutating_fields):
             return Response(
                 {

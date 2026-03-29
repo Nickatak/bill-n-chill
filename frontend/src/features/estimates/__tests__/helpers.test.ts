@@ -159,6 +159,7 @@ function estimate(overrides: Partial<EstimateRecord>): EstimateRecord {
     title: "Test",
     valid_through: null,
     terms_text: "",
+    notes_text: "",
     sender_name: "",
     sender_address: "",
     sender_logo_url: "",

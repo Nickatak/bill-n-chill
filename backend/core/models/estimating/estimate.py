@@ -79,6 +79,7 @@ class Estimate(StatusTransitionMixin, models.Model):
     title = models.CharField(max_length=255, blank=True)
     valid_through = models.DateField(null=True, blank=True)
     terms_text = models.TextField(blank=True, default="")
+    notes_text = models.TextField(blank=True, default="")
     sender_name = models.CharField(max_length=255, blank=True, default="")
     sender_address = models.TextField(blank=True, default="")
     sender_logo_url = models.URLField(blank=True, default="")

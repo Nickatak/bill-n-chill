@@ -107,6 +107,7 @@ export function useEstimateFormFields({
   const [estimateDate, setEstimateDate] = useState("");
   const [validThrough, setValidThrough] = useState("");
   const [termsText, setTermsText] = useState("");
+  const [notesText, setNotesText] = useState("");
   const [taxPercent, setTaxPercent] = useState("0");
   const [lineSortKey, setLineSortKey] = useState<LineSortKey | null>(null);
   const [lineSortDirection, setLineSortDirection] = useState<"asc" | "desc">("asc");
@@ -125,6 +126,7 @@ export function useEstimateFormFields({
     const estimateTerms = (estimate.terms_text || "").trim();
     setEstimateTitle(estimate.title || "Untitled");
     setTermsText(estimateTerms || organizationDefaults?.estimate_terms_and_conditions || "");
+    setNotesText(estimate.notes_text || "");
     setTaxPercent(String(estimate.tax_percent ?? "0"));
     setValidThrough(estimate.valid_through ?? "");
     const mapped = mapEstimateLineItemsToInputs(estimate.line_items ?? []);
@@ -159,6 +161,7 @@ export function useEstimateFormFields({
       setDuplicateHint("");
     }
     setTermsText(estimateTerms || organizationDefaults?.estimate_terms_and_conditions || "");
+    setNotesText(estimate.notes_text || "");
     setTaxPercent(String(estimate.tax_percent ?? "0"));
     setValidThrough(estimate.valid_through ?? "");
     const mapped = mapEstimateLineItemsToInputs(estimate.line_items ?? []);
@@ -183,6 +186,7 @@ export function useEstimateFormFields({
     setFamilyCollisionPrompt(null);
     setConfirmedFamilyTitleKey("");
     setTermsText(organizationDefaults?.estimate_terms_and_conditions || "");
+    setNotesText("");
     setTaxPercent("0");
     resetLines();
     setLineSortKey(null);
@@ -230,6 +234,7 @@ export function useEstimateFormFields({
     estimateDate,
     validThrough,
     termsText,
+    notesText,
     taxPercent,
     lineSortKey,
     lineSortDirection,
@@ -245,6 +250,7 @@ export function useEstimateFormFields({
     setEstimateDate,
     setValidThrough,
     setTermsText,
+    setNotesText,
     setTaxPercent,
     setLineSortKey,
     setLineSortDirection,

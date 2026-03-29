@@ -85,7 +85,7 @@ function actionConfirmationMessage(
   customerName: string,
   customerEmail: string,
 ): string {
-  const docLabel = `estimate #${estimate.id} v${estimate.version}`;
+  const docLabel = `${estimate.title || "Untitled"} v${estimate.version}`;
   const isResend = optionLabel === "Re-send";
   if (statusValue === "sent") {
     const verb = isResend ? "Re-send" : "Send";
@@ -171,7 +171,7 @@ function EstimateActionPanel({
 
       if (typeof navigator.share === "function") {
         try {
-          await navigator.share({ title: `Estimate #${updated.id}`, text: shareText });
+          await navigator.share({ title: updated.title || "Estimate", text: shareText });
         } catch {
           // User cancelled share sheet — not an error
         }
@@ -520,7 +520,7 @@ export function EstimatesViewerPanel({
                               </span>
                             </span>
                             <span className={styles.familyMeta}>
-                              ${latestTotal} · Estimate #{latest.id} · {history.length} history{" "}
+                              ${latestTotal} · {history.length} history{" "}
                               {history.length === 1 ? "entry" : "entries"}
                             </span>
                             <span className={styles.familyDate}>
@@ -539,7 +539,7 @@ export function EstimatesViewerPanel({
                               <button
                                 type="button"
                                 className={styles.familyActionButton}
-                                aria-label={`${quickActionTitle} (estimate #${latest.id})`}
+                                aria-label={`${quickActionTitle} (${latest.title || "Untitled"} v${latest.version})`}
                                 title={quickActionTitle}
                                 onClick={() => void handleFamilyCardQuickAction(latest)}
                               >

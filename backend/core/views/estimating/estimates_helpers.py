@@ -327,6 +327,9 @@ def _handle_estimate_document_save(
         if "tax_percent" in data:
             estimate.tax_percent = data["tax_percent"]
             update_fields.append("tax_percent")
+        if "notes_text" in data:
+            estimate.notes_text = (data["notes_text"] or "").strip()
+            update_fields.append("notes_text")
         if len(update_fields) > 1:
             estimate.save(update_fields=update_fields)
 

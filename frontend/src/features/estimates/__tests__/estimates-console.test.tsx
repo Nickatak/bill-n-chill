@@ -90,6 +90,7 @@ function makeEstimate(overrides: Record<string, unknown> = {}) {
     grand_total: "5000.00",
     valid_through: "2026-04-01",
     terms_text: "",
+    notes_text: "",
     estimate_date: "2026-03-01",
     line_items: [],
     is_active_estimate: false,
@@ -313,7 +314,7 @@ describe("EstimatesConsole", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Send to Customer" }));
 
-    expect(screen.getByText(/Send estimate #42 v1/)).toBeInTheDocument();
+    expect(screen.getByText(/Send Foundation Work v1/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirm Send to Customer" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
   });
@@ -402,10 +403,10 @@ describe("EstimatesConsole", () => {
     }, { timeout: 3000 });
 
     fireEvent.click(screen.getByRole("button", { name: "Send to Customer" }));
-    expect(screen.getByText(/Send estimate #42 v1/)).toBeInTheDocument();
+    expect(screen.getByText(/Send Foundation Work v1/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByText(/Send estimate #42 v1/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Send Foundation Work v1/)).not.toBeInTheDocument();
   });
 
   it("shows Re-send and Mark Approved buttons for a sent estimate", async () => {
@@ -489,11 +490,11 @@ describe("EstimatesConsole", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm Send to Customer" }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Sent estimate #42/)).toBeInTheDocument();
+      expect(screen.getByText(/Sent Foundation Work v1/)).toBeInTheDocument();
     }, { timeout: 3000 });
 
     // Confirmation panel should be closed
-    expect(screen.queryByText(/Send estimate #42 v1/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Send Foundation Work v1/)).not.toBeInTheDocument();
 
     // Verify PATCH was called with correct body
     const patchCall = mockFetch.mock.calls.find(
@@ -521,7 +522,7 @@ describe("EstimatesConsole", () => {
     }, { timeout: 3000 });
 
     fireEvent.click(screen.getByRole("button", { name: "Mark Approved" }));
-    expect(screen.getByText(/Mark estimate #42 v1 as approved/)).toBeInTheDocument();
+    expect(screen.getByText(/Mark Foundation Work v1 as approved/)).toBeInTheDocument();
 
     mockFetch.mockImplementation((url: string, opts?: RequestInit) => {
       if (opts?.method === "PATCH") {
@@ -541,7 +542,7 @@ describe("EstimatesConsole", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm Mark Approved" }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Marked estimate #42 as approved/)).toBeInTheDocument();
+      expect(screen.getByText(/Marked Foundation Work v1 as approved/)).toBeInTheDocument();
     }, { timeout: 3000 });
   });
 

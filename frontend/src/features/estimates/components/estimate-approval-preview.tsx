@@ -253,10 +253,6 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
                 <section className={`${frameStyles.metaDetails} ${styles.publicDetailsPanel}`}>
                   <h4 className={frameStyles.metaDetailsTitle}>Estimate Details</h4>
                   <div className={frameStyles.metaDetailsRow}>
-                    <span>Estimate #</span>
-                    <span>#{estimate.id}</span>
-                  </div>
-                  <div className={frameStyles.metaDetailsRow}>
                     <span>Status</span>
                     <span>{decisionStatusLabel}</span>
                   </div>
@@ -324,15 +320,28 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
               </div>
             }
             afterLineSection={
-              <div className={frameStyles.terms}>
-                <h4>Terms and Conditions</h4>
-                {termsText
-                  .split("\n")
-                  .filter((line) => line.trim())
-                  .map((line, index) => (
-                    <p key={`estimate-terms-${line}-${index}`}>{line}</p>
-                  ))}
-              </div>
+              <>
+                {estimate.notes_text ? (
+                  <div className={frameStyles.terms}>
+                    <h4>Notes &amp; Exclusions</h4>
+                    {estimate.notes_text
+                      .split("\n")
+                      .filter((line) => line.trim())
+                      .map((line, index) => (
+                        <p key={`estimate-notes-${index}`}>{line}</p>
+                      ))}
+                  </div>
+                ) : null}
+                <div className={frameStyles.terms}>
+                  <h4>Terms and Conditions</h4>
+                  {termsText
+                    .split("\n")
+                    .filter((line) => line.trim())
+                    .map((line, index) => (
+                      <p key={`estimate-terms-${line}-${index}`}>{line}</p>
+                    ))}
+                </div>
+              </>
             }
             footer={
               <footer>
