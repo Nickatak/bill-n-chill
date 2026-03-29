@@ -177,10 +177,6 @@ export const EstimateSheetV2 = forwardRef<EstimateSheetV2Handle, EstimateSheetV2
     const senderAddressLines = senderBranding.senderAddressLines;
     const senderLogoUrl = senderBranding.logoUrl;
 
-    function findCostCodeLabel(costCodeId: string): string {
-      const code = costCodes.find((c) => String(c.id) === costCodeId);
-      return code ? `${code.code} - ${code.name}` : costCodeId || "Not set";
-    }
 
     // -----------------------------------------------------------------------
     // Sections + flat ordering
