@@ -14,6 +14,7 @@ function makeCostCode(overrides: Partial<CostCode> = {}): CostCode {
     code: "01-100",
     name: "General Conditions",
     is_active: true,
+    taxable: true,
     ...overrides,
   };
 }

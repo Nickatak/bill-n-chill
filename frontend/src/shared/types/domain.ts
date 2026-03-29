@@ -22,6 +22,7 @@ export type CostCode = {
   code: string;
   name: string;
   is_active: boolean;
+  taxable: boolean;
 };
 
 /** Minimal user identity for auth context in feature consoles. */

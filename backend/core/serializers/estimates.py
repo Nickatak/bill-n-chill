@@ -18,6 +18,7 @@ class EstimateLineItemSerializer(serializers.ModelSerializer):
 
     cost_code_code = serializers.CharField(source="cost_code.code", read_only=True)
     cost_code_name = serializers.CharField(source="cost_code.name", read_only=True)
+    cost_code_taxable = serializers.BooleanField(source="cost_code.taxable", read_only=True)
 
     class Meta:
         model = EstimateLineItem
@@ -27,6 +28,7 @@ class EstimateLineItemSerializer(serializers.ModelSerializer):
             "cost_code",
             "cost_code_code",
             "cost_code_name",
+            "cost_code_taxable",
             "description",
             "quantity",
             "unit",

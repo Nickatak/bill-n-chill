@@ -72,7 +72,7 @@ class CostCodeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CostCode
-        fields = ["id", "code", "name", "is_active", "created_at", "updated_at"]
+        fields = ["id", "code", "name", "is_active", "taxable", "created_at", "updated_at"]
 
 
 class ProjectFinancialSummarySerializer(serializers.Serializer):

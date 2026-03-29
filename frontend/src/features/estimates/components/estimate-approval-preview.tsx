@@ -84,7 +84,11 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   );
   const subtotal = lineTotals.reduce((sum, value) => sum + value, 0);
   const taxPercent = String(estimate?.tax_percent ?? "0");
-  const taxAmount = subtotal * (Number(taxPercent) / 100);
+  const taxableBase = lineTotals.reduce((sum, value, index) => {
+    const cc = costCodes.find((c) => String(c.id) === lineItems[index].costCodeId);
+    return sum + (cc?.taxable !== false ? value : 0);
+  }, 0);
+  const taxAmount = taxableBase * (Number(taxPercent) / 100);
   const totalAmount = subtotal + taxAmount;
   const canDecide = estimate?.status === "sent";
   const hasDecision = estimate?.status === "approved" || estimate?.status === "rejected";

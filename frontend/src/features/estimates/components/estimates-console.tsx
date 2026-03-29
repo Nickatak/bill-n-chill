@@ -463,7 +463,11 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const lineValidation = useMemo(() => validateEstimateLineItems(lineItems), [lineItems]);
   const subtotal = lineTotals.reduce((sum, value) => sum + value, 0);
   const taxRate = toNumber(formFields.taxPercent);
-  const taxAmount = subtotal * (taxRate / 100);
+  const taxableBase = lineTotals.reduce((sum, value, index) => {
+    const cc = costCodes.find((c) => String(c.id) === lineItems[index].costCodeId);
+    return sum + (cc?.taxable !== false ? value : 0);
+  }, 0);
+  const taxAmount = taxableBase * (taxRate / 100);
   const totalAmount = subtotal + taxAmount;
   const estimateFamilies = useMemo(() => groupEstimateFamilies(estimates), [estimates]);
   const estimateStatusCounts = useMemo(() => computeEstimateStatusCounts(estimateFamilies), [estimateFamilies]);

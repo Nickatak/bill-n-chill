@@ -246,19 +246,22 @@ def _apply_estimate_lines_and_totals(
         return {"missing_cost_codes": missing}
 
     tax_percent = Decimal(str(tax_percent))
-    tax_total = quantize_money((subtotal + markup_total) * (tax_percent / Decimal("100")))
-    grand_total = quantize_money(subtotal + markup_total + tax_total)
 
     estimate.line_items.all().delete()
     lines_to_create = []
+    taxable_base = MONEY_ZERO
     for line_item in computed_line_items:
         description = (line_item.get("description") or "").strip()
         unit_value = (line_item.get("unit") or "ea").strip().lower() or "ea"
+        cost_code = cost_code_map[line_item["cost_code"]]
+
+        if cost_code.taxable:
+            taxable_base = quantize_money(taxable_base + line_item["line_total"])
 
         lines_to_create.append(
             EstimateLineItem(
                 estimate=estimate,
-                cost_code=cost_code_map[line_item["cost_code"]],
+                cost_code=cost_code,
                 description=description,
                 quantity=line_item["quantity"],
                 unit=unit_value,
@@ -267,6 +270,9 @@ def _apply_estimate_lines_and_totals(
                 line_total=line_item["line_total"],
             )
         )
+
+    tax_total = quantize_money(taxable_base * (tax_percent / Decimal("100")))
+    grand_total = quantize_money(subtotal + markup_total + tax_total)
     EstimateLineItem.objects.bulk_create(lines_to_create)
 
     estimate.subtotal = subtotal

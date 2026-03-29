@@ -34,6 +34,7 @@ class CostCode(models.Model):
     code = models.CharField(max_length=50)
     name = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
+    taxable = models.BooleanField(default=True)
     organization = models.ForeignKey(
         "Organization",
         on_delete=models.PROTECT,

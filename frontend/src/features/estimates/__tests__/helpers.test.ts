@@ -490,12 +490,14 @@ describe("mapLineCostCodes", () => {
       code: "01-100",
       name: "Demo",
       is_active: true,
+      taxable: true,
     });
     expect(result[1]).toEqual({
       id: 8,
       code: "02-200",
       name: "Framing",
       is_active: true,
+      taxable: true,
     });
   });
 

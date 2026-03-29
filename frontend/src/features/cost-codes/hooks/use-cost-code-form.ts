@@ -79,6 +79,7 @@ export function useCostCodeForm({
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [isTaxable, setIsTaxable] = useState(true);
 
   // --- Functions ---
 
@@ -87,6 +88,7 @@ export function useCostCodeForm({
     setCode(costCode.code);
     setName(costCode.name);
     setIsActive(costCode.is_active);
+    setIsTaxable(costCode.taxable);
     setFormMode("edit");
   }
 
@@ -96,6 +98,7 @@ export function useCostCodeForm({
     setCode("");
     setName("");
     setIsActive(true);
+    setIsTaxable(true);
     setFormMode("create");
   }
 
@@ -125,6 +128,7 @@ export function useCostCodeForm({
           code: code.trim(),
           name: name.trim(),
           is_active: true,
+          taxable: isTaxable,
         }),
       });
       const payload: ApiResponse = await response.json();
@@ -160,7 +164,7 @@ export function useCostCodeForm({
       const response = await fetch(`${apiBaseUrl}/cost-codes/${costCodeId}/`, {
         method: "PATCH",
         headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
-        body: JSON.stringify({ code: code.trim(), name: name.trim(), is_active: isActive }),
+        body: JSON.stringify({ code: code.trim(), name: name.trim(), is_active: isActive, taxable: isTaxable }),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
@@ -184,11 +188,13 @@ export function useCostCodeForm({
     code,
     name,
     isActive,
+    isTaxable,
 
     // Setters
     setCode,
     setName,
     setIsActive,
+    setIsTaxable,
 
     // Helpers
     hydrate,

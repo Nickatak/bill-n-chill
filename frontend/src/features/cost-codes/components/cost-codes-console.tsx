@@ -217,6 +217,18 @@ export function CostCodesConsole() {
                   Name
                   <input value={form.name} onChange={(event) => form.setName(event.target.value)} required />
                 </label>
+                <label className={styles.toggleField}>
+                  Taxable
+                  <span className={styles.switchRow}>
+                    <input
+                      className={styles.switchInput}
+                      type="checkbox"
+                      checked={form.isTaxable}
+                      onChange={(event) => form.setIsTaxable(event.target.checked)}
+                    />
+                    <span className={styles.switchLabel}>{form.isTaxable ? "Yes" : "No"}</span>
+                  </span>
+                </label>
                 {isEditing ? (
                   <label className={styles.toggleField}>
                     Archive

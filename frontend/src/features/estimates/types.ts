@@ -42,6 +42,7 @@ export type EstimateLineItemRecord = {
   cost_code: number;
   cost_code_code?: string;
   cost_code_name?: string;
+  cost_code_taxable?: boolean;
   description: string;
   quantity: string;
   unit: string;

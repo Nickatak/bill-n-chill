@@ -264,6 +264,7 @@ export function mapLineCostCodes(estimate: EstimateRecord | null): CostCode[] {
       code: item.cost_code_code || `CC-${costCodeId}`,
       name: item.cost_code_name || "Cost code",
       is_active: true,
+      taxable: item.cost_code_taxable !== false,
     });
   }
   return Array.from(byId.values());
