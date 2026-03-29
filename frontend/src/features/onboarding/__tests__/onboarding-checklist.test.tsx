@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -103,7 +103,9 @@ describe("OnboardingChecklist", () => {
     cleanup();
   });
 
-  it("renders with Remodelers / GCs tab active by default", async () => {
+  // ── Single track structure ──────────────────────────────────────
+
+  it("renders top-level steps (org, customer, project)", async () => {
     setupEmptyProgress();
     render(<OnboardingChecklist />);
 
@@ -111,12 +113,12 @@ describe("OnboardingChecklist", () => {
       expect(screen.queryByText("Checking progress\u2026")).not.toBeInTheDocument();
     });
 
-    // Remodeler-specific steps visible
-    expect(screen.getByText("Handle a change order")).toBeInTheDocument();
-    expect(screen.getByText("Track a vendor bill")).toBeInTheDocument();
+    expect(screen.getByText("Set up your organization")).toBeInTheDocument();
+    expect(screen.getByText("Add your first customer")).toBeInTheDocument();
+    expect(screen.getByText("Create a project")).toBeInTheDocument();
   });
 
-  it("switches to Individual Contractors tab", async () => {
+  it("does not render tabs — single track only", async () => {
     setupEmptyProgress();
     render(<OnboardingChecklist />);
 
@@ -124,14 +126,13 @@ describe("OnboardingChecklist", () => {
       expect(screen.queryByText("Checking progress\u2026")).not.toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText("Individual Contractors"));
-
-    // Individual-specific: has "Record a payment" but not "Track a vendor bill"
-    expect(screen.getByText("Record a payment")).toBeInTheDocument();
-    expect(screen.queryByText("Track a vendor bill")).not.toBeInTheDocument();
+    expect(screen.queryByText("Individual Contractors")).not.toBeInTheDocument();
+    expect(screen.queryByText("Remodelers / GCs")).not.toBeInTheDocument();
   });
 
-  it("persists tab choice to localStorage", async () => {
+  // ── Sub-steps ───────────────────────────────────────────────────
+
+  it("renders project sub-steps in locked state when no project exists", async () => {
     setupEmptyProgress();
     render(<OnboardingChecklist />);
 
@@ -139,22 +140,79 @@ describe("OnboardingChecklist", () => {
       expect(screen.queryByText("Checking progress\u2026")).not.toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText("Individual Contractors"));
-    expect(localStorage.getItem("onboarding:workflow-tab")).toBe("individual");
-
-    fireEvent.click(screen.getByText("Remodelers / GCs"));
-    expect(localStorage.getItem("onboarding:workflow-tab")).toBe("remodeler");
+    // Sub-steps are visible but locked
+    expect(screen.getByText("Build & send an estimate")).toBeInTheDocument();
+    expect(screen.getByText("Create an invoice & record payment")).toBeInTheDocument();
+    expect(screen.getByText("Track expenses")).toBeInTheDocument();
+    expect(screen.getByText("Complete this step to unlock")).toBeInTheDocument();
   });
+
+  it("reveals sub-steps with deep links when a project exists", async () => {
+    setupPartialProgress({ projects: true });
+    render(<OnboardingChecklist />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Inside your project")).toBeInTheDocument();
+    });
+
+    // Deep links should resolve to project 5
+    const invoiceLink = screen.getByText("Invoices \u2192");
+    expect(invoiceLink.getAttribute("href")).toBe("/projects/5/invoices");
+
+    const estimateLink = screen.getByText("Estimates \u2192");
+    expect(estimateLink.getAttribute("href")).toBe("/projects/5/estimates");
+  });
+
+  it("shows sub-step links only when project exists (no links in locked state)", async () => {
+    setupEmptyProgress();
+    render(<OnboardingChecklist />);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Checking progress\u2026")).not.toBeInTheDocument();
+    });
+
+    // Sub-step link labels should not appear as links when locked
+    expect(screen.queryByText("Invoices \u2192")).not.toBeInTheDocument();
+    expect(screen.queryByText("Estimates \u2192")).not.toBeInTheDocument();
+  });
+
+  it("vendor bill sub-step deep links into project", async () => {
+    setupPartialProgress({ projects: true });
+    render(<OnboardingChecklist />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Inside your project")).toBeInTheDocument();
+    });
+
+    const billLink = screen.getByText("Bills \u2192");
+    expect(billLink.getAttribute("href")).toBe("/projects/5/bills");
+  });
+
+  // ── Optional badges ─────────────────────────────────────────────
+
+  it("shows Optional badge on optional sub-steps", async () => {
+    setupEmptyProgress();
+    render(<OnboardingChecklist />);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Checking progress\u2026")).not.toBeInTheDocument();
+    });
+
+    const badges = screen.getAllByText("Optional");
+    // estimate, change-order, bill = 3 optional sub-steps
+    expect(badges).toHaveLength(3);
+  });
+
+  // ── Progress detection ──────────────────────────────────────────
 
   it("shows loading state while checking progress", () => {
-    // Never resolve — confirm loading state appears
     mockFetch.mockReturnValue(new Promise(() => {}));
     render(<OnboardingChecklist />);
 
     expect(screen.getByText("Checking progress\u2026")).toBeInTheDocument();
   });
 
-  it("shows progress after loading (0 of N with no data)", async () => {
+  it("shows 0 of N with no data", async () => {
     setupEmptyProgress();
     render(<OnboardingChecklist />);
 
@@ -192,46 +250,21 @@ describe("OnboardingChecklist", () => {
     });
   });
 
-  it("shows Optional badge on optional steps", async () => {
-    setupEmptyProgress();
+  // ── Required step count ─────────────────────────────────────────
+
+  it("counts only required steps in progress (org, customer, project, invoice)", async () => {
+    // Complete all 3 top-level required steps + invoice
+    localStorage.setItem(ORG_VISITED_KEY, "true");
+    setupPartialProgress({ customers: true, projects: true, invoices: true });
     render(<OnboardingChecklist />);
 
     await waitFor(() => {
-      expect(screen.queryByText("Checking progress\u2026")).not.toBeInTheDocument();
+      // org + customer + project + invoice = 4 of 4
+      expect(screen.getByText("4 of 4 steps complete")).toBeInTheDocument();
     });
-
-    // Remodeler tab has "Handle a change order" as optional
-    const badges = screen.getAllByText("Optional");
-    expect(badges.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("renders shared steps across both tabs", async () => {
-    setupEmptyProgress();
-    render(<OnboardingChecklist />);
-
-    await waitFor(() => {
-      expect(screen.queryByText("Checking progress\u2026")).not.toBeInTheDocument();
-    });
-
-    // Shared steps always present
-    expect(screen.getByText("Set up your organization")).toBeInTheDocument();
-    expect(screen.getByText("Add your first customer")).toBeInTheDocument();
-    expect(screen.getByText("Create a project")).toBeInTheDocument();
-  });
-
-  it("resolves dynamic hrefs when a project is detected", async () => {
-    setupPartialProgress({ projects: true });
-    render(<OnboardingChecklist />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/\d+ of \d+ steps complete/)).toBeInTheDocument();
-    });
-
-    // The "Build an estimate" step should link to /projects/5 (detected project id)
-    const estimateLink = screen.getAllByText(/Projects \u2192/);
-    const dynamicLink = estimateLink.find((el) => el.getAttribute("href")?.includes("/projects/5"));
-    expect(dynamicLink).toBeTruthy();
-  });
+  // ── Guide arrow overlay ─────────────────────────────────────────
 
   it("renders the guide arrow overlay", async () => {
     setupEmptyProgress();

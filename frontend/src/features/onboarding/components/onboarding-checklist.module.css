@@ -5,38 +5,6 @@
   gap: 14px;
 }
 
-/* ── Workflow tabs ────────────────────────────────────────────── */
-
-.tabBar {
-  display: flex;
-  gap: 0;
-  border-bottom: 2px solid var(--border);
-}
-
-.tab {
-  flex: 1;
-  padding: var(--space-sm) var(--space-md);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  font-family: inherit;
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: color 150ms ease, border-color 150ms ease;
-}
-
-.tab:hover {
-  color: var(--text-primary);
-}
-
-.tabActive {
-  color: var(--accent-text);
-  border-bottom-color: var(--accent);
-}
-
 /* ── Progress bar ─────────────────────────────────────────────── */
 
 .progressBar {
@@ -175,23 +143,88 @@
   text-decoration: underline;
 }
 
-/* ── Skip / dismiss guide ─────────────────────────────────────── */
+/* ── Project sub-section ─────────────────────────────────────── */
 
-.skipButton {
-  padding: var(--space-sm) var(--space-lg);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  font-family: inherit;
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease;
-  justify-self: start;
+.subSection {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  opacity: 0.5;
+  transition: opacity 300ms ease, border-color 300ms ease, background 300ms ease;
 }
 
-.skipButton:hover {
-  background: var(--surface-secondary);
-  border-color: var(--text-secondary);
+.subSectionRevealed {
+  opacity: 1;
+  border-style: solid;
+  border-color: var(--accent-border);
+  background: var(--surface);
+}
+
+.subSectionHeader {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.subSectionRevealed .subSectionHeader {
+  color: var(--accent-text);
+}
+
+.subSteps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.subStep {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  transition: border-color 200ms ease, background 200ms ease, opacity 200ms ease;
+}
+
+.subStepCompleted {
+  border-color: var(--status-green-border);
+  background: var(--status-green-bg);
+}
+
+.subStepOptional {
+  border-style: dashed;
+}
+
+.subStepLocked {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.subStepContent {
+  display: grid;
+  gap: 4px;
+}
+
+.subStepLabel {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.subStepCompleted .subStepLabel {
+  color: var(--status-green-text);
+}
+
+.subStepDescription {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
 }

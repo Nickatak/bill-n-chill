@@ -16,18 +16,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./guide-arrow-overlay.module.css";
 
-/** Maps onboarding step keys to the data-onboarding-target values on nav elements. */
+/**
+ * Maps onboarding step keys to the data-onboarding-target values on nav elements.
+ * Only top-level steps get arrows — project sub-steps are implicitly "inside Projects".
+ */
 const STEP_TARGETS: Record<string, string> = {
   "return-hint": "get-started-item",
   organization: "organization-item",
   customer: "customers",
   project: "projects",
-  estimate: "projects",
-  send: "projects",
-  "change-order": "projects",
-  invoice: "invoices",
-  bill: "bills",
-  payment: "invoices",
 };
 
 /** Steps that require opening the toolbar dropdown first. */

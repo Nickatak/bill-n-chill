@@ -20,8 +20,8 @@ export default function OnboardingPage() {
           <p className={shell.eyebrow}>Get Started</p>
           <h1 className={shell.title}>Set up your first project in minutes</h1>
           <p className={shell.copy}>
-            Follow these steps to go from zero to your first invoice. Each step builds on the
-            last &mdash; by the end you&apos;ll have a complete billing workflow.
+            Follow these steps to go from zero to your first invoice. Once you create a project,
+            the full billing workflow unlocks inside it.
           </p>
           <p className={styles.returnHint} data-onboarding-step="return-hint">
             You can always get back here from your organization menu &rarr; <strong>Get Started</strong>
