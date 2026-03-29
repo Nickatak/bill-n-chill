@@ -392,7 +392,7 @@ export const EstimateSheetV2 = forwardRef<EstimateSheetV2Handle, EstimateSheetV2
           {!readOnly ? (
             <button type="button" className={lineStyles.removeX} onClick={() => onRemoveLineItem(line.localId)} aria-label="Remove line item">&times;</button>
           ) : null}
-          <span className={lineStyles.rowIndex} {...handleProps}><span className={lineStyles.dragGrip}>⠿</span> Item {index + 1}</span>
+          <span className={lineStyles.rowIndex} {...handleProps}>{!readOnly ? <span className={lineStyles.dragGrip}>⠿</span> : null} Item {index + 1}</span>
           <div className={`${lineStyles.field} ${lineStyles.fieldDesc}`}>
             <span className={lineStyles.fieldLabel}>Description</span>
             <input className={lineStyles.fieldInput} aria-label="Description" value={line.description}
@@ -447,7 +447,7 @@ export const EstimateSheetV2 = forwardRef<EstimateSheetV2Handle, EstimateSheetV2
             <button type="button" className={lineStyles.removeX} onClick={() => removeSection(section.id)} aria-label="Remove section">&times;</button>
           ) : null}
           <div className={lineStyles.sectionNameRow}>
-            <span className={lineStyles.sectionDragHandle} {...handleProps}><span className={lineStyles.dragGrip}>⠿</span></span>
+            {!readOnly ? <span className={lineStyles.sectionDragHandle} {...handleProps}><span className={lineStyles.dragGrip}>⠿</span></span> : null}
             <input
               className={lineStyles.sectionNameInput}
               value={section.name}
