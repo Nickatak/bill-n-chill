@@ -508,3 +508,56 @@
     white-space: nowrap;
   }
 }
+
+/* ── Integrations Tab ── */
+
+.integrationSection {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.integrationHeading {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.integrationStatus {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.integrationConnected {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--status-green-text);
+}
+
+.integrationDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-green-text);
+}
+
+.integrationMeta {
+  display: grid;
+  gap: 2px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.integrationHint {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.integrationWarning {
+  color: var(--status-amber-text);
+  font-weight: 600;
+}

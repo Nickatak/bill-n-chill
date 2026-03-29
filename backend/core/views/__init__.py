@@ -87,6 +87,7 @@ from core.views.public_signing import (
     public_verify_otp_view,
 )
 from core.views.push import push_status_view, push_subscribe_view, push_unsubscribe_view
+from core.views.qbo import qbo_callback_view, qbo_connect_view, qbo_disconnect_view, qbo_status_view
 from core.views.shared_operations.vendors import vendor_detail_view, vendors_list_create_view
 
 __all__ = [
@@ -168,4 +169,8 @@ __all__ = [
     "push_status_view",
     "push_subscribe_view",
     "push_unsubscribe_view",
+    "qbo_callback_view",
+    "qbo_connect_view",
+    "qbo_disconnect_view",
+    "qbo_status_view",
 ]

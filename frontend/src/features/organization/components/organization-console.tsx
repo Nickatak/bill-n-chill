@@ -72,17 +72,22 @@ import type {
 import { BusinessProfileTab } from "./business-profile-tab";
 import { TeamTab } from "./team-tab";
 import { DocumentSettingsTab } from "./document-settings-tab";
+import { IntegrationsTab } from "./integrations-tab";
 import { NotificationsTab } from "./notifications-tab";
+import { isDebugMode } from "@/shared/shell/nav-routes";
 import styles from "./organization-console.module.css";
 
-type OrgTab = "business" | "team" | "documents" | "notifications";
+type OrgTab = "business" | "team" | "documents" | "notifications" | "integrations";
 
-const TABS: Array<{ key: OrgTab; label: string }> = [
+const TABS: Array<{ key: OrgTab; label: string; debugOnly?: boolean }> = [
   { key: "business", label: "Business" },
   { key: "documents", label: "Docs" },
   { key: "notifications", label: "Notifications" },
   { key: "team", label: "Team" },
+  { key: "integrations", label: "Integrations", debugOnly: true },
 ];
+
+const visibleTabs = TABS.filter((tab) => !tab.debugOnly || isDebugMode);
 
 const FALLBACK_EDITABLE_ROLES = ["owner", "pm", "bookkeeping", "worker", "viewer"];
 const FALLBACK_EDITABLE_STATUSES: OrganizationMembershipStatus[] = ["active", "disabled"];
@@ -221,7 +226,7 @@ export function OrganizationConsole() {
       <PageCard>
         {/* Tab bar */}
         <div className={styles.tabBar}>
-          {TABS.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
@@ -277,6 +282,10 @@ export function OrganizationConsole() {
 
             {activeTab === "notifications" ? (
               <NotificationsTab authToken={authToken} />
+            ) : null}
+
+            {activeTab === "integrations" ? (
+              <IntegrationsTab authToken={authToken} />
             ) : null}
           </div>
         ) : null}

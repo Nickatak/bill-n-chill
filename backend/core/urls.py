@@ -14,6 +14,10 @@ from core.views import (
     public_change_order_detail_view,
     cost_code_detail_view,
     cost_codes_list_create_view,
+    qbo_callback_view,
+    qbo_connect_view,
+    qbo_disconnect_view,
+    qbo_status_view,
     customer_detail_view,
     customer_project_create_view,
     customers_list_view,
@@ -310,4 +314,9 @@ urlpatterns = [
     path("vendors/<int:vendor_id>/", vendor_detail_view, name="vendors-detail"),
     path("cost-codes/", cost_codes_list_create_view, name="cost-codes-list-create"),
     path("cost-codes/<int:cost_code_id>/", cost_code_detail_view, name="cost-codes-detail"),
+    # QuickBooks Online integration (gated by QBO_ENABLED env var)
+    path("qbo/connect/", qbo_connect_view, name="qbo-connect"),
+    path("qbo/callback/", qbo_callback_view, name="qbo-callback"),
+    path("qbo/disconnect/", qbo_disconnect_view, name="qbo-disconnect"),
+    path("qbo/status/", qbo_status_view, name="qbo-status"),
 ]
