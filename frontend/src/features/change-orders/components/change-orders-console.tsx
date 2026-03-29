@@ -717,6 +717,16 @@ export function ChangeOrdersConsole({
         actionMessage={projectData.actionMessage}
         actionTone={projectData.actionTone}
         selectedChangeOrderStatusEvents={viewer.selectedChangeOrderStatusEvents}
+        authToken={authToken}
+        onContractPdfUpdate={(newUrl) => {
+          const co = viewer.selectedChangeOrder;
+          if (!co) return;
+          const updated = { ...co, contract_pdf_url: newUrl };
+          projectData.setChangeOrders((current) =>
+            current.map((c) => (c.id === updated.id ? updated : c)),
+          );
+          void projectData.loadChangeOrderStatusEvents(co.id);
+        }}
       />
 
 
@@ -789,16 +799,6 @@ export function ChangeOrdersConsole({
         setIsOriginLineItemsSectionOpen={setIsOriginLineItemsSectionOpen}
         currentAcceptedTotal={viewer.currentAcceptedTotal}
         originalEstimateTotal={viewer.originalEstimateTotal}
-        authToken={authToken}
-        onContractPdfUpdate={(newUrl) => {
-          const co = viewer.selectedChangeOrder;
-          if (!co) return;
-          const updated = { ...co, contract_pdf_url: newUrl };
-          projectData.setChangeOrders((current) =>
-            current.map((c) => (c.id === updated.id ? updated : c)),
-          );
-          void projectData.loadChangeOrderStatusEvents(co.id);
-        }}
       />
       </>
       )}

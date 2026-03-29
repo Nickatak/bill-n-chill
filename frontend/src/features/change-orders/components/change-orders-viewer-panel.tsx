@@ -12,6 +12,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ContractPdfUpload } from "@/shared/document-creator/contract-pdf-upload";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 import { PaginationControls } from "@/shared/components/pagination-controls";
 import {
@@ -412,6 +413,9 @@ export type ChangeOrdersViewerPanelProps = {
   // History
   selectedChangeOrderStatusEvents: AuditEventRecord[];
 
+  // Contract PDF
+  authToken: string;
+  onContractPdfUpdate: (newUrl: string) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -454,6 +458,8 @@ export function ChangeOrdersViewerPanel({
   actionMessage,
   actionTone,
   selectedChangeOrderStatusEvents,
+  authToken,
+  onContractPdfUpdate,
 }: ChangeOrdersViewerPanelProps) {
   return (
     <section className={styles.viewer}>
@@ -588,6 +594,16 @@ export function ChangeOrdersViewerPanel({
                         canMutateChangeOrders={canMutateChangeOrders}
                         changeOrderStatusLabels={changeOrderStatusLabels}
                       />
+
+                      {selectedViewerChangeOrder ? (
+                        <ContractPdfUpload
+                          contractPdfUrl={selectedViewerChangeOrder.contract_pdf_url ?? ""}
+                          documentPath={`change-orders/${selectedViewerChangeOrder.id}`}
+                          authToken={authToken}
+                          readOnly={!canMutateChangeOrders}
+                          onUpdate={onContractPdfUpdate}
+                        />
+                      ) : null}
 
                       {selectedChangeOrderStatusEvents.length > 0 ? (
                         <div className={styles.statusEvents}>
