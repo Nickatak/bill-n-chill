@@ -191,6 +191,11 @@
     display: none !important;
   }
 
+  .sectionLabel {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
   .table {
     border-color: #9ca3af;
   }
@@ -209,7 +214,28 @@
     -webkit-text-fill-color: #000000;
   }
 
+  .cell,
+  .computed {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
   .row {
     border-top-color: #d1d5db;
+  }
+
+  .footer {
+    border-top-color: #d1d5db;
+  }
+
+  .totalLabel,
+  .totalValue {
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .totalInvalid {
+    color: #dc2626;
+    -webkit-text-fill-color: #dc2626;
   }
 }

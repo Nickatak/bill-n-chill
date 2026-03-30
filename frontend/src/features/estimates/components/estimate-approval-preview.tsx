@@ -25,7 +25,8 @@ import { defaultApiBaseUrl, normalizeApiBaseUrl } from "../api";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
 import styles from "./estimates-console.module.css";
-import { ApiResponse, EstimateRecord } from "../types";
+import { ApiResponse, BillingPeriodInput, EstimateRecord } from "../types";
+import { BillingScheduleEditor } from "./billing-schedule-editor";
 import {
   estimateStatusLabel,
   mapLineCostCodes,
@@ -96,6 +97,16 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
   }, 0);
   const taxAmount = taxableBase * (Number(taxPercent) / 100);
   const totalAmount = subtotal + contingencyAmount + overheadProfitAmount + insuranceAmount + taxAmount;
+  const billingPeriods: BillingPeriodInput[] = useMemo(() => {
+    const records = estimate?.billing_periods ?? [];
+    return records.map((r, i) => ({
+      localId: i,
+      description: r.description,
+      percent: r.percent,
+      dueDate: r.due_date || "",
+    }));
+  }, [estimate?.billing_periods]);
+
   const canDecide = estimate?.status === "sent";
   const hasDecision = estimate?.status === "approved" || estimate?.status === "rejected";
   const decisionStatusLabel = estimateStatusLabel(estimate?.status);
@@ -358,40 +369,49 @@ export function EstimateApprovalPreview({ publicToken }: EstimateApprovalPreview
               return result;
             })()}
             afterTable={
-              <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                <div className={frameStyles.summaryBox}>
-                  <div className={frameStyles.summaryRow}>
-                    <span>Subtotal</span>
-                    <span>${formatDecimal(subtotal)}</span>
-                  </div>
-                  {Number(contingencyPercent) !== 0 ? (
+              <>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <div className={frameStyles.summaryBox}>
                     <div className={frameStyles.summaryRow}>
-                      <span>Contingency ({Number(contingencyPercent).toFixed(2)}%)</span>
-                      <span>${formatDecimal(contingencyAmount)}</span>
+                      <span>Subtotal</span>
+                      <span>${formatDecimal(subtotal)}</span>
                     </div>
-                  ) : null}
-                  {Number(overheadProfitPercent) !== 0 ? (
+                    {Number(contingencyPercent) !== 0 ? (
+                      <div className={frameStyles.summaryRow}>
+                        <span>Contingency ({Number(contingencyPercent).toFixed(2)}%)</span>
+                        <span>${formatDecimal(contingencyAmount)}</span>
+                      </div>
+                    ) : null}
+                    {Number(overheadProfitPercent) !== 0 ? (
+                      <div className={frameStyles.summaryRow}>
+                        <span>Overhead &amp; Profit ({Number(overheadProfitPercent).toFixed(2)}%)</span>
+                        <span>${formatDecimal(overheadProfitAmount)}</span>
+                      </div>
+                    ) : null}
+                    {Number(insurancePercent) !== 0 ? (
+                      <div className={frameStyles.summaryRow}>
+                        <span>Insurance ({Number(insurancePercent).toFixed(2)}%)</span>
+                        <span>${formatDecimal(insuranceAmount)}</span>
+                      </div>
+                    ) : null}
                     <div className={frameStyles.summaryRow}>
-                      <span>Overhead &amp; Profit ({Number(overheadProfitPercent).toFixed(2)}%)</span>
-                      <span>${formatDecimal(overheadProfitAmount)}</span>
+                      <span>Sales Tax ({Number(taxPercent || 0).toFixed(2)}%)</span>
+                      <span>${formatDecimal(taxAmount)}</span>
                     </div>
-                  ) : null}
-                  {Number(insurancePercent) !== 0 ? (
-                    <div className={frameStyles.summaryRow}>
-                      <span>Insurance ({Number(insurancePercent).toFixed(2)}%)</span>
-                      <span>${formatDecimal(insuranceAmount)}</span>
+                    <div className={`${frameStyles.summaryRow} ${frameStyles.summaryTotal}`}>
+                      <span>Total</span>
+                      <span>${formatDecimal(totalAmount)}</span>
                     </div>
-                  ) : null}
-                  <div className={frameStyles.summaryRow}>
-                    <span>Sales Tax ({Number(taxPercent || 0).toFixed(2)}%)</span>
-                    <span>${formatDecimal(taxAmount)}</span>
-                  </div>
-                  <div className={`${frameStyles.summaryRow} ${frameStyles.summaryTotal}`}>
-                    <span>Total</span>
-                    <span>${formatDecimal(totalAmount)}</span>
                   </div>
                 </div>
-              </div>
+                {billingPeriods.length > 1 ? (
+                  <BillingScheduleEditor
+                    periods={billingPeriods}
+                    estimateTotal={totalAmount}
+                    readOnly
+                  />
+                ) : null}
+              </>
             }
             afterLineSection={
               <>
