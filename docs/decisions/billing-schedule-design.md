@@ -4,202 +4,147 @@ Source: PM feedback #9 (2026-03-28). Payment schedule by % on estimates/projects
 
 ## Concept
 
-A billing schedule breaks a project's contract into named payment milestones (periods).
-Each period is a **percentage** — the dollar amount is computed at invoice time against
-a specific estimate's total, not stored on the period itself.
+A billing schedule breaks an estimate into named payment milestones (periods).
+Each period is a **percentage** — the dollar amount is computed at render/invoice
+time against the estimate's total, not stored on the period itself.
 
-**Key insight:** The billing schedule belongs to the **project**, not any individual estimate.
-The estimate creator is the natural *authoring surface* (GCs think about payment splits when
-the numbers are in front of them), but the data is always project-scoped.
+**Key decision:** Billing periods are **estimate-scoped**, not project-scoped.
+A project can have multiple estimates, and "33% on bathroom completion" is
+meaningless for a different estimate covering a garage remodel. Each estimate
+owns its own billing schedule.
 
-This is because:
-- Multiple estimates can be approved against the same project
-- A contractor has one payment schedule per contract, not per estimate
-- The schedule is just percentages — dollar amounts are derived per-estimate at invoice time
+Periods are embedded in the estimate payload (like sections) — they create/update
+atomically with the estimate in a single request. No separate endpoint.
 
 ## Model
 
-### `BillingPeriod` (project-scoped)
+### `BillingPeriod` (estimate-scoped)
 
 | Field         | Type                        | Notes                                          |
 |---------------|-----------------------------|-------------------------------------------------|
-| `project`     | FK(Project, CASCADE)        | Parent project (the contract-level entity)      |
+| `estimate`    | FK(Estimate, CASCADE)       | Parent estimate                                 |
 | `description` | CharField(255)              | e.g. "Upon signing", "At rough-in", "Final"    |
-| `percent`     | DecimalField(6, 2)          | Percentage of total contract value              |
+| `percent`     | DecimalField(6, 2)          | Percentage of estimate total                    |
 | `due_date`    | DateField (nullable, blank) | Expected payment date                           |
 | `order`       | PositiveIntegerField        | Display/sort order                              |
 | `created_at`  | DateTimeField(auto_now_add) |                                                 |
 | `updated_at`  | DateTimeField(auto_now)     |                                                 |
 
 - `ordering = ["order"]`
-- Validation: `sum(percent)` across all periods for a project must equal `100` (serializer-level, not DB constraint since it spans rows).
-- No `amount` or `amount_invoiced` fields — amounts are computed at invoice time.
+- Validation: `sum(percent)` across all periods for an estimate must equal `100` (serializer-level, not DB constraint since it spans rows).
+- Descriptions required — validated in `EstimateWriteSerializer.validate_billing_periods`.
+- No `amount` or `amount_invoiced` fields — amounts are computed at render time.
 
 ### How amounts work
 
-Periods store only percentages. When invoicing, the user picks an estimate and a period.
-The amount is computed:
+Periods store only percentages. Dollar amounts are computed:
 
 ```
-period_amount = estimate.total * period.percent / 100
+period_amount = estimate.grand_total * period.percent / 100
 ```
 
 This means:
 - No stored amounts on periods — nothing to recompute when COs land
 - No tracking of invoiced amounts on the period itself
-- Tracking lives on the invoice side (optional FKs — see Invoice integration)
+- Tracking lives on the invoice side (optional FK — see Invoice integration)
 
 ### Default behavior
 
-On estimate creation (for a project with no existing periods), one default period:
-- description: "Lump Sum"
-- percent: 100
-- order: 0
+The frontend seeds a default "Lump Sum" 100% period with due date =
+today + org's `default_invoice_due_delta`. User can split from there
+by adding periods and adjusting percentages. Billing periods are optional —
+an estimate with no periods has no billing schedule.
 
-User can split from there by adding periods and adjusting percentages.
+### Embedding pattern
+
+Billing periods follow the same pattern as sections:
+- Included in `EstimateWriteSerializer` as `billing_periods` (list, optional, default `[]`)
+- Returned in `EstimateSerializer` as nested read-only `billing_periods`
+- Prefetched in `_prefetch_estimate_qs`
+- On create: bulk-created within the estimate's atomic transaction
+- On update (draft save): delete-all + bulk-create within `_handle_estimate_document_save`
+- Locked on non-draft estimates (included in `mutating_fields` set)
 
 ## Authoring surfaces
 
-### Estimate creator (primary)
+### Estimate creator (primary — implemented)
 
-- Billing schedule section below the line items / totals area
-- Editable — saves directly to the project's `BillingPeriod` rows
-- If the project already has periods, they show up pre-populated
-- Labeled "Project Billing Schedule" to clarify this is project-wide, not estimate-specific
-- Validation: percentages must sum to 100% before save
+- `BillingScheduleEditor` component below line items / totals area
+- Editable table: description, %, due date, computed $ amount, remove button
+- "Add Period" button in footer
+- Total % shown with invalid styling when != 100%
+- Periods included in create/update payload — no separate save cycle
+- Default Lump Sum seeded on form reset / initial load
 
-### Project overview
+### Public estimate preview (Phase 5 — not yet implemented)
 
-- Billing schedule visible on project overview
-- Editable — add/remove/rename/reorder periods, adjust percentages
-- Same data as estimate creator (project-scoped rows)
-
-### Public estimate preview
-
-- Billing schedule renders read-only on the estimate public page
-- Shows each period with description, percent, and computed dollar amount
+- Read-only rendering with computed dollar amounts
+- Same `BillingScheduleEditor` component with `readOnly` prop
 
 ## Invoice integration
 
-### "Invoice a period" quick action
+### Tracking FK (implemented in migration)
 
-1. User is on a project with billing periods and approved estimates
-2. User picks an **estimate** and a **billing period**
-3. Amount is computed: `estimate.total * period.percent / 100`
-4. Invoice is pre-filled with the period's description and computed amount
-5. User can edit the invoice freely before sending
+`Invoice.billing_period` — nullable FK(BillingPeriod, SET_NULL).
+When the future "invoice a period" quick action creates an invoice, it stamps
+this FK so the UI can show invoiced/not-yet-invoiced state on the schedule.
 
-This means with two approved estimates ($50k and $30k) and a 30/40/30 schedule,
-each estimate's milestones are invoiced independently — not lumped into one
-contract-value calculation.
+No enforcement — users can still create freeform invoices, manually invoice
+any amount, or re-bill a period. The tracking covers the common case:
+estimate -> bill each period in order -> done.
 
-### Tracking (not enforcement)
+### "Invoice a period" quick action (Phase 6 — not yet implemented)
 
-When the quick action creates an invoice, it stamps two optional FKs on the Invoice:
-- `source_estimate` — nullable FK to Estimate
-- `billing_period` — nullable FK to BillingPeriod
-
-This lets the UI grey out estimate+period combos that already have an invoice,
-and show invoiced/not-yet-invoiced state on the billing schedule view.
-
-No enforcement — the user can still create freeform invoices (both FKs null),
-manually invoice any amount, or even re-bill a period if they choose. The tracking
-covers the common case: estimate → bill each period in order → done.
+1. User picks an **estimate** and a **billing period**
+2. Amount computed: `estimate.grand_total * period.percent / 100`
+3. Invoice pre-filled with period description and computed amount
+4. User can edit freely before sending
 
 ### IC workflow preserved
 
-Independent contractors who skip the estimate flow create invoices directly — freeform,
-no billing periods involved. This path is unchanged.
+Independent contractors who skip the estimate flow create invoices directly —
+freeform, no billing periods involved. This path is unchanged.
 
 ## Two workflow paths
 
 | Path | Flow | Billing periods? |
 |------|------|-------------------|
 | **IC** | Create invoice directly | No — freeform |
-| **GC / Remodeler** | Estimate → billing periods → "invoice this period" | Yes — structured |
+| **GC / Remodeler** | Estimate -> billing periods -> "invoice this period" | Yes — structured |
 
 No forced coupling. Billing periods are opt-in, only relevant when estimates exist.
 
-## Implementation Plan
+## Error handling
 
-### Phase 1 — Backend: Model, Migration, Serializers, API
+Serializer errors from billing period validation are wrapped in the standard
+`{"error": {"code": "...", "message": "..."}}` envelope. The estimate views
+use manual `is_valid()` instead of `raise_exception=True` so that nested
+serializer errors (e.g. invalid percent on a period row) produce readable
+messages via `_format_serializer_errors`.
 
-Foundation — everything else depends on this.
+## Implementation status
 
-**Create:**
-- `backend/core/models/billing_periods/__init__.py`
-- `backend/core/models/billing_periods/billing_period.py` — `BillingPeriod` model
-- `backend/core/serializers/billing_periods.py` — read serializer + bulk-write serializer (sum-to-100 validation)
-- `backend/core/views/billing_periods/__init__.py`
-- `backend/core/views/billing_periods/billing_periods.py` — `GET/PUT /projects/<id>/billing-periods/`
-- Migration: `BillingPeriod` table + `billing_period` nullable FK on Invoice
+### Done (Phases 1-3)
 
-**Modify:**
-- `backend/core/models/__init__.py` — register BillingPeriod
-- `backend/core/models/accounts_receivable/invoice.py` — add `billing_period` FK (SET_NULL, nullable)
-- `backend/core/serializers/__init__.py` — register new serializers
-- `backend/core/serializers/invoices.py` — add `billing_period` to read + write serializers
-- `backend/core/views/__init__.py` — register new view
-- `backend/core/urls.py` — add route
-- `backend/core/views/estimating/estimates.py` — trigger default "Lump Sum" on first estimate creation
-- `backend/core/views/accounts_receivable/invoices.py` — validate billing_period belongs to project on invoice create
+- `BillingPeriod` model (estimate-scoped) + migration
+- Billing period serializers (read + input)
+- Embedded in `EstimateWriteSerializer` / `EstimateSerializer`
+- Validation: sum to 100%, descriptions required
+- Create/update handling in estimate views + helpers
+- Prefetch for N+1 prevention
+- Invoice `billing_period` FK (migration only — UI not wired yet)
+- `BillingScheduleEditor` component (editable + read-only)
+- Estimate creator integration (state, payload, hydration, duplication)
+- Default Lump Sum seeding from org invoice due delta
+- Responsive CSS (desktop table, mobile card, print flattening)
 
-**API shape:**
-- `GET /projects/<id>/billing-periods/` — list periods for project
-- `PUT /projects/<id>/billing-periods/` — bulk replace (delete-all + bulk_create, atomic)
+### Remaining
 
-### Phase 2 — Frontend: Types, API Client, Editor Component
+- **Phase 5:** Public estimate preview (read-only billing schedule)
+- **Phase 6:** Invoice integration ("invoice a period" quick action)
+- **Phase 7:** Tests (backend model/API + frontend component)
 
-Reusable primitives consumed by all three surfaces.
+## Open decisions
 
-**Create:**
-- `frontend/src/features/estimates/components/billing-schedule-editor.tsx` — editable/read-only rows (description, percent, due date, computed dollar amount, remove button)
-- `frontend/src/features/estimates/components/billing-schedule-editor.module.css`
-
-**Modify:**
-- `frontend/src/features/estimates/types.ts` — add `BillingPeriodRecord`, `BillingPeriodInput`
-- `frontend/src/features/estimates/api.ts` — add `fetchBillingPeriods()`, `saveBillingPeriods()`
-
-### Phase 3 — Estimate Creator Integration
-
-Primary authoring surface. Section below totals, above submit.
-
-**Modify:**
-- `frontend/src/features/estimates/components/estimate-sheet-v2.tsx` — render `BillingScheduleEditor` below totals
-- `frontend/src/features/estimates/components/estimates-console.tsx` — fetch periods on project load, save as separate API call after estimate save
-- `frontend/src/features/estimates/hooks/use-estimate-form-fields.ts` — add billing period state
-
-### Phase 4 — Project Overview Integration
-
-Same editor, same endpoint, different surface.
-
-**Modify:**
-- `frontend/src/features/projects/components/projects-console.tsx` — billing schedule section in financial snapshot
-- `frontend/src/features/projects/api.ts` — add/re-export billing period fetch functions
-
-### Phase 5 — Public Estimate Preview
-
-Read-only rendering with computed dollar amounts.
-
-**Modify:**
-- `backend/core/views/estimating/estimates.py` — include billing periods in public estimate response
-- `frontend/src/features/estimates/components/estimate-approval-preview.tsx` — render read-only `BillingScheduleEditor`
-
-### Phase 6 — Invoice Integration ("Invoice a Period")
-
-Evolve deposit panel into period-aware invoice creation.
-
-**Modify:**
-- `frontend/src/features/projects/components/deposit-panel.tsx` — pick estimate + period → auto-compute amount, grey out invoiced combos
-- `frontend/src/features/projects/components/projects-console.tsx` — compute invoiced combos from invoice list, pass to deposit panel
-
-### Phase 7 — Tests
-
-**Create:**
-- `backend/core/tests/test_billing_periods.py` — model basics, CRUD, sum-to-100 validation, org scoping, invoice linkage, default lump sum
-- `frontend/src/features/estimates/__tests__/billing-schedule-editor.test.tsx` — rendering, add/remove, validation, dollar computation
-
-## Open Decisions
-
-1. **Editing after partial invoicing:** Allow description/date edits on invoiced periods, block percent changes. Prevents silent financial drift.
-2. **Default "Lump Sum" timing:** Triggered on first estimate creation for a project. Explicit, happens once, avoids write-side-effects on GET.
+1. **Editing after partial invoicing:** Allow description/date edits on invoiced periods, block percent changes? Prevents silent financial drift.
+2. **Duplicate-as-new behavior:** Currently copies billing periods from source estimate. Should due dates be recalculated relative to today?
