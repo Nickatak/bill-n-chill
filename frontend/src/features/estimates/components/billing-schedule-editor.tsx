@@ -59,7 +59,7 @@ export function BillingScheduleEditor({
 
   return (
     <div className={styles.wrapper}>
-      <p className={styles.sectionLabel}>Project Billing Schedule</p>
+      <p className={styles.sectionLabel}>Payment Schedule</p>
 
       <div className={styles.table}>
         <div className={`${styles.header} ${readOnly ? styles.headerReadOnly : ""}`}>
