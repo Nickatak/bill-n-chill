@@ -22,7 +22,7 @@ export function StatusEvents({ events, title = "Status Events", className }: Pro
 
   return (
     <section className={`${styles.root}${className ? ` ${className}` : ""}`}>
-      <h4 className={styles.title}>{title}</h4>
+      {title ? <h4 className={styles.title}>{title}</h4> : null}
       <div className={styles.list}>
         {events.map((event) => (
           <article key={event.id} className={styles.card}>

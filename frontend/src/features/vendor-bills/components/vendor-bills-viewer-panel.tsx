@@ -9,6 +9,8 @@ import { formatDateDisplay } from "@/shared/date-format";
 import {
   collapseToggleButtonStyles as collapseButtonStyles,
 } from "@/shared/project-list-viewer";
+import { StatusEvents, type StatusEvent } from "@/shared/status-events/status-events";
+import statusBadges from "@/shared/styles/status.module.css";
 import type {
   ProjectRecord,
   VendorBillRecord,
@@ -74,6 +76,33 @@ function statusDisplayLabel(value: VendorBillStatus, labels: Record<string, stri
 
 function statusBadgeClass(value: VendorBillStatus): string {
   return styles[`tableStatus${value[0].toUpperCase()}${value.slice(1)}`] ?? "";
+}
+
+const vendorBillEventBadgeClasses: Record<string, string> = {
+  open: statusBadges.open ?? "",
+  disputed: statusBadges.disputed ?? "",
+  closed: statusBadges.closed ?? "",
+  void: statusBadges.void ?? "",
+};
+
+function mapVendorBillSnapshots(
+  snaps: VendorBillSnapshotRecord[],
+  labels: Record<string, string>,
+): StatusEvent[] {
+  return snaps.map((snap) => ({
+    id: snap.id,
+    badge: {
+      label: snap.action_type === "notate"
+        ? "Note"
+        : statusDisplayLabel(snap.capture_status as VendorBillStatus, labels),
+      className: snap.action_type === "notate"
+        ? statusBadges.neutral ?? ""
+        : vendorBillEventBadgeClasses[snap.capture_status] ?? "",
+    },
+    date: formatDateDisplay(snap.created_at),
+    note: snap.status_note,
+    actor: snap.acted_by_display || snap.acted_by_email || "Unknown",
+  }));
 }
 
 function statusPillClass(value: VendorBillStatus): string {
@@ -308,32 +337,7 @@ export function VendorBillsViewerPanel(props: VendorBillsViewerPanelProps) {
             </button>
             {isHistorySectionOpen ? (
               <div className={styles.viewerSectionContent} onClick={(e) => e.stopPropagation()}>
-                <div className={styles.readOnlyTableWrap}>
-                  <table className={styles.readOnlyTable}>
-                    <thead>
-                      <tr>
-                        <th>Action</th>
-                        <th>Date</th>
-                        <th>Note</th>
-                        <th>Who</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {snapshots.map((snap) => (
-                        <tr key={snap.id}>
-                          <td>
-                            <span className={`${styles.tableStatusBadge} ${statusBadgeClass(snap.capture_status as VendorBillStatus)}`}>
-                              {snap.action_type === "notate" ? "note" : statusDisplayLabel(snap.capture_status as VendorBillStatus, billStatusLabels)}
-                            </span>
-                          </td>
-                          <td>{formatDateDisplay(snap.created_at)}</td>
-                          <td>{snap.status_note || "—"}</td>
-                          <td>{snap.acted_by_display || snap.acted_by_email || "Unknown"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <StatusEvents events={mapVendorBillSnapshots(snapshots, billStatusLabels)} title="" />
               </div>
             ) : null}
           </div>

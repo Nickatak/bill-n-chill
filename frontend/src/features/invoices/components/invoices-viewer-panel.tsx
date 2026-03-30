@@ -14,6 +14,8 @@ import Link from "next/link";
 import { formatDateDisplay, formatDateTimeDisplay } from "@/shared/date-format";
 import { parseAmount, formatDecimal } from "@/shared/money-format";
 import { PaginationControls } from "@/shared/components/pagination-controls";
+import { StatusEvents, type StatusEvent } from "@/shared/status-events/status-events";
+import statusBadges from "@/shared/styles/status.module.css";
 import {
   invoiceNextActionHint,
   invoiceStatusEventActionLabel,
@@ -62,14 +64,44 @@ function invoiceCardStatusClass(status: string): string {
   return "";
 }
 
-/** Map a status event to its badge class for the status events table. */
+/** Map a status event to its shared badge class. */
+const invoiceEventBadgeClasses: Record<string, string> = {
+  draft: statusBadges.draft ?? "",
+  sent: statusBadges.sent ?? "",
+  outstanding: statusBadges.outstanding ?? "",
+  closed: statusBadges.closed ?? "",
+  void: statusBadges.void ?? "",
+};
+
 function invoiceEventBadgeClass(event: InvoiceStatusEventRecord): string {
-  if (event.action_type === "notate") return styles.statusToneNotate;
-  if (event.action_type === "resend") return styles.statusToneSent;
-  if (event.action_type === "create") return styles.statusToneDraft;
-  if (event.from_status === event.to_status && (event.note || "").trim()) return styles.statusToneNotate;
-  if (event.from_status === "sent" && event.to_status === "sent") return styles.statusToneSent;
-  return invoiceStatusToneClass(event.to_status);
+  if (event.action_type === "notate") return statusBadges.neutral ?? "";
+  if (event.action_type === "resend") return statusBadges.sent ?? "";
+  if (event.action_type === "create") return statusBadges.draft ?? "";
+  if (event.from_status === event.to_status && (event.note || "").trim()) return statusBadges.neutral ?? "";
+  if (event.from_status === "sent" && event.to_status === "sent") return statusBadges.sent ?? "";
+  return invoiceEventBadgeClasses[event.to_status] ?? "";
+}
+
+function mapInvoiceStatusEvents(
+  events: InvoiceStatusEventRecord[],
+  statusLabelFn: (status: string) => string,
+): StatusEvent[] {
+  return events.map((event) => ({
+    id: event.id,
+    badge: { label: invoiceStatusEventActionLabel(event, statusLabelFn), className: invoiceEventBadgeClass(event) },
+    date: formatDateTimeDisplay(event.changed_at, "--"),
+    note: event.note,
+    actor: event.changed_by_customer_id ? (
+      <Link
+        href={`/customers?customer=${event.changed_by_customer_id}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {event.changed_by_display || `Customer #${event.changed_by_customer_id}`}
+      </Link>
+    ) : (
+      event.changed_by_display || event.changed_by_email || "Unknown user"
+    ),
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -722,47 +754,7 @@ export function InvoicesViewerPanel({
                     />
 
                     {selectedInvoiceStatusEvents.length > 0 ? (
-                      <div className={styles.statusEvents}>
-                        <h4>Status Events</h4>
-                        <div className={styles.statusEventsTableWrap}>
-                          <table className={styles.statusEventsTable}>
-                            <thead>
-                              <tr>
-                                <th>Action</th>
-                                <th>Occurred</th>
-                                <th>Note</th>
-                                <th>Who</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {selectedInvoiceStatusEvents.map((event) => (
-                                <tr key={event.id}>
-                                  <td data-label="Action">
-                                    <span className={`${styles.invoiceEventBadge} ${invoiceEventBadgeClass(event)}`}>
-                                      {invoiceStatusEventActionLabel(event, statusLabel)}
-                                    </span>
-                                  </td>
-                                  <td data-label="Occurred">{formatDateTimeDisplay(event.changed_at, "--")}</td>
-                                  <td data-label="Note">{event.note || "—"}</td>
-                                  <td data-label="Who">
-                                    {event.changed_by_customer_id ? (
-                                      <Link
-                                        href={`/customers?customer=${event.changed_by_customer_id}`}
-                                        className={styles.statusActorLink}
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        {event.changed_by_display || `Customer #${event.changed_by_customer_id}`}
-                                      </Link>
-                                    ) : (
-                                      event.changed_by_display || event.changed_by_email || "Unknown user"
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
+                      <StatusEvents events={mapInvoiceStatusEvents(selectedInvoiceStatusEvents, statusLabel)} />
                     ) : statusEventsLoading ? (
                       <p className={styles.inlineHint}>Loading status history...</p>
                     ) : null}

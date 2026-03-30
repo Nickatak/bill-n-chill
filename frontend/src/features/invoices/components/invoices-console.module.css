@@ -298,16 +298,6 @@
   composes: toolbarSecondaryButton from "../../../shared/document-creator/creator-foundation.module.css";
 }
 
-.statusActorLink {
-  color: var(--accent);
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.statusActorLink:hover,
-.statusActorLink:focus-visible {
-  text-decoration: underline;
-}
 
 
 .statusToneDraft {
@@ -335,12 +325,6 @@
 }
 
 .statusToneVoid {
-  background: var(--status-gray-bg);
-  color: var(--status-gray-text);
-  border-color: var(--status-gray-border);
-}
-
-.statusToneNotate {
   background: var(--status-gray-bg);
   color: var(--status-gray-text);
   border-color: var(--status-gray-border);
@@ -663,117 +647,6 @@
   font-size: var(--font-sm);
   font-weight: 600;
   color: var(--tone-error-text);
-}
-
-/* ── Status events table ───────────────────────────────────────── */
-
-.statusEvents {
-  display: grid;
-  gap: 6px;
-}
-
-.statusEvents h4 {
-  margin: 0 0 6px;
-  color: var(--text-primary);
-}
-
-.statusEventsTableWrap {
-  composes: tableWrap from '../../../shared/styles/table.module.css';
-  background: var(--surface);
-  overflow-x: auto;
-}
-
-.statusEventsTable {
-  composes: table from '../../../shared/styles/table.module.css';
-  min-width: 480px;
-}
-
-.statusEventsTable thead th {
-  text-align: left;
-  padding: 9px 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.7rem;
-  background: var(--table-header-bg);
-  color: var(--table-header-text);
-}
-
-.statusEventsTable tbody td {
-  padding: 9px 10px;
-  border-top: 1px solid var(--table-border);
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  vertical-align: top;
-}
-
-.statusEventsTable tbody tr:nth-child(even) {
-  background: var(--table-row-alt);
-}
-
-/* ── Status events table: stacked cards on mobile ── */
-@media (max-width: 850px) {
-  .statusEventsTable,
-  .statusEventsTable tbody {
-    min-width: 0;
-    background: transparent;
-  }
-
-  .statusEventsTable thead {
-    display: none;
-  }
-
-  .statusEventsTable tbody tr {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px 10px;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface-secondary);
-    margin-bottom: 6px;
-  }
-
-  .statusEventsTable tbody tr:nth-child(even) {
-    background: var(--surface-secondary);
-  }
-
-  .statusEventsTable tbody td {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    padding: 4px 0;
-    border-top: 0;
-    font-size: 0.82rem;
-  }
-
-  .statusEventsTable tbody td::before {
-    content: attr(data-label);
-    font-size: 0.62rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-tertiary, var(--text-secondary));
-    opacity: 0.7;
-  }
-
-  .statusEventsTableWrap {
-    border: 0;
-    border-radius: 0;
-    overflow: visible;
-    background: transparent;
-  }
-}
-
-.invoiceEventBadge {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 7px;
-  border-radius: var(--radius-pill);
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
 }
 
 .invoiceViewerMetaRow {

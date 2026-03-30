@@ -301,11 +301,7 @@
 .coStatusRejected { composes: rejected from '../../../shared/styles/status.module.css'; }
 .coStatusVoid { composes: archived from '../../../shared/styles/status.module.css'; }
 
-.coStatusEventNotated {
-  composes: badge from '../../../shared/styles/status.module.css';
-  background: var(--tone-neutral-bg);
-  color: var(--text-secondary);
-}
+
 
 /* --- CO card list (mirrors estimate familyGroup/familyMain pattern) --- */
 
@@ -388,69 +384,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* --- Status events table (mirrors estimates pattern) --- */
-
-.statusEvents h4 {
-  margin: 0 0 6px;
-  color: var(--text-primary);
-}
-
-.statusEventsTableWrap {
-  composes: tableWrap from '../../../shared/styles/table.module.css';
-  background: var(--surface);
-  overflow-x: auto;
-}
-
-.statusEventsTable {
-  composes: table from '../../../shared/styles/table.module.css';
-  min-width: 680px;
-}
-
-.statusEventsTable thead th {
-  text-align: left;
-  padding: 9px 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.7rem;
-  background: var(--table-header-bg);
-  color: var(--table-header-text);
-}
-
-.statusEventsTable tbody td {
-  padding: 9px 10px;
-  border-top: 1px solid var(--table-border);
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  vertical-align: top;
-}
-
-.statusEventsTable tbody tr:nth-child(even) {
-  background: var(--table-row-alt);
-}
-
-.coEventBadge {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 7px;
-  border-radius: var(--radius-pill);
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.eventActorLink {
-  color: var(--accent);
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.eventActorLink:hover,
-.eventActorLink:focus-visible {
-  text-decoration: underline;
 }
 
 .viewerHistoryMetaText {
@@ -843,17 +776,6 @@
   color: var(--text-secondary);
 }
 
-.eventActorLink {
-  color: var(--accent);
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.eventActorLink:hover,
-.eventActorLink:focus-visible {
-  text-decoration: underline;
-}
-
 .viewerEventNote {
   font-size: 0.76rem;
   color: var(--text-secondary);
@@ -1068,55 +990,6 @@
   }
 
   .lineTableWrap {
-    border: 0;
-    border-radius: 0;
-    overflow: visible;
-  }
-
-  /* ── Status events table: stacked cards on mobile ── */
-  .statusEventsTable {
-    min-width: 0;
-  }
-
-  .statusEventsTable thead {
-    display: none;
-  }
-
-  .statusEventsTable tbody tr {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px 10px;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface-secondary);
-    margin-bottom: 6px;
-  }
-
-  .statusEventsTable tbody tr:nth-child(even) {
-    background: var(--surface-secondary);
-  }
-
-  .statusEventsTable tbody td {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    padding: 4px 0;
-    border-top: 0;
-    font-size: 0.82rem;
-  }
-
-  .statusEventsTable tbody td::before {
-    content: attr(data-label);
-    font-size: 0.62rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-tertiary, var(--text-secondary));
-    opacity: 0.7;
-  }
-
-  .statusEventsTableWrap {
     border: 0;
     border-radius: 0;
     overflow: visible;

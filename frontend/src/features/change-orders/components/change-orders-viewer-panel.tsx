@@ -15,6 +15,8 @@ import Link from "next/link";
 import { ContractPdfUpload } from "@/shared/document-creator/contract-pdf-upload";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
 import { PaginationControls } from "@/shared/components/pagination-controls";
+import { StatusEvents, type StatusEvent } from "@/shared/status-events/status-events";
+import statusBadges from "@/shared/styles/status.module.css";
 import {
   statusLabel,
   formatEventDateTime,
@@ -39,21 +41,21 @@ import creatorStyles from "@/shared/document-creator/creator-foundation.module.c
 // Pure display helpers (CSS-dependent -- kept local)
 // ---------------------------------------------------------------------------
 
-function statusEventActionClass(event: AuditEventRecord): string {
+function coEventBadgeClass(event: AuditEventRecord): string {
   const toStatus = event.to_status || "";
   const fromStatus = event.from_status || "";
   const statusAction = String(event.metadata_json?.status_action || "").toLowerCase();
-  if (statusAction === "notate") return styles.coStatusEventNotated;
-  if (statusAction === "resend") return styles.coStatusSent;
-  if (!fromStatus && toStatus === "draft") return styles.coStatusDraft;
-  if (fromStatus === toStatus && (event.note || "").trim()) return styles.coStatusEventNotated;
-  if (fromStatus === "sent" && toStatus === "sent") return styles.coStatusSent;
-  if (fromStatus === "draft" && toStatus === "sent") return styles.coStatusSent;
-  if (toStatus === "approved") return styles.coStatusApproved;
-  if (toStatus === "rejected") return styles.coStatusRejected;
-  if (toStatus === "void") return styles.coStatusVoid;
-  if (toStatus === "draft" && fromStatus) return styles.coStatusDraft;
-  return styles.coStatusEventNotated;
+  if (statusAction === "notate") return statusBadges.neutral ?? "";
+  if (statusAction === "resend") return statusBadges.sent ?? "";
+  if (!fromStatus && toStatus === "draft") return statusBadges.draft ?? "";
+  if (fromStatus === toStatus && (event.note || "").trim()) return statusBadges.neutral ?? "";
+  if (fromStatus === "sent" && toStatus === "sent") return statusBadges.sent ?? "";
+  if (fromStatus === "draft" && toStatus === "sent") return statusBadges.sent ?? "";
+  if (toStatus === "approved") return statusBadges.approved ?? "";
+  if (toStatus === "rejected") return statusBadges.rejected ?? "";
+  if (toStatus === "void") return statusBadges.void ?? "";
+  if (toStatus === "draft" && fromStatus) return statusBadges.draft ?? "";
+  return statusBadges.neutral ?? "";
 }
 
 const coStatusClasses: Record<string, string> = {
@@ -81,11 +83,20 @@ function renderEventActor(event: AuditEventRecord) {
   const label = eventActorLabel(event);
   const href = eventActorHref(event);
   if (!href) return label;
-  return (
-    <Link href={href} className={styles.eventActorLink}>
-      {label}
-    </Link>
-  );
+  return <Link href={href}>{label}</Link>;
+}
+
+function mapCOStatusEvents(
+  events: AuditEventRecord[],
+  labels: Record<string, string>,
+): StatusEvent[] {
+  return events.map((event) => ({
+    id: event.id,
+    badge: { label: statusEventActionLabel(event, labels), className: coEventBadgeClass(event) },
+    date: formatEventDateTime(event.created_at),
+    note: event.note,
+    actor: renderEventActor(event),
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -605,40 +616,7 @@ export function ChangeOrdersViewerPanel({
                         />
                       ) : null}
 
-                      {selectedChangeOrderStatusEvents.length > 0 ? (
-                        <div className={styles.statusEvents}>
-                          <h4>Status Events</h4>
-                          <div className={styles.statusEventsTableWrap}>
-                            <table className={styles.statusEventsTable}>
-                              <thead>
-                                <tr>
-                                  <th>Action</th>
-                                  <th>Occurred</th>
-                                  <th>Note</th>
-                                  <th>Who</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {selectedChangeOrderStatusEvents.map((event) => {
-                                  const actionClass = statusEventActionClass(event);
-                                  return (
-                                    <tr key={event.id}>
-                                      <td data-label="Action">
-                                        <span className={`${styles.coEventBadge} ${actionClass}`}>
-                                          {statusEventActionLabel(event, changeOrderStatusLabels)}
-                                        </span>
-                                      </td>
-                                      <td data-label="Occurred">{formatEventDateTime(event.created_at)}</td>
-                                      <td data-label="Note">{event.note || "—"}</td>
-                                      <td data-label="Who">{renderEventActor(event)}</td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      ) : null}
+                      <StatusEvents events={mapCOStatusEvents(selectedChangeOrderStatusEvents, changeOrderStatusLabels)} />
                     </>
                   ) : null}
                 </>
