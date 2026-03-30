@@ -1137,54 +1137,6 @@
   backdrop-filter: blur(3px);
 }
 
-.statusEvents h4 {
-  margin: 0 0 6px;
-  color: var(--text-primary);
-}
-
-.statusEventsTableWrap {
-  composes: tableWrap from '../../../shared/styles/table.module.css';
-  background: var(--surface);
-}
-
-.statusEventsTable {
-  composes: table from '../../../shared/styles/table.module.css';
-  min-width: 680px;
-}
-
-.statusEventsTable thead th {
-  text-align: left;
-  padding: 9px 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.7rem;
-  background: var(--table-header-bg);
-  color: var(--table-header-text);
-}
-
-.statusEventsTable tbody td {
-  padding: 9px 10px;
-  border-top: 1px solid var(--table-border);
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  vertical-align: top;
-}
-
-.statusEventsTable tbody tr:nth-child(even) {
-  background: var(--table-row-alt);
-}
-
-.statusEventActorLink {
-  color: var(--accent);
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.statusEventActorLink:hover,
-.statusEventActorLink:focus-visible {
-  text-decoration: underline;
-}
-
 .versionTree {
   display: grid;
   gap: 8px;
@@ -1588,19 +1540,6 @@
   composes: archived from '../../../shared/styles/status.module.css';
 }
 
-.statusNotated {
-  composes: badge from '../../../shared/styles/status.module.css';
-  background: var(--tone-neutral-bg);
-  color: var(--text-secondary);
-}
-
-.statusCreated {
-  composes: badge from '../../../shared/styles/status.module.css';
-  background: var(--status-gray-bg);
-  color: var(--text-secondary);
-}
-
-
 .versionAmount {
   font-size: 0.85rem;
   color: var(--text-primary);
@@ -1664,8 +1603,7 @@
   .versionTree,
   .versionFilters,
   .familyGroup,
-  .composerPrep,
-  .statusEvents {
+  .composerPrep {
     min-width: 0;
     overflow: hidden;
   }
@@ -1860,49 +1798,6 @@
     width: 100%;
   }
 
-  /* ── Status events: stacked cards ── */
-  .statusEventsTable {
-    min-width: 0;
-  }
-
-  .statusEventsTable thead {
-    display: none;
-  }
-
-  .statusEventsTable tbody tr {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px 10px;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface-secondary);
-    margin-bottom: 6px;
-  }
-
-  .statusEventsTable tbody tr:nth-child(even) {
-    background: var(--surface-secondary);
-  }
-
-  .statusEventsTable tbody td {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    padding: 4px 0;
-    border-top: 0;
-    font-size: 0.82rem;
-  }
-
-  .statusEventsTable tbody td::before {
-    content: attr(data-label);
-    font-size: 0.62rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--text-tertiary, var(--text-secondary));
-    opacity: 0.7;
-  }
-
   /* ── Duplicate dialog ── */
   .duplicateDialog {
     max-width: calc(100vw - 32px);
@@ -1942,8 +1837,6 @@
   .composerPrep,
   .duplicatePanel,
   .duplicateDialog,
-  .statusEvents,
-  .statusEventsTableWrap,
   .financialActivationPanel,
   .decisionBannerAwaiting,
   .publicDecisionBanner,

@@ -62,6 +62,9 @@
 /* --- Orange: overdue --- */
 .overdue { composes: badge; background: var(--status-orange-bg); border-color: var(--status-orange-border); color: var(--status-orange-text); }
 
+/* --- Neutral: notated, note-only --- */
+.neutral   { composes: badge; background: var(--tone-neutral-bg); border-color: var(--border); color: var(--text-secondary); }
+
 /* --- Violet: outstanding, partially paid --- */
 .outstanding    { composes: badge; background: var(--status-violet-bg); border-color: var(--status-violet-border); color: var(--status-violet-text); }
 .partiallyPaid  { composes: badge; background: var(--status-violet-bg); border-color: var(--status-violet-border); color: var(--status-violet-text); }

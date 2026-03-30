@@ -137,11 +137,11 @@ messages via `_format_serializer_errors`.
 - Estimate creator integration (state, payload, hydration, duplication)
 - Default Lump Sum seeding from org invoice due delta
 - Responsive CSS (desktop table, mobile card, print flattening)
+- Public estimate preview (read-only billing schedule)
 
 ### Remaining
 
-- **Phase 5:** Public estimate preview (read-only billing schedule)
-- **Phase 6:** Invoice integration ("invoice a period" quick action)
+- **Phase 6:** Invoice integration ("invoice a period" quick action) — **deferred**
 - **Phase 7:** Tests (backend model/API + frontend component)
 
 ## Open decisions

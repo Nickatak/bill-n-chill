@@ -15,6 +15,8 @@ import { ContractPdfUpload } from "@/shared/document-creator/contract-pdf-upload
 import { formatDateTimeDisplay } from "@/shared/date-format";
 import { formatDecimal } from "@/shared/money-format";
 import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
+import { StatusEvents, type StatusEvent } from "@/shared/status-events/status-events";
+import statusBadges from "@/shared/styles/status.module.css";
 import { formatStatusAction, isNotatedStatusEvent, isResendStatusEvent } from "../helpers";
 import type { EstimateRecord, EstimateStatusEventRecord, ProjectRecord } from "../types";
 import styles from "./estimates-console.module.css";
@@ -51,6 +53,41 @@ const statusClasses: Record<string, string> = {
   void: styles.statusArchived,
   archived: styles.statusArchived,
 };
+
+const eventBadgeClasses: Record<string, string> = {
+  draft: statusBadges.draft ?? "",
+  sent: statusBadges.sent ?? "",
+  approved: statusBadges.approved ?? "",
+  rejected: statusBadges.rejected ?? "",
+  void: statusBadges.archived ?? "",
+  archived: statusBadges.archived ?? "",
+};
+
+function mapStatusEvents(
+  events: EstimateStatusEventRecord[],
+): StatusEvent[] {
+  return events.map((event) => {
+    const badgeClass = isResendStatusEvent(event)
+      ? eventBadgeClasses["sent"] ?? ""
+      : isNotatedStatusEvent(event)
+        ? statusBadges.neutral ?? ""
+        : eventBadgeClasses[event.to_status] ?? "";
+
+    return {
+      id: event.id,
+      badge: { label: formatStatusAction(event), className: badgeClass },
+      date: formatEventDate(event.changed_at),
+      note: event.note,
+      actor: event.changed_by_customer_id ? (
+        <Link href={`/customers?customer=${event.changed_by_customer_id}`}>
+          {event.changed_by_display || `Customer #${event.changed_by_customer_id}`}
+        </Link>
+      ) : (
+        event.changed_by_display || event.changed_by_email || "Unknown user"
+      ),
+    };
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Action button definitions
@@ -647,54 +684,8 @@ export function EstimatesViewerPanel({
             />
           ) : null}
 
-          {selectedEstimateId && statusEvents.length > 0 ? (
-            <div className={styles.statusEvents}>
-              <h4>Status Events</h4>
-              <div className={styles.statusEventsTableWrap}>
-                <table className={styles.statusEventsTable}>
-                  <thead>
-                    <tr>
-                      <th>Action</th>
-                      <th>Occurred</th>
-                      <th>Note</th>
-                      <th>Who</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {statusEvents.map((event) => {
-                      const toStatusClass = isResendStatusEvent(event)
-                        ? statusClasses["sent"] ?? ""
-                        : isNotatedStatusEvent(event)
-                          ? styles.statusNotated
-                          : statusClasses[event.to_status] ?? "";
-                      return (
-                        <tr key={event.id}>
-                          <td data-label="Action">
-                            <span className={`${styles.versionStatus} ${toStatusClass}`}>
-                              {formatStatusAction(event)}
-                            </span>
-                          </td>
-                          <td data-label="Occurred">{formatEventDate(event.changed_at)}</td>
-                          <td data-label="Note">{event.note || "—"}</td>
-                          <td data-label="Who">
-                            {event.changed_by_customer_id ? (
-                              <Link
-                                href={`/customers?customer=${event.changed_by_customer_id}`}
-                                className={styles.statusEventActorLink}
-                              >
-                                {event.changed_by_display || `Customer #${event.changed_by_customer_id}`}
-                              </Link>
-                            ) : (
-                              event.changed_by_display || event.changed_by_email || "Unknown user"
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          {selectedEstimateId ? (
+            <StatusEvents events={mapStatusEvents(statusEvents)} />
           ) : null}
         </>
       ) : (
