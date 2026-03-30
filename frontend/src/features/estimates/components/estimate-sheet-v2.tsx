@@ -25,7 +25,7 @@ import { formatDecimal } from "@/shared/money-format";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import lineStyles from "./line-item-row.module.css";
 
-import { CostCode, EstimateLineInput, EstimateSectionRecord, ProjectRecord } from "../types";
+import { BillingPeriodInput, CostCode, EstimateLineInput, EstimateSectionRecord, ProjectRecord } from "../types";
 import { computeLineTotal } from "../helpers";
 import { CostCodeCombobox } from "./cost-code-combobox";
 import {
@@ -33,6 +33,7 @@ import {
   type OrganizationBrandingDefaults,
 } from "@/shared/document-creator";
 import type { LineValidationResult } from "../helpers";
+import { BillingScheduleEditor } from "./billing-schedule-editor";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -65,6 +66,7 @@ function SortableEntry({ id, disabled, children }: { id: string; disabled?: bool
 export type OrganizationDocumentDefaults = OrganizationBrandingDefaults & {
   estimate_terms_and_conditions: string;
   default_estimate_valid_delta: number;
+  default_invoice_due_delta: number;
 };
 
 /** Payload returned by getOrderPayload() for the parent to include in API requests. */
@@ -112,6 +114,10 @@ type EstimateSheetV2Props = {
   showMarkupColumn?: boolean;
   /** Sections from the API response — used to hydrate local section state. */
   apiSections?: EstimateSectionRecord[];
+  /** Project billing schedule — editable periods. */
+  billingPeriods: BillingPeriodInput[];
+  onBillingPeriodsChange?: (periods: BillingPeriodInput[]) => void;
+  billingPeriodsError?: string;
   onTitleChange: (value: string) => void;
   onValidThroughChange: (value: string) => void;
   onTaxPercentChange: (value: string) => void;
@@ -168,6 +174,9 @@ export const EstimateSheetV2 = forwardRef<EstimateSheetV2Handle, EstimateSheetV2
       lineValidation,
       showMarkupColumn = true,
       apiSections,
+      billingPeriods,
+      onBillingPeriodsChange,
+      billingPeriodsError,
       onTitleChange,
       onValidThroughChange,
       onTaxPercentChange,
@@ -781,6 +790,15 @@ export const EstimateSheetV2 = forwardRef<EstimateSheetV2Handle, EstimateSheetV2
         {metaSection}
         {lineItemsSection}
         {totalsSection}
+        <section className={creatorStyles.sheetSection}>
+          <BillingScheduleEditor
+            periods={billingPeriods}
+            estimateTotal={totalAmount}
+            readOnly={readOnly}
+            onPeriodsChange={onBillingPeriodsChange}
+            validationError={billingPeriodsError}
+          />
+        </section>
         {submitSection}
         {notesSection}
         {termsSection}

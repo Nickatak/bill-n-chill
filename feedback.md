@@ -5,8 +5,8 @@ Source: PM demo session. First real ICP feedback.
 ## Items
 
 1. [x] **Cost Codes** — Already implemented. PM just didn't realize it was live. *(Resolved — explanation only.)*
-2. [ ] **Sub Items** — Hierarchical line items (parent/child nesting for visual grouping). *Moderate.*
-    - when she nests items, does the parent line have its own quantity/price, or is it just a label that sums its children?
+2. [x] **Sub Items** — Hierarchical line items (parent/child nesting for visual grouping). *Moderate.*
+    - Implemented via sections: named section headers with drag-and-drop reordering, subtotals per section. Live on estimates and COs.
 3. [x] **Drag and Drop Reorder** — Desktop only via @dnd-kit. Line number + grip handle as drag target. Mobile keeps up/down arrows. *(Done — estimates.)*
 4. [ ] **Contract Attachment** — Store a link to external contract/DocuSign on the estimate. *Trivial.*
 5. [ ] **Bottom of Bid Markups** — Summary-level markups below line items (contingency, OH&P, insurance). *Moderate.*

@@ -89,6 +89,13 @@ class Invoice(StatusTransitionMixin, models.Model):
         null=True,
         blank=True,
     )
+    billing_period = models.ForeignKey(
+        "BillingPeriod",
+        on_delete=models.SET_NULL,
+        related_name="invoices",
+        null=True,
+        blank=True,
+    )
     created_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,

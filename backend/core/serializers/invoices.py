@@ -93,6 +93,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "public_ref",
             "status",
             "related_estimate",
+            "billing_period",
             "issue_date",
             "due_date",
             "sender_name",
@@ -119,6 +120,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "customer_display_name",
             "invoice_number",
             "related_estimate",
+            "billing_period",
             "subtotal",
             "tax_total",
             "total",
@@ -147,6 +149,7 @@ class InvoiceWriteSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Invoice.Status.choices, required=False)
     status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True)
     related_estimate = serializers.IntegerField(required=False, allow_null=True)
+    billing_period = serializers.IntegerField(required=False, allow_null=True)
     initial_status = serializers.ChoiceField(
         choices=[("draft", "Draft"), ("sent", "Sent")],
         required=False,

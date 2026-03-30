@@ -5,6 +5,7 @@ from decimal import Decimal
 from rest_framework import serializers
 
 from core.models import Estimate, EstimateLineItem, EstimateSection, EstimateStatusEvent
+from core.serializers.billing_periods import BillingPeriodInputSerializer, BillingPeriodSerializer
 from core.serializers.mixins import resolve_public_actor_customer_id, resolve_public_actor_display
 
 
@@ -61,6 +62,7 @@ class EstimateSerializer(serializers.ModelSerializer):
 
     line_items = EstimateLineItemSerializer(many=True, read_only=True)
     sections = EstimateSectionSerializer(many=True, read_only=True)
+    billing_periods = BillingPeriodSerializer(many=True, read_only=True)
     public_ref = serializers.CharField(read_only=True)
     contract_pdf_url = serializers.SerializerMethodField()
 
@@ -102,6 +104,7 @@ class EstimateSerializer(serializers.ModelSerializer):
             "public_ref",
             "line_items",
             "sections",
+            "billing_periods",
             "created_at",
             "updated_at",
         ]
@@ -121,6 +124,7 @@ class EstimateSerializer(serializers.ModelSerializer):
             "grand_total",
             "line_items",
             "sections",
+            "billing_periods",
             "created_at",
             "updated_at",
         ]
@@ -213,6 +217,26 @@ class EstimateWriteSerializer(serializers.Serializer):
     insurance_percent = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, default=0)
     line_items = EstimateLineItemInputSerializer(many=True, required=False)
     sections = EstimateSectionInputSerializer(many=True, required=False, default=[])
+    billing_periods = BillingPeriodInputSerializer(many=True, required=False, default=[])
+
+    def validate_billing_periods(self, periods: list[dict]) -> list[dict]:
+        """Validate billing period descriptions and percentage total when provided."""
+        if not periods:
+            return periods
+        blank_descriptions = [
+            i + 1 for i, p in enumerate(periods) if not (p.get("description") or "").strip()
+        ]
+        if blank_descriptions:
+            positions = ", ".join(str(n) for n in blank_descriptions)
+            raise serializers.ValidationError(
+                f"Every billing period needs a description (missing on period {positions})."
+            )
+        total = sum(Decimal(str(p["percent"])) for p in periods)
+        if total != Decimal("100.00"):
+            raise serializers.ValidationError(
+                f"Billing period percentages must sum to 100% (currently {total}%)."
+            )
+        return periods
 
     def validate_title(self, value: str) -> str:
         trimmed = value.strip()

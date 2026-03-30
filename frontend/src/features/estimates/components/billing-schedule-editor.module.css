@@ -1,0 +1,215 @@
+/* Billing schedule editor — project-scoped payment periods. */
+
+.wrapper {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.sectionLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.table {
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--surface);
+  width: 100%;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: 2fr 80px 120px 100px 36px;
+  gap: var(--space-sm);
+  padding: 8px var(--space-md);
+  background: var(--table-header-bg);
+  color: var(--table-header-text);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.headerReadOnly {
+  grid-template-columns: 2fr 80px 120px 100px;
+}
+
+.headerCell {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 2fr 80px 120px 100px 36px;
+  gap: var(--space-sm);
+  padding: 6px var(--space-md);
+  border-top: 1px solid var(--border);
+  align-items: center;
+}
+
+.rowReadOnly {
+  grid-template-columns: 2fr 80px 120px 100px;
+}
+
+.cell {
+  min-width: 0;
+  font-size: var(--font-base);
+  color: var(--text-primary);
+}
+
+.input {
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: var(--font-base);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.computed {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  white-space: nowrap;
+}
+
+.removeBtn {
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  background: var(--tone-error-bg);
+  color: var(--tone-error-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.row:hover .removeBtn {
+  opacity: 1;
+}
+
+.removeBtn:hover {
+  background: var(--tone-error-border);
+}
+
+/* Footer row: totals + add button */
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px var(--space-md);
+  border-top: 1px solid var(--border);
+}
+
+.totalLabel {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.totalValue {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.totalInvalid {
+  color: var(--tone-error-text);
+}
+
+.addBtn {
+  border: 1px dashed var(--border-accent);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 4px 12px;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.addBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.validationError {
+  color: var(--tone-error-text);
+  font-size: var(--font-sm);
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .header {
+    display: none;
+  }
+
+  .row {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "desc desc"
+      "pct date"
+      "amount remove";
+    gap: 6px;
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .rowReadOnly {
+    grid-template-areas:
+      "desc desc"
+      "pct date"
+      "amount amount";
+  }
+
+  .removeBtn {
+    opacity: 1;
+    justify-self: end;
+  }
+}
+
+/* Print */
+@media print {
+  .addBtn,
+  .removeBtn {
+    display: none !important;
+  }
+
+  .table {
+    border-color: #9ca3af;
+  }
+
+  .header {
+    background: #f3f4f6;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .input {
+    border: 0;
+    background: transparent;
+    padding: 2px 0;
+    color: #000000;
+    -webkit-text-fill-color: #000000;
+  }
+
+  .row {
+    border-top-color: #d1d5db;
+  }
+}

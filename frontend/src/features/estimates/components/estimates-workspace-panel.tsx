@@ -13,6 +13,7 @@ import { RefObject, useEffect, useRef } from "react";
 import type { LineValidationResult } from "../helpers";
 import { EstimateSheetV2, type EstimateSheetV2Handle, type OrganizationDocumentDefaults } from "./estimate-sheet-v2";
 import type {
+  BillingPeriodInput,
   CostCode,
   EstimateLineInput,
   EstimateRecord,
@@ -95,6 +96,9 @@ export type EstimatesWorkspacePanelProps = {
   formSuccessMessage: string;
   lineValidation: LineValidationResult;
   apiSections?: EstimateSectionRecord[];
+  billingPeriods: BillingPeriodInput[];
+  onBillingPeriodsChange?: (periods: BillingPeriodInput[]) => void;
+  billingPeriodsError?: string;
   onTitleChange: (title: string) => void;
   onValidThroughChange: (value: string) => void;
   onTaxPercentChange: (value: string) => void;
@@ -161,6 +165,9 @@ export function EstimatesWorkspacePanel({
   formSuccessMessage,
   lineValidation,
   apiSections,
+  billingPeriods,
+  onBillingPeriodsChange,
+  billingPeriodsError,
   onTitleChange,
   onValidThroughChange,
   onTaxPercentChange,
@@ -292,6 +299,9 @@ export function EstimatesWorkspacePanel({
           formSuccessMessage={formSuccessMessage}
           lineValidation={lineValidation}
           apiSections={apiSections}
+          billingPeriods={billingPeriods}
+          onBillingPeriodsChange={onBillingPeriodsChange}
+          billingPeriodsError={billingPeriodsError}
           onTitleChange={onTitleChange}
           onValidThroughChange={onValidThroughChange}
           onTaxPercentChange={onTaxPercentChange}

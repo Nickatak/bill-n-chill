@@ -39,6 +39,7 @@ export type EstimateRecord = {
   updated_at: string;
   line_items?: EstimateLineItemRecord[];
   sections?: EstimateSectionRecord[];
+  billing_periods?: BillingPeriodRecord[];
   project_context?: ProjectRecord;
   organization_context?: OrganizationPublicContext;
   ceremony_consent_text?: string;
@@ -86,6 +87,24 @@ export type EstimateRelatedChangeOrderRecord = {
   status: string;
   origin_estimate: number | null;
   is_latest_revision: boolean;
+};
+
+export type BillingPeriodRecord = {
+  id: number;
+  estimate: number;
+  description: string;
+  percent: string;
+  due_date: string | null;
+  order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BillingPeriodInput = {
+  localId: number;
+  description: string;
+  percent: string;
+  dueDate: string;
 };
 
 export type EstimateLineInput = {

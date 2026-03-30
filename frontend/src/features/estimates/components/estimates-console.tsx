@@ -82,6 +82,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { todayDateInput, addDaysToDateInput } from "@/shared/date-format";
 import {
   ApiResponse,
+  BillingPeriodInput,
   CostCode,
   EstimateLineInput,
   EstimatePolicyContract,
@@ -196,6 +197,20 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
   const [estimates, setEstimates] = useState<EstimateRecord[]>([]);
   const [selectedEstimateId, setSelectedEstimateId] = useState("");
   const selectedEstimateIdRef = useRef("");
+  const [billingPeriods, setBillingPeriods] = useState<BillingPeriodInput[]>([]);
+  const billingPeriodsNextId = useRef(Date.now());
+
+  /** Build a default "Lump Sum" 100% billing period using org invoice due delta. */
+  function defaultBillingPeriod(dueDaysOverride?: number): BillingPeriodInput[] {
+    const dueDays = dueDaysOverride ?? organizationDefaults?.default_invoice_due_delta ?? 30;
+    const dueDate = addDaysToDateInput(todayDateInput(), dueDays);
+    return [{
+      localId: billingPeriodsNextId.current++,
+      description: "Lump Sum",
+      percent: "100",
+      dueDate,
+    }];
+  }
 
   // -------------------------------------------------------------------------
   // Line items (shared hook)
@@ -438,6 +453,16 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     formFields.populateCreateFromEstimate(sourceEstimate);
     setSelectedEstimateId("");
     selectedEstimateIdRef.current = "";
+    // Copy billing periods from the source estimate
+    const periods = sourceEstimate.billing_periods ?? [];
+    setBillingPeriods(
+      periods.map((r) => ({
+        localId: billingPeriodsNextId.current++,
+        description: r.description,
+        percent: r.percent,
+        dueDate: r.due_date || "",
+      })),
+    );
     flashCreator();
   }
 
@@ -500,6 +525,16 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     formFields.setConfirmedFamilyTitleKey("");
     loadEstimateIntoForm(estimate);
     formFields.setTitleLocked(false);
+    // Hydrate billing periods from the estimate payload
+    const periods = estimate.billing_periods ?? [];
+    setBillingPeriods(
+      periods.map((r) => ({
+        localId: billingPeriodsNextId.current++,
+        description: r.description,
+        percent: r.percent,
+        dueDate: r.due_date || "",
+      })),
+    );
   }, [loadEstimateIntoForm]);
 
   // Keep the ref in sync so async callbacks always see the latest selection.
@@ -520,6 +555,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     setStatusNote("");
     setStatusEvents([]);
     formFields.resetFormFields();
+    setBillingPeriods(defaultBillingPeriod());
   }, [formFields.resetFormFields]);
 
   /** Reset the composer to a blank draft. */
@@ -590,6 +626,10 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
             resolveEstimateValidationDeltaDays(organizationData),
           );
         });
+        // Seed default billing period if starting fresh (no estimate selected)
+        if (!selectedEstimateIdRef.current) {
+          setBillingPeriods(defaultBillingPeriod(organizationData.default_invoice_due_delta));
+        }
       }
 
       if (projectRows[0]) {
@@ -760,7 +800,14 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       order: lineItemOrders.get(line.localId) ?? 0,
     }));
 
-    return { line_items: orderedLineItems, sections };
+    const billing_periods = billingPeriods.map((p, i) => ({
+      description: p.description,
+      percent: p.percent,
+      due_date: p.dueDate || null,
+      order: i,
+    }));
+
+    return { line_items: orderedLineItems, sections, billing_periods };
   }
 
   async function submitNewEstimateWithTitle({
@@ -776,7 +823,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
     formFields.submitGuard.current = true;
     formFields.setIsSubmitting(true);
     try {
-      const { line_items, sections } = buildOrderedPayload();
+      const { line_items, sections, billing_periods } = buildOrderedPayload();
       const response = await fetch(`${apiBaseUrl}/projects/${projectId}/estimates/`, {
         method: "POST",
         headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
@@ -791,6 +838,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
           notes_text: formFields.notesText,
           line_items,
           sections,
+          billing_periods,
         }),
       });
       const payload: ApiResponse = await response.json();
@@ -827,7 +875,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       setStatusEvents([]);
       setFormErrorMessage("");
       setFormSuccessMessage(`Created ${created.title || "Untitled"} v${created.version}.`);
-        loadEstimateIntoForm(created);
+      loadEstimateIntoForm(created);
       formFields.setFamilyCollisionPrompt(null);
       formFields.setConfirmedFamilyTitleKey("");
       flashCreator();
@@ -878,7 +926,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
       formFields.submitGuard.current = true;
       formFields.setIsSubmitting(true);
       try {
-        const { line_items, sections } = buildOrderedPayload();
+        const { line_items, sections, billing_periods } = buildOrderedPayload();
         const response = await fetch(`${apiBaseUrl}/estimates/${selectedEstimate.id}/`, {
           method: "PATCH",
           headers: buildAuthHeaders(authToken, { contentType: "application/json" }),
@@ -892,6 +940,7 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
             notes_text: formFields.notesText,
             line_items,
             sections,
+            billing_periods,
           }),
         });
         const payload: ApiResponse = await response.json();
@@ -1231,6 +1280,8 @@ export function EstimatesConsole({ scopedProjectId: scopedProjectIdProp = null }
         formSuccessMessage={formSuccessMessage}
         lineValidation={lineValidation}
         apiSections={selectedEstimate?.sections}
+        billingPeriods={billingPeriods}
+        onBillingPeriodsChange={setBillingPeriods}
         onTitleChange={formFields.handleEstimateTitleChange}
         onValidThroughChange={formFields.setValidThrough}
         onTaxPercentChange={formFields.setTaxPercent}

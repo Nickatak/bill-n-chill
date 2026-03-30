@@ -15,6 +15,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.models import (
+    BillingPeriod,
     Estimate,
     EstimateLineItem,
     EstimateSection,
@@ -26,6 +27,45 @@ from core.user_helpers import _ensure_org_membership
 from django_q.tasks import async_task
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import _promote_prospect_to_active, _resolve_cost_codes_for_user
+
+
+# ---------------------------------------------------------------------------
+# Serializer-error formatting
+# ---------------------------------------------------------------------------
+
+
+_BILLING_PERIOD_FIELD_LABELS: dict[str, str] = {
+    "percent": "% amount",
+    "description": "description",
+    "due_date": "due date",
+}
+
+
+def _format_serializer_errors(errors: dict) -> str:
+    """Flatten DRF serializer errors into a single human-readable message.
+
+    Handles nested list-of-dict structures (e.g. billing_periods) by
+    collecting the distinct failing fields and producing a single sentence.
+    """
+    messages: list[str] = []
+    for field, detail in errors.items():
+        if field == "billing_periods" and isinstance(detail, list) and detail and isinstance(detail[0], dict):
+            failing_fields: set[str] = set()
+            for item_errors in detail:
+                for sub_field in item_errors:
+                    failing_fields.add(sub_field)
+            labels = [_BILLING_PERIOD_FIELD_LABELS.get(f, f) for f in sorted(failing_fields)]
+            joined = " and ".join(labels) if len(labels) <= 2 else ", ".join(labels[:-1]) + f", and {labels[-1]}"
+            verb = "is" if len(labels) == 1 else "are"
+            messages.append(f"A valid {joined} {verb} required on all billing periods.")
+        elif isinstance(detail, list) and detail and isinstance(detail[0], dict):
+            for i, item_errors in enumerate(detail):
+                for sub_field, sub_msgs in item_errors.items():
+                    if isinstance(sub_msgs, list) and sub_msgs:
+                        messages.append(f"{field} row {i + 1}: {sub_field} — {sub_msgs[0]}")
+        elif isinstance(detail, list) and detail:
+            messages.append(f"{field}: {detail[0]}")
+    return "; ".join(messages) if messages else "Validation failed."
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +102,7 @@ def _prefetch_estimate_qs(queryset: QuerySet) -> QuerySet:
         "line_items",
         "line_items__cost_code",
         "sections",
+        "billing_periods",
     )
 
 
@@ -480,6 +521,22 @@ def _handle_estimate_document_save(
                 overhead_profit_percent=estimate.overhead_profit_percent,
                 insurance_percent=estimate.insurance_percent,
             )
+
+        # Billing periods — independent of line items / totals
+        if "billing_periods" in data:
+            estimate.billing_periods.all().delete()
+            bp_data = data["billing_periods"]
+            if bp_data:
+                BillingPeriod.objects.bulk_create([
+                    BillingPeriod(
+                        estimate=estimate,
+                        description=p["description"],
+                        percent=p["percent"],
+                        due_date=p.get("due_date"),
+                        order=p["order"],
+                    )
+                    for p in bp_data
+                ])
 
     estimate.refresh_from_db()
     return Response({"data": EstimateSerializer(estimate, context={"request": request}).data, "email_sent": False})

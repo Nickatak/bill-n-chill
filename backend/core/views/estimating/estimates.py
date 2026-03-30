@@ -13,7 +13,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import Estimate, EstimateStatusEvent, SigningCeremonyRecord
+from core.models import BillingPeriod, Estimate, EstimateStatusEvent, SigningCeremonyRecord
 from core.policies import get_estimate_policy_contract
 from core.serializers import (
     EstimateSerializer,
@@ -30,6 +30,7 @@ from core.views.estimating.estimates_helpers import (
     _apply_estimate_lines_and_totals,
     _archive_estimate_family,
     _estimate_stored_signature,
+    _format_serializer_errors,
     _handle_estimate_document_save,
     _handle_estimate_status_note,
     _handle_estimate_status_transition,
@@ -442,7 +443,17 @@ def project_estimates_view(request, project_id):
             return terminal_error
 
         serializer = EstimateWriteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": _format_serializer_errors(serializer.errors),
+                        "fields": serializer.errors,
+                    }
+                },
+                status=400,
+            )
         data = serializer.validated_data
         resolved_valid_through = data.get("valid_through")
         if resolved_valid_through is None:
@@ -609,6 +620,20 @@ def project_estimates_view(request, project_id):
                     status=400,
                 )
 
+            # Billing periods (optional — embedded in estimate payload)
+            billing_periods_data = data.get("billing_periods", [])
+            if billing_periods_data:
+                BillingPeriod.objects.bulk_create([
+                    BillingPeriod(
+                        estimate=estimate,
+                        description=p["description"],
+                        percent=p["percent"],
+                        due_date=p.get("due_date"),
+                        order=p["order"],
+                    )
+                    for p in billing_periods_data
+                ])
+
             estimate.refresh_from_db()
             EstimateStatusEvent.record(
                 estimate=estimate,
@@ -685,7 +710,17 @@ def estimate_detail_view(request, estimate_id):
             data=request.data,
             partial=True,
         )
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "error": {
+                        "code": "validation_error",
+                        "message": _format_serializer_errors(serializer.errors),
+                        "fields": serializer.errors,
+                    }
+                },
+                status=400,
+            )
         data = serializer.validated_data
 
         # Status-transition capability gates
@@ -727,7 +762,7 @@ def estimate_detail_view(request, estimate_id):
                 status=400,
             )
         is_locked = estimate.status != Estimate.Status.DRAFT
-        mutating_fields = {"title", "valid_through", "tax_percent", "contingency_percent", "overhead_profit_percent", "insurance_percent", "line_items", "sections", "notes_text"}
+        mutating_fields = {"title", "valid_through", "tax_percent", "contingency_percent", "overhead_profit_percent", "insurance_percent", "line_items", "sections", "billing_periods", "notes_text"}
         if is_locked and any(field in data for field in mutating_fields):
             return Response(
                 {
