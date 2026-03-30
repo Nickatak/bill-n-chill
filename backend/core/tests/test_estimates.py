@@ -712,7 +712,7 @@ class EstimateTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
-            response.json()["status"][0],
+            response.json()["error"]["fields"]["status"][0],
             "Archived status is system-controlled and cannot be set directly.",
         )
 
@@ -957,7 +957,7 @@ class EstimateTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
-            response.json()["status"][0],
+            response.json()["error"]["fields"]["status"][0],
             "Archived status is system-controlled and cannot be set directly.",
         )
 
