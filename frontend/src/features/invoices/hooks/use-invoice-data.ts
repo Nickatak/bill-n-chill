@@ -60,6 +60,14 @@ import type {
 // Local types
 // ---------------------------------------------------------------------------
 
+export type SchedulePeriodLineItem = {
+  costCode: string;
+  description: string;
+  quantity: string;
+  unit: string;
+  unitPrice: string;
+};
+
 export type SchedulePeriodOption = {
   estimateId: number;
   estimateTitle: string;
@@ -69,6 +77,7 @@ export type SchedulePeriodOption = {
   percent: string;
   dueDate: string | null;
   amount: number;
+  lineItems: SchedulePeriodLineItem[];
 };
 
 type ContractBreakdownEstimateLine = {
@@ -95,6 +104,16 @@ type EstimateWithSchedule = {
   id: number;
   title: string;
   grand_total: string;
+  line_items?: Array<{
+    id: number;
+    cost_code?: number | null;
+    description: string;
+    quantity: string;
+    unit: string;
+    unit_price: string;
+    markup_percent: string;
+    line_total: string;
+  }>;
   billing_periods?: Array<{
     id: number;
     description: string;
@@ -383,6 +402,18 @@ export function useInvoiceData({
       for (const period of est.billing_periods ?? []) {
         if (invoicedPeriodIds.has(period.id)) continue;
         const pct = parseAmount(period.percent);
+        const scaledLines: SchedulePeriodLineItem[] = (est.line_items ?? []).map((line) => {
+          const qty = parseAmount(line.quantity);
+          const effectiveUnitPrice = qty !== 0 ? parseAmount(line.line_total) / qty : 0;
+          const scaledUnitPrice = effectiveUnitPrice * pct / 100;
+          return {
+            costCode: line.cost_code ? String(line.cost_code) : "",
+            description: line.description,
+            quantity: line.quantity,
+            unit: line.unit || "ea",
+            unitPrice: scaledUnitPrice.toFixed(2),
+          };
+        });
         options.push({
           estimateId: est.id,
           estimateTitle: est.title || `Estimate #${est.id}`,
@@ -392,6 +423,7 @@ export function useInvoiceData({
           percent: period.percent,
           dueDate: period.due_date,
           amount: total * pct / 100,
+          lineItems: scaledLines,
         });
       }
     }

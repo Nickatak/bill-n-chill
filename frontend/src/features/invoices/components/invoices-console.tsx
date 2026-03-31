@@ -548,17 +548,20 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     formFields.setWorkspaceSourceInvoiceId(null);
     formFields.setEditingDraftInvoiceId(null);
     formFields.setWorkspaceContext("New invoice draft");
-    const description = `${option.description} — ${option.estimateTitle}`;
-    setLineItems([{
-      localId: 1,
-      costCode: "",
-      description,
-      quantity: "1",
-      unit: "ea",
-      unitPrice: option.amount.toFixed(2),
-    }]);
-    setNextLineId(2);
-    setSuccessStatus(`Prefilled from schedule: ${option.description}`);
+    const lines: InvoiceLineInput[] = option.lineItems.map((line, i) => ({
+      localId: i + 1,
+      costCode: line.costCode,
+      description: line.description,
+      quantity: line.quantity,
+      unit: line.unit,
+      unitPrice: line.unitPrice,
+    }));
+    if (lines.length === 0) {
+      lines.push(emptyLine(1));
+    }
+    setLineItems(lines);
+    setNextLineId(lines.length + 1);
+    setSuccessStatus(`Prefilled ${lines.length} line${lines.length === 1 ? "" : "s"} from schedule: ${option.description} (${option.percent}%)`);
     flashCreator();
   }
 
