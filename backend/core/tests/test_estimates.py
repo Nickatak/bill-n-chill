@@ -1274,3 +1274,130 @@ class EstimateTests(TestCase):
         self.assertEqual(invalid.status_code, 400)
         self.assertEqual(invalid.json()["error"]["code"], "validation_error")
 
+    # -----------------------------------------------------------------------
+    # Billing period validation
+    # -----------------------------------------------------------------------
+
+    def _base_estimate_payload(self, **overrides):
+        """Base payload for estimate creation with one line item."""
+        payload = {
+            "title": "Schedule Test",
+            "tax_percent": "0",
+            "line_items": [
+                {
+                    "cost_code": self.cost_code.id,
+                    "description": "Test item",
+                    "quantity": "1",
+                    "unit": "ea",
+                    "unit_price": "1000",
+                    "markup_percent": "0",
+                }
+            ],
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_billing_periods_exact_100_accepted(self):
+        """Billing periods summing to exactly 100.00% are accepted."""
+        payload = self._base_estimate_payload(billing_periods=[
+            {"description": "Deposit", "percent": "50.00", "order": 0},
+            {"description": "Final", "percent": "50.00", "order": 1},
+        ])
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data=payload,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+        estimate = response.json()["data"]
+        self.assertEqual(len(estimate.get("billing_periods", [])), 2)
+
+    def test_billing_periods_single_100_accepted(self):
+        """A single 100% billing period is accepted."""
+        payload = self._base_estimate_payload(billing_periods=[
+            {"description": "Lump sum", "percent": "100.00", "order": 0},
+        ])
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data=payload,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_billing_periods_99_99_rejected(self):
+        """Three-way split of 33.33% each (99.99%) is rejected."""
+        payload = self._base_estimate_payload(billing_periods=[
+            {"description": "Phase 1", "percent": "33.33", "order": 0},
+            {"description": "Phase 2", "percent": "33.33", "order": 1},
+            {"description": "Phase 3", "percent": "33.33", "order": 2},
+        ])
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data=payload,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        error = response.json()["error"]
+        self.assertIn("100%", error["message"])
+        self.assertIn("99.99", error["message"])
+        # Verify no field prefix in the message
+        self.assertNotIn("billing_periods:", error["message"])
+
+    def test_billing_periods_100_01_rejected(self):
+        """Periods summing to 100.01% are rejected."""
+        payload = self._base_estimate_payload(billing_periods=[
+            {"description": "Deposit", "percent": "50.01", "order": 0},
+            {"description": "Final", "percent": "50.00", "order": 1},
+        ])
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data=payload,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("100%", response.json()["error"]["message"])
+
+    def test_billing_periods_three_way_exact_split_accepted(self):
+        """33.33 + 33.33 + 33.34 = 100.00 is accepted."""
+        payload = self._base_estimate_payload(billing_periods=[
+            {"description": "Phase 1", "percent": "33.33", "order": 0},
+            {"description": "Phase 2", "percent": "33.33", "order": 1},
+            {"description": "Phase 3", "percent": "33.34", "order": 2},
+        ])
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data=payload,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_billing_periods_empty_list_accepted(self):
+        """Empty billing_periods list is valid (no schedule)."""
+        payload = self._base_estimate_payload(billing_periods=[])
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data=payload,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_billing_periods_blank_description_rejected(self):
+        """Billing period with blank description is rejected."""
+        payload = self._base_estimate_payload(billing_periods=[
+            {"description": "", "percent": "100.00", "order": 0},
+        ])
+        response = self.client.post(
+            f"/api/v1/projects/{self.project.id}/estimates/",
+            data=payload,
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("description", response.json()["error"]["message"].lower())
+
