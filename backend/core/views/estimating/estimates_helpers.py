@@ -64,7 +64,8 @@ def _format_serializer_errors(errors: dict) -> str:
                     if isinstance(sub_msgs, list) and sub_msgs:
                         messages.append(f"{field} row {i + 1}: {sub_field} — {sub_msgs[0]}")
         elif isinstance(detail, list) and detail:
-            messages.append(f"{field}: {detail[0]}")
+            msg = str(detail[0])
+            messages.append(msg if field == "billing_periods" else f"{field}: {msg}")
     return "; ".join(messages) if messages else "Validation failed."
 
 
