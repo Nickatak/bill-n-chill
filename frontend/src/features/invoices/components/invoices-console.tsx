@@ -495,10 +495,9 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     [invoiceCreatorStatusPolicy],
   );
 
-  const statusMessageAtCreator =
-    statusTone === "success" && /^(Created|Saved|Started|Loaded)\b/i.test(statusMessage);
   const statusMessageAtToolbar =
-    statusTone === "success" && /^Duplicated\b/i.test(statusMessage);
+    statusTone === "success" && /^(Duplicated|Copied)\b/i.test(statusMessage);
+  const statusMessageAtCreator = Boolean(statusMessage && !statusMessageAtToolbar);
 
   // -------------------------------------------------------------------------
   // Line item handlers
@@ -824,20 +823,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     <section className={styles.console}>
       {!authToken ? <p className={styles.authNotice}>{authMessage}</p> : null}
 
-      {statusMessage && !statusMessageAtCreator && !statusMessageAtToolbar ? (
-        <p
-          className={`${styles.statusBanner} ${
-            statusTone === "success"
-              ? styles.statusSuccess
-              : statusTone === "error"
-                ? styles.statusError
-                : ""
-          }`}
-        >
-          {statusMessage}
-        </p>
-      ) : null}
-
       {authToken ? (
         <>
           {!canMutateInvoices ? (
@@ -923,6 +908,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
             onTaxPercentChange={formFields.setTaxPercent}
             onSubmit={handleCreateInvoice}
             statusMessageAtCreator={statusMessageAtCreator}
+            statusTone={statusTone}
             termsText={formFields.termsText}
             organizationInvoiceDefaults={invoiceData.organizationInvoiceDefaults}
             schedulePeriodOptions={invoiceData.schedulePeriodOptions}

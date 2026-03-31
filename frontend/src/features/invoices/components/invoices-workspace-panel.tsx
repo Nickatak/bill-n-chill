@@ -136,6 +136,7 @@ export type InvoicesWorkspacePanelProps = {
 
   // Creator status message
   statusMessageAtCreator: boolean;
+  statusTone: string;
 
   // Terms
   termsText: string;
@@ -189,6 +190,7 @@ export function InvoicesWorkspacePanel({
   onTaxPercentChange,
   onSubmit,
   statusMessageAtCreator,
+  statusTone,
   termsText,
   organizationInvoiceDefaults,
   schedulePeriodOptions,
@@ -521,22 +523,24 @@ export function InvoicesWorkspacePanel({
                       <strong>${formatDecimal(draftTotal)}</strong>
                     </div>
                   </div>
+                  {statusMessageAtCreator ? (
+                    <p className={`${invoiceCreatorStyles.invoiceCreateStatusMessage} ${
+                      statusTone === "error"
+                        ? creatorStyles.actionError
+                        : creatorStyles.actionSuccess
+                    }`}>
+                      {statusMessage}
+                    </p>
+                  ) : null}
                   {canMutateInvoices && !workspaceIsLocked ? (
-                    <>
-                      {statusMessageAtCreator ? (
-                        <p className={`${creatorStyles.actionSuccess} ${invoiceCreatorStyles.invoiceCreateStatusMessage}`}>
-                          {statusMessage}
-                        </p>
-                      ) : null}
-                      <div className={invoiceCreatorStyles.invoiceCreateActions}>
-                        <button
-                          type="submit"
-                          className={`${creatorStyles.primaryButton} ${invoiceCreatorStyles.invoiceCreatePrimary}`}
-                        >
-                          {editingDraftInvoiceId ? "Save Draft" : "Create Invoice"}
-                        </button>
-                      </div>
-                    </>
+                    <div className={invoiceCreatorStyles.invoiceCreateActions}>
+                      <button
+                        type="submit"
+                        className={`${creatorStyles.primaryButton} ${invoiceCreatorStyles.invoiceCreatePrimary}`}
+                      >
+                        {editingDraftInvoiceId ? "Save Draft" : "Create Invoice"}
+                      </button>
+                    </div>
                   ) : null}
                 </div>
               </div>
