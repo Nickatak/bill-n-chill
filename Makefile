@@ -10,7 +10,7 @@
 	docker-up docker-down docker-logs db-migrate \
 	db-seed db-reset db-reset-hard db-grant-test-db-perms \
 	docker-prod-up docker-prod-down docker-prod-logs \
-	db-prod-reset db-prod-reset-hard
+	db-prod-migrate db-prod-reset db-prod-reset-hard
 
 BACKEND_PYTHON := .venv/bin/python
 BACKEND_MANAGE := $(BACKEND_PYTHON) backend/manage.py
@@ -52,6 +52,7 @@ help:
 	@echo "  make docker-prod-up         Full cycle: force-recreate all prod containers"
 	@echo "  make docker-prod-down       Stop prod stack"
 	@echo "  make docker-prod-logs       Stream prod stack logs"
+	@echo "  make db-prod-migrate        Apply Django migrations against prod DB"
 	@echo "  make db-prod-reset          Flush all prod app data and re-migrate"
 	@echo "  make db-prod-reset-hard     Drop prod DB volume and recreate DB container"
 	@echo ""
@@ -222,6 +223,9 @@ docker-prod-down: local-env-prod
 
 docker-prod-logs: local-env-prod
 	$(PROD_COMPOSE) logs -f --tail=200
+
+db-prod-migrate: local-env-prod
+	$(PROD_COMPOSE) exec -T backend python manage.py migrate
 
 db-prod-reset: local-env-prod
 	@echo "This will flush ALL prod app data with no reseed. Type 'yes' to confirm:"
