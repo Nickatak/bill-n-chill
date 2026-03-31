@@ -87,7 +87,6 @@ import {
   InvoiceFormState,
   toInvoiceStatusPolicy,
 } from "../document-adapter";
-import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import { useLineItems } from "@/shared/hooks/use-line-items";
 import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import { useClientPagination } from "@/shared/hooks/use-client-pagination";
@@ -148,7 +147,6 @@ type InvoicesConsoleProps = {
 };
 
 export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
-  const isMobile = useMediaQuery("(max-width: 850px)");
   const { token: authToken, authMessage, role, capabilities } = useSharedSessionAuth();
   const canMutateInvoices = canDo(capabilities, "invoices", "create");
   const canSendInvoices = canDo(capabilities, "invoices", "send");
@@ -168,6 +166,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     add: addLine,
     remove: removeLine,
     update: updateLine,
+    reorder: reorderLine,
     reset: resetLines,
   } = useLineItems<InvoiceLineInput>({ createEmpty: emptyLine });
 
@@ -886,7 +885,6 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
           />
 
           <InvoicesWorkspacePanel
-            isMobile={isMobile}
             canMutateInvoices={canMutateInvoices}
             workspaceSourceInvoice={workspaceSourceInvoice}
             workspaceIsLocked={workspaceIsLocked}
@@ -917,6 +915,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
             onAddLineItem={addLineItem}
             onRemoveLineItem={removeLineItem}
             onUpdateLineItem={updateLineItem}
+            onReorderLineItem={reorderLine}
             draftLineSubtotal={draftLineSubtotal}
             draftTaxTotal={draftTaxTotal}
             draftTotal={draftTotal}

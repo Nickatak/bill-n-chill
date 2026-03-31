@@ -9,13 +9,15 @@
  */
 "use client";
 
-import { FormEvent, RefObject, useMemo, useState } from "react";
+import { FormEvent, ReactNode, RefObject, useMemo, useState } from "react";
+import { DndContext, closestCenter, type DragEndEvent, type Modifier } from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { parseAmount, formatDecimal, formatCurrency } from "@/shared/money-format";
 import { BillingScheduleEditor } from "@/features/estimates/components/billing-schedule-editor";
 import type { BillingPeriodInput } from "@/features/estimates/types";
 import { DocumentCreator } from "@/shared/document-creator";
 import type { DocumentCreatorAdapter, CreatorLineDraft } from "@/shared/document-creator/types";
-import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
 import { CostCodeCombobox } from "@/features/estimates/components/cost-code-combobox";
 import { ReadOnlyLineTable } from "@/shared/document-viewer/read-only-line-table";
 import type {
@@ -31,7 +33,33 @@ import styles from "./invoices-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import invoiceCreatorStyles from "@/shared/document-creator/invoice-creator.module.css";
 import stampStyles from "@/shared/styles/decision-stamp.module.css";
-import mobileCardStyles from "@/shared/document-creator/mobile-line-card.module.css";
+import lineStyles from "./invoice-line-row.module.css";
+
+// ---------------------------------------------------------------------------
+// DnD helpers
+// ---------------------------------------------------------------------------
+
+const verticalOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
+
+function SortableEntry({ id, disabled, children }: {
+  id: string;
+  disabled?: boolean;
+  children: (handleProps: Record<string, unknown>) => ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id, disabled });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition: transition ?? undefined,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+  const handleProps = { ...attributes, ...listeners };
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children(handleProps)}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,9 +71,6 @@ type LineValidation = {
 };
 
 export type InvoicesWorkspacePanelProps = {
-  // Layout
-  isMobile: boolean;
-
   // RBAC
   canMutateInvoices: boolean;
 
@@ -97,6 +122,7 @@ export type InvoicesWorkspacePanelProps = {
   onAddLineItem: () => void;
   onRemoveLineItem: (localId: number) => void;
   onUpdateLineItem: (localId: number, key: keyof Omit<InvoiceLineInput, "localId">, value: string) => void;
+  onReorderLineItem: (activeId: number, overId: number) => void;
 
   // Totals
   draftLineSubtotal: number;
@@ -125,7 +151,6 @@ export type InvoicesWorkspacePanelProps = {
 // ---------------------------------------------------------------------------
 
 export function InvoicesWorkspacePanel({
-  isMobile,
   canMutateInvoices,
   workspaceSourceInvoice,
   workspaceIsLocked,
@@ -156,6 +181,7 @@ export function InvoicesWorkspacePanel({
   onAddLineItem,
   onRemoveLineItem,
   onUpdateLineItem,
+  onReorderLineItem,
   draftLineSubtotal,
   draftTaxTotal,
   draftTotal,
@@ -378,182 +404,79 @@ export function InvoicesWorkspacePanel({
                   ]}
                 />
                 </div>
-              ) : isMobile ? (
-                <div className={mobileCardStyles.cardList}>
-                  {lineItems.map((line, index) => {
-                    const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
-                    const rowIssues = lineValidation.issuesByLocalId.get(line.localId) ?? [];
-                    return (
-                      <MobileLineItemCard
-                        key={line.localId}
-                        index={index}
-                        readOnly={false}
-                        isFirst={index === 0}
-                        isLast={index === lineItems.length - 1}
-                        onRemove={() => onRemoveLineItem(line.localId)}
-                        validationError={rowIssues.length ? `Row ${index + 1}: ${rowIssues.join(" ")}` : undefined}
-                        fields={[
-                          {
-                            label: "Description",
-                            key: "description",
-                            span: "full",
-                            render: () => (
-                              <input
-                                className={mobileCardStyles.fieldInput}
-                                value={line.description}
-                                onChange={(event) => onUpdateLineItem(line.localId, "description", event.target.value)}
-                              />
-                            ),
-                          },
-                          {
-                            label: "Cost Code",
-                            key: "costCode",
-                            span: "full",
-                            render: () => (
-                              <CostCodeCombobox
-                                costCodes={costCodes}
-                                value={line.costCode}
-                                onChange={(nextValue) => onUpdateLineItem(line.localId, "costCode", nextValue)}
-                                ariaLabel="Cost code"
-                                allowEmptySelection
-                                emptySelectionLabel="No cost code (optional)"
-                                placeholder="Search cost code"
-                              />
-                            ),
-                          },
-                          {
-                            label: "Qty",
-                            key: "quantity",
-                            render: () => (
-                              <input
-                                className={mobileCardStyles.fieldInput}
-                                value={line.quantity}
-                                onChange={(event) => onUpdateLineItem(line.localId, "quantity", event.target.value)}
-                                inputMode="decimal"
-                              />
-                            ),
-                          },
-                          {
-                            label: "Unit",
-                            key: "unit",
-                            render: () => (
-                              <input
-                                className={mobileCardStyles.fieldInput}
-                                value={line.unit}
-                                onChange={(event) => onUpdateLineItem(line.localId, "unit", event.target.value)}
-                              />
-                            ),
-                          },
-                          {
-                            label: "Unit Price",
-                            key: "unitPrice",
-                            render: () => (
-                              <input
-                                className={mobileCardStyles.fieldInput}
-                                value={line.unitPrice}
-                                onChange={(event) => onUpdateLineItem(line.localId, "unitPrice", event.target.value)}
-                                inputMode="decimal"
-                              />
-                            ),
-                          },
-                          {
-                            label: "Amount",
-                            key: "amount",
-                            render: () => (
-                              <span className={mobileCardStyles.fieldStatic}>
-                                ${formatDecimal(lineAmount)}
-                              </span>
-                            ),
-                          },
-                        ]}
-                      />
-                    );
-                  })}
-                </div>
               ) : (
-                <div className={creatorStyles.lineTable}>
-                  <div className={invoiceCreatorStyles.invoiceLineHeader}>
-                    <span>Cost Code</span>
-                    <span>Description</span>
-                    <span>Qty</span>
-                    <span>Unit</span>
-                    <span>Unit price</span>
-                    <span>Amount</span>
-                    <span>Actions</span>
-                  </div>
-                  {lineItems.map((line, index) => {
-                    const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
-                    const rowIssues = lineValidation.issuesByLocalId.get(line.localId) ?? [];
-                    return (
-                      <div
-                        key={line.localId}
-                        className={`${invoiceCreatorStyles.invoiceLineRow} ${index % 2 === 1 ? invoiceCreatorStyles.invoiceLineRowAlt : ""} ${rowIssues.length ? creatorStyles.lineRowInvalid : ""}`}
-                      >
-                        <div>
-                          <span className={creatorStyles.printOnly}>
-                            {costCodes.find((c) => String(c.id) === line.costCode)?.code || "—"}
-                          </span>
-                          <span className={creatorStyles.screenOnly}>
-                            <CostCodeCombobox
-                              costCodes={costCodes}
-                              value={line.costCode}
-                              onChange={(nextValue) => onUpdateLineItem(line.localId, "costCode", nextValue)}
-                              ariaLabel="Cost code"
-                              allowEmptySelection
-                              emptySelectionLabel="No cost code (optional)"
-                              placeholder="Search cost code"
-                            />
-                          </span>
-                        </div>
-                        <input
-                          className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                          value={line.description}
-                          onChange={(event) =>
-                            onUpdateLineItem(line.localId, "description", event.target.value)
-                          }
-                        />
-                        <input
-                          className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                          value={line.quantity}
-                          onChange={(event) =>
-                            onUpdateLineItem(line.localId, "quantity", event.target.value)
-                          }
-                          inputMode="decimal"
-                        />
-                        <input
-                          className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                          value={line.unit}
-                          onChange={(event) => onUpdateLineItem(line.localId, "unit", event.target.value)}
-                        />
-                        <input
-                          className={`${creatorStyles.lineInput} ${invoiceCreatorStyles.invoiceLockableControl}`}
-                          value={line.unitPrice}
-                          onChange={(event) =>
-                            onUpdateLineItem(line.localId, "unitPrice", event.target.value)
-                          }
-                          inputMode="decimal"
-                        />
-                        <span className={`${creatorStyles.amountCell} ${invoiceCreatorStyles.invoiceReadAmount}`}>
-                          ${formatDecimal(lineAmount)}
-                        </span>
-                        <div className={invoiceCreatorStyles.invoiceLineActionsCell}>
-                          <button
-                            type="button"
-                            className={creatorStyles.smallButton}
-                            onClick={() => onRemoveLineItem(line.localId)}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                        {rowIssues.length ? (
-                          <p className={creatorStyles.lineIssue}>
-                            Row {index + 1}: {rowIssues.join(" ")}
-                          </p>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
+                <DndContext
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event: DragEndEvent) => {
+                    const { active, over } = event;
+                    if (!over || active.id === over.id) return;
+                    onReorderLineItem(Number(active.id), Number(over.id));
+                  }}
+                  modifiers={[verticalOnly]}
+                >
+                  <SortableContext
+                    items={lineItems.map((l) => String(l.localId))}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className={lineStyles.list}>
+                      {lineItems.map((line, index) => {
+                        const lineAmount = parseAmount(line.quantity) * parseAmount(line.unitPrice);
+                        const rowIssues = lineValidation.issuesByLocalId.get(line.localId) ?? [];
+                        return (
+                          <SortableEntry key={line.localId} id={String(line.localId)}>
+                            {(handleProps) => (
+                              <div className={`${lineStyles.row} ${rowIssues.length ? lineStyles.rowInvalid : ""}`}>
+                                <button type="button" className={lineStyles.removeX} onClick={() => onRemoveLineItem(line.localId)} aria-label="Remove line item">&times;</button>
+                                <span className={lineStyles.rowIndex} {...handleProps}>
+                                  <span className={lineStyles.dragGrip}>⠿</span> Item {index + 1}
+                                </span>
+                                <div className={`${lineStyles.field} ${lineStyles.fieldCostCode}`}>
+                                  <span className={lineStyles.fieldLabel}>Cost Code</span>
+                                  <CostCodeCombobox
+                                    costCodes={costCodes}
+                                    value={line.costCode}
+                                    onChange={(v) => onUpdateLineItem(line.localId, "costCode", v)}
+                                    ariaLabel="Cost code"
+                                    allowEmptySelection
+                                    emptySelectionLabel="No cost code (optional)"
+                                    placeholder="Search cost code"
+                                  />
+                                </div>
+                                <div className={`${lineStyles.field} ${lineStyles.fieldDesc}`}>
+                                  <span className={lineStyles.fieldLabel}>Description</span>
+                                  <input className={lineStyles.fieldInput} aria-label="Description" value={line.description}
+                                    onChange={(e) => onUpdateLineItem(line.localId, "description", e.target.value)} required />
+                                </div>
+                                <div className={`${lineStyles.field} ${lineStyles.fieldQty}`}>
+                                  <span className={lineStyles.fieldLabel}>Qty</span>
+                                  <input className={lineStyles.fieldInput} aria-label="Quantity" value={line.quantity}
+                                    onChange={(e) => onUpdateLineItem(line.localId, "quantity", e.target.value)} inputMode="decimal" required />
+                                </div>
+                                <div className={`${lineStyles.field} ${lineStyles.fieldUnit}`}>
+                                  <span className={lineStyles.fieldLabel}>Unit</span>
+                                  <input className={lineStyles.fieldInput} aria-label="Unit" value={line.unit}
+                                    onChange={(e) => onUpdateLineItem(line.localId, "unit", e.target.value)} required />
+                                </div>
+                                <div className={`${lineStyles.field} ${lineStyles.fieldPrice}`}>
+                                  <span className={lineStyles.fieldLabel}>Unit Price</span>
+                                  <input className={lineStyles.fieldInput} aria-label="Unit price" value={line.unitPrice}
+                                    onChange={(e) => onUpdateLineItem(line.localId, "unitPrice", e.target.value)} inputMode="decimal" required />
+                                </div>
+                                <div className={`${lineStyles.field} ${lineStyles.fieldAmount}`}>
+                                  <span className={lineStyles.fieldLabel}>Amount</span>
+                                  <span className={lineStyles.amountValue}>${formatDecimal(lineAmount)}</span>
+                                </div>
+                                {rowIssues.length ? (
+                                  <p className={lineStyles.validationError}>Row {index + 1}: {rowIssues.join(" ")}</p>
+                                ) : null}
+                              </div>
+                            )}
+                          </SortableEntry>
+                        );
+                      })}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               )}
 
               {!workspaceIsLocked ? (
