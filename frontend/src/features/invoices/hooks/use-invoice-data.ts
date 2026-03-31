@@ -91,7 +91,7 @@ type ContractBreakdownEstimate = {
   line_items: ContractBreakdownEstimateLine[];
 };
 
-type ApprovedEstimateWithSchedule = {
+type EstimateWithSchedule = {
   id: number;
   title: string;
   grand_total: string;
@@ -178,7 +178,7 @@ export function useInvoiceData({
     InvoiceStatusEventRecord[]
   >([]);
   const [statusEventsLoading, setStatusEventsLoading] = useState(false);
-  const [approvedEstimates, setApprovedEstimates] = useState<ApprovedEstimateWithSchedule[]>([]);
+  const [estimatesWithSchedule, setEstimatesWithSchedule] = useState<EstimateWithSchedule[]>([]);
 
   // --- Functions ---
 
@@ -263,10 +263,10 @@ export function useInvoiceData({
   );
 
   /** Fetch approved estimates with billing periods for the scoped project. */
-  const loadApprovedEstimates = useCallback(
+  const loadEstimatesWithSchedule = useCallback(
     async (projectId: number) => {
       if (!authToken || !projectId) {
-        setApprovedEstimates([]);
+        setEstimatesWithSchedule([]);
         return;
       }
       try {
@@ -275,15 +275,15 @@ export function useInvoiceData({
         });
         const payload = await response.json();
         if (!response.ok || !Array.isArray(payload.data)) {
-          setApprovedEstimates([]);
+          setEstimatesWithSchedule([]);
           return;
         }
-        const approved = (payload.data as ApprovedEstimateWithSchedule[]).filter(
+        const withSchedule = (payload.data as EstimateWithSchedule[]).filter(
           (e) => e.billing_periods && e.billing_periods.length > 0,
         );
-        setApprovedEstimates(approved);
+        setEstimatesWithSchedule(withSchedule);
       } catch {
-        setApprovedEstimates([]);
+        setEstimatesWithSchedule([]);
       }
     },
     [authToken],
@@ -362,9 +362,9 @@ export function useInvoiceData({
       onInitialLoad(rows);
     })();
     void loadContractBreakdown(scopedProjectId);
-    void loadApprovedEstimates(scopedProjectId);
+    void loadEstimatesWithSchedule(scopedProjectId);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- onInitialLoad is an untracked callback; adding it would re-fire on every render
-  }, [loadApprovedEstimates, loadContractBreakdown, loadInvoices, scopedProjectId, authToken]);
+  }, [loadEstimatesWithSchedule, loadContractBreakdown, loadInvoices, scopedProjectId, authToken]);
 
   // --- Derived: available schedule period options ---
 
@@ -378,7 +378,7 @@ export function useInvoiceData({
     }
 
     const options: SchedulePeriodOption[] = [];
-    for (const est of approvedEstimates) {
+    for (const est of estimatesWithSchedule) {
       const total = parseAmount(est.grand_total);
       for (const period of est.billing_periods ?? []) {
         if (invoicedPeriodIds.has(period.id)) continue;
@@ -396,7 +396,7 @@ export function useInvoiceData({
       }
     }
     return options;
-  }, [approvedEstimates, invoices]);
+  }, [estimatesWithSchedule, invoices]);
 
   // --- Return bag ---
 
@@ -423,7 +423,7 @@ export function useInvoiceData({
     loadDependencies,
     loadInvoices,
     loadContractBreakdown,
-    loadApprovedEstimates,
+    loadEstimatesWithSchedule,
     loadInvoiceStatusEvents,
   };
 }

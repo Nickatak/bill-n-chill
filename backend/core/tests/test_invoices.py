@@ -935,8 +935,8 @@ class InvoiceTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("not found", response.json()["error"]["message"].lower())
 
-    def test_related_estimate_must_be_approved(self):
-        """related_estimate that is not approved is rejected."""
+    def test_related_estimate_any_status_accepted(self):
+        """related_estimate links regardless of estimate status (no approval gate)."""
         estimate = Estimate.objects.create(
             project=self.project,
             version=1,
@@ -957,8 +957,8 @@ class InvoiceTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("approved", response.json()["error"]["message"].lower())
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["data"]["related_estimate"], estimate.id)
 
     def test_duplicate_related_estimate_blocked(self):
         """Second invoice with same related_estimate is rejected (409)."""

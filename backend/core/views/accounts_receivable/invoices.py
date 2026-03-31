@@ -446,18 +446,6 @@ def project_invoices_view(request, project_id: int):
                     },
                     status=400,
                 )
-            if related_estimate.status != Estimate.Status.APPROVED:
-                return Response(
-                    {
-                        "error": {
-                            "code": "validation_error",
-                            "message": "Related estimate must be approved.",
-                            "fields": {"related_estimate": ["Only approved estimates can be linked."]},
-                        }
-                    },
-                    status=400,
-                )
-
             # Validate billing_period belongs to the related estimate.
             if ingress.billing_period_id:
                 from core.models import BillingPeriod
