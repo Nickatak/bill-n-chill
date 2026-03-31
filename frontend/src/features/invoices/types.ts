@@ -19,6 +19,8 @@ export type InvoiceRecord = {
   customer_display_name: string;
   invoice_number: string;
   public_ref?: string;
+  related_estimate?: number | null;
+  billing_period?: number | null;
   status: string;
   issue_date: string;
   due_date: string;
@@ -34,6 +36,16 @@ export type InvoiceRecord = {
   tax_total: string;
   total: string;
   balance_due: string;
+  payment_schedule?: {
+    estimate_total: string;
+    periods: Array<{
+      id: number;
+      description: string;
+      percent: string;
+      due_date: string | null;
+      order: number;
+    }>;
+  } | null;
   line_items?: Array<{
     id: number;
     cost_code: number | null;

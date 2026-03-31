@@ -426,8 +426,9 @@ def project_invoices_view(request, project_id: int):
                 status=400,
             )
 
-        # --- Validate related_estimate if provided ---
+        # --- Validate related_estimate and billing_period if provided ---
         related_estimate = None
+        billing_period = None
         if ingress.related_estimate_id:
             try:
                 related_estimate = Estimate.objects.get(
@@ -456,20 +457,55 @@ def project_invoices_view(request, project_id: int):
                     },
                     status=400,
                 )
-            # Guard: one invoice per related estimate (via this shortcut).
-            if Invoice.objects.filter(
-                related_estimate=related_estimate,
-            ).exclude(status=Invoice.Status.VOID).exists():
-                return Response(
-                    {
-                        "error": {
-                            "code": "conflict",
-                            "message": "An invoice already exists for this estimate.",
-                            "fields": {"related_estimate": ["An active invoice is already linked to this estimate."]},
-                        }
-                    },
-                    status=409,
-                )
+
+            # Validate billing_period belongs to the related estimate.
+            if ingress.billing_period_id:
+                from core.models import BillingPeriod
+                try:
+                    billing_period = BillingPeriod.objects.get(
+                        id=ingress.billing_period_id,
+                        estimate=related_estimate,
+                    )
+                except BillingPeriod.DoesNotExist:
+                    return Response(
+                        {
+                            "error": {
+                                "code": "validation_error",
+                                "message": "Billing period not found for this estimate.",
+                                "fields": {"billing_period": ["Billing period not found for this estimate."]},
+                            }
+                        },
+                        status=400,
+                    )
+                # Guard: one non-void invoice per billing period.
+                if Invoice.objects.filter(
+                    billing_period=billing_period,
+                ).exclude(status=Invoice.Status.VOID).exists():
+                    return Response(
+                        {
+                            "error": {
+                                "code": "conflict",
+                                "message": "An invoice already exists for this billing period.",
+                                "fields": {"billing_period": ["An active invoice is already linked to this billing period."]},
+                            }
+                        },
+                        status=409,
+                    )
+            else:
+                # No billing period — guard: one invoice per estimate.
+                if Invoice.objects.filter(
+                    related_estimate=related_estimate,
+                ).exclude(status=Invoice.Status.VOID).exists():
+                    return Response(
+                        {
+                            "error": {
+                                "code": "conflict",
+                                "message": "An invoice already exists for this estimate.",
+                                "fields": {"related_estimate": ["An active invoice is already linked to this estimate."]},
+                            }
+                        },
+                        status=409,
+                    )
 
         # --- Check send capability upfront if initial_status is sent ---
         send_immediately = ingress.initial_status == "sent"
@@ -495,6 +531,7 @@ def project_invoices_view(request, project_id: int):
                 notes_text=ingress.notes_text,
                 tax_percent=ingress.tax_percent,
                 related_estimate=related_estimate,
+                billing_period=billing_period,
                 created_by=request.user,
             )
 

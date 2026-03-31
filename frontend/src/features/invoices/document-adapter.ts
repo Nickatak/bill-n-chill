@@ -40,6 +40,8 @@ type InvoiceFormState = {
   taxAmount: number;
   totalAmount: number;
   lineItems: InvoiceLineInput[];
+  relatedEstimate?: number | null;
+  billingPeriod?: number | null;
 };
 
 /**
@@ -127,6 +129,8 @@ export function createInvoiceDocumentAdapter(
       due_date: form.dueDate,
       tax_percent: form.taxPercent,
       terms_text: form.termsText,
+      ...(form.relatedEstimate ? { related_estimate: form.relatedEstimate } : {}),
+      ...(form.billingPeriod ? { billing_period: form.billingPeriod } : {}),
       line_items: form.lineItems.map((line) => ({
         cost_code: line.costCode ? Number(line.costCode) : null,
         description: line.description,

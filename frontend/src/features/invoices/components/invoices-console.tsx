@@ -78,6 +78,7 @@ import type {
   InvoicePolicyContract,
   InvoiceRecord,
 } from "../types";
+import type { SchedulePeriodOption } from "../hooks/use-invoice-data";
 import {
   resolveOrganizationBranding,
 } from "@/shared/document-creator";
@@ -473,6 +474,8 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       taxAmount: draftTaxTotal,
       totalAmount: draftTotal,
       lineItems,
+      relatedEstimate: formFields.relatedEstimate,
+      billingPeriod: formFields.billingPeriod,
     }),
     [
       draftLineSubtotal,
@@ -480,6 +483,8 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       draftTotal,
       formFields.dueDate,
       formFields.issueDate,
+      formFields.relatedEstimate,
+      formFields.billingPeriod,
       lineItems,
       formFields.taxPercent,
       formFields.termsText,
@@ -530,6 +535,33 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     setSelectedStatus("");
     setViewerActionMessage("");
     formFields.loadInvoiceIntoWorkspace(invoice);
+  }
+
+  /** Prefill the workspace from a billing schedule period (single line item). */
+  function handlePrefillFromSchedule(option: SchedulePeriodOption) {
+    const nextIssueDate = todayDateInput();
+    const dueDays = invoiceData.organizationInvoiceDefaults?.default_invoice_due_delta ?? 30;
+    formFields.setIssueDate(nextIssueDate);
+    formFields.setDueDate(option.dueDate || dueDateFromIssueDate(nextIssueDate, dueDays));
+    formFields.setTaxPercent("0");
+    formFields.setTermsText(invoiceData.organizationInvoiceDefaults?.invoice_terms_and_conditions || "");
+    formFields.setRelatedEstimate(option.estimateId);
+    formFields.setBillingPeriod(option.billingPeriodId);
+    formFields.setWorkspaceSourceInvoiceId(null);
+    formFields.setEditingDraftInvoiceId(null);
+    formFields.setWorkspaceContext("New invoice draft");
+    const description = `${option.description} — ${option.estimateTitle}`;
+    setLineItems([{
+      localId: 1,
+      costCode: "",
+      description,
+      quantity: "1",
+      unit: "ea",
+      unitPrice: option.amount.toFixed(2),
+    }]);
+    setNextLineId(2);
+    setSuccessStatus(`Prefilled from schedule: ${option.description}`);
+    flashCreator();
   }
 
   /** Reset the creator workspace to a fresh new-draft state. */
@@ -894,6 +926,8 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
             statusMessageAtCreator={statusMessageAtCreator}
             termsText={formFields.termsText}
             organizationInvoiceDefaults={invoiceData.organizationInvoiceDefaults}
+            schedulePeriodOptions={invoiceData.schedulePeriodOptions}
+            onPrefillFromSchedule={handlePrefillFromSchedule}
           />
       </>
       ) : null}

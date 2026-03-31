@@ -757,6 +757,59 @@
   }
 }
 
+/* ── Schedule prefill dropdown ────────────────────────────────── */
+
+.schedulePrefillWrap {
+  position: relative;
+}
+
+.schedulePrefillDropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10;
+  margin-top: 4px;
+  min-width: 260px;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  display: grid;
+  gap: 0;
+}
+
+.schedulePrefillOption {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.schedulePrefillOption:last-child {
+  border-bottom: none;
+}
+
+.schedulePrefillOption:hover {
+  background: var(--surface-secondary);
+}
+
+.schedulePrefillLabel {
+  font-weight: 600;
+}
+
+.schedulePrefillMeta {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
 /* ── Print ────────────────────────────────────────────────────── */
 
 @media print {
@@ -769,7 +822,8 @@
   .statusFilters,
   .invoiceSearchInput,
   .toolbarPrimaryButton,
-  .toolbarSecondaryButton {
+  .toolbarSecondaryButton,
+  .schedulePrefillWrap {
     display: none !important;
   }
 

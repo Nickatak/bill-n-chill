@@ -9,6 +9,8 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { BillingScheduleEditor } from "@/features/estimates/components/billing-schedule-editor";
+import type { BillingPeriodInput } from "@/features/estimates/types";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import { PublicDocumentViewerShell } from "@/shared/document-viewer/public-document-viewer-shell";
 import {
@@ -65,6 +67,19 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
     const organizationTerms = resolveDefaultTerms(invoice?.organization_context, "invoice");
     return organizationTerms || "No terms specified.";
   }, [invoice?.organization_context, invoice?.terms_text]);
+  const schedulePeriods: BillingPeriodInput[] = useMemo(() => {
+    const schedule = invoice?.payment_schedule;
+    if (!schedule?.periods) return [];
+    return schedule.periods.map((p, i) => ({
+      localId: i,
+      description: p.description,
+      percent: p.percent,
+      dueDate: p.due_date || "",
+    }));
+  }, [invoice?.payment_schedule]);
+  const scheduleTotal = invoice?.payment_schedule
+    ? parseAmount(invoice.payment_schedule.estimate_total)
+    : 0;
   const canDecide =
     invoice?.status === "sent" || invoice?.status === "outstanding";
 
@@ -273,6 +288,13 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
                     <span>${formatDecimal(parseAmount(invoice.total))}</span>
                   </div>
                 </div>
+                {schedulePeriods.length > 0 ? (
+                  <BillingScheduleEditor
+                    periods={schedulePeriods}
+                    estimateTotal={scheduleTotal}
+                    readOnly
+                  />
+                ) : null}
               </div>
             }
             afterLineSection={

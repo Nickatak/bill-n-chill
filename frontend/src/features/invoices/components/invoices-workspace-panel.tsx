@@ -9,8 +9,10 @@
  */
 "use client";
 
-import { FormEvent, RefObject } from "react";
-import { parseAmount, formatDecimal } from "@/shared/money-format";
+import { FormEvent, RefObject, useMemo, useState } from "react";
+import { parseAmount, formatDecimal, formatCurrency } from "@/shared/money-format";
+import { BillingScheduleEditor } from "@/features/estimates/components/billing-schedule-editor";
+import type { BillingPeriodInput } from "@/features/estimates/types";
 import { DocumentCreator } from "@/shared/document-creator";
 import type { DocumentCreatorAdapter, CreatorLineDraft } from "@/shared/document-creator/types";
 import { MobileLineItemCard } from "@/shared/document-creator/mobile-line-card";
@@ -23,6 +25,7 @@ import type {
   OrganizationInvoiceDefaults,
   ProjectRecord,
 } from "../types";
+import type { SchedulePeriodOption } from "../hooks/use-invoice-data";
 import type { InvoiceFormState } from "../document-adapter";
 import styles from "./invoices-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
@@ -111,6 +114,10 @@ export type InvoicesWorkspacePanelProps = {
   // Terms
   termsText: string;
   organizationInvoiceDefaults: OrganizationInvoiceDefaults | null;
+
+  // Schedule prefill
+  schedulePeriodOptions: SchedulePeriodOption[];
+  onPrefillFromSchedule: (option: SchedulePeriodOption) => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -158,7 +165,23 @@ export function InvoicesWorkspacePanel({
   statusMessageAtCreator,
   termsText,
   organizationInvoiceDefaults,
+  schedulePeriodOptions,
+  onPrefillFromSchedule,
 }: InvoicesWorkspacePanelProps) {
+  const [scheduleDropdownOpen, setScheduleDropdownOpen] = useState(false);
+  const schedule = workspaceSourceInvoice?.payment_schedule;
+  const periods = schedule?.periods;
+  const schedulePeriods: BillingPeriodInput[] = useMemo(() => {
+    if (!periods) return [];
+    return periods.map((p, i) => ({
+      localId: i,
+      description: p.description,
+      percent: p.percent,
+      dueDate: p.due_date || "",
+    }));
+  }, [periods]);
+  const scheduleTotal = schedule ? parseAmount(schedule.estimate_total) : 0;
+
   return (
     <div className={styles.workspace}>
       {canMutateInvoices ? (
@@ -188,6 +211,39 @@ export function InvoicesWorkspacePanel({
               >
                 Duplicate Invoice
               </button>
+            ) : null}
+            {schedulePeriodOptions.length > 0 ? (
+              <div className={styles.schedulePrefillWrap}>
+                <button
+                  type="button"
+                  className={styles.toolbarSecondaryButton}
+                  onClick={() => setScheduleDropdownOpen(!scheduleDropdownOpen)}
+                >
+                  From Schedule ▾
+                </button>
+                {scheduleDropdownOpen ? (
+                  <div className={styles.schedulePrefillDropdown}>
+                    {schedulePeriodOptions.map((option) => (
+                      <button
+                        key={option.billingPeriodId}
+                        type="button"
+                        className={styles.schedulePrefillOption}
+                        onClick={() => {
+                          onPrefillFromSchedule(option);
+                          setScheduleDropdownOpen(false);
+                        }}
+                      >
+                        <span className={styles.schedulePrefillLabel}>
+                          {option.description || "Untitled period"}
+                        </span>
+                        <span className={styles.schedulePrefillMeta}>
+                          {option.percent}% — {formatCurrency(option.amount)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
             ) : null}
           </div>
           {statusMessageAtToolbar ? (
@@ -561,6 +617,14 @@ export function InvoicesWorkspacePanel({
                   ) : null}
                 </div>
               </div>
+
+              {schedulePeriods.length > 0 ? (
+                <BillingScheduleEditor
+                  periods={schedulePeriods}
+                  estimateTotal={scheduleTotal}
+                  readOnly
+                />
+              ) : null}
 
               <div className={creatorStyles.terms}>
                 <h4>Terms and Conditions</h4>

@@ -42,8 +42,9 @@
  *   Auto-loads first invoice into workspace via onInitialLoad callback.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildAuthHeaders } from "@/shared/session/auth-headers";
+import { parseAmount } from "@/shared/money-format";
 import { apiBaseUrl } from "@/shared/api/base";
 import { dueDateFromIssueDate, readInvoiceApiError } from "../helpers";
 import type {
@@ -58,6 +59,17 @@ import type {
 // ---------------------------------------------------------------------------
 // Local types
 // ---------------------------------------------------------------------------
+
+export type SchedulePeriodOption = {
+  estimateId: number;
+  estimateTitle: string;
+  estimateTotal: string;
+  billingPeriodId: number;
+  description: string;
+  percent: string;
+  dueDate: string | null;
+  amount: number;
+};
 
 type ContractBreakdownEstimateLine = {
   id: number;
@@ -77,6 +89,19 @@ type ContractBreakdownEstimate = {
   version: number;
   grand_total: string;
   line_items: ContractBreakdownEstimateLine[];
+};
+
+type ApprovedEstimateWithSchedule = {
+  id: number;
+  title: string;
+  grand_total: string;
+  billing_periods?: Array<{
+    id: number;
+    description: string;
+    percent: string;
+    due_date: string | null;
+    order: number;
+  }>;
 };
 
 type ContractBreakdownCO = {
@@ -153,6 +178,7 @@ export function useInvoiceData({
     InvoiceStatusEventRecord[]
   >([]);
   const [statusEventsLoading, setStatusEventsLoading] = useState(false);
+  const [approvedEstimates, setApprovedEstimates] = useState<ApprovedEstimateWithSchedule[]>([]);
 
   // --- Functions ---
 
@@ -236,6 +262,33 @@ export function useInvoiceData({
     [authToken, scopedProjectId, status],
   );
 
+  /** Fetch approved estimates with billing periods for the scoped project. */
+  const loadApprovedEstimates = useCallback(
+    async (projectId: number) => {
+      if (!authToken || !projectId) {
+        setApprovedEstimates([]);
+        return;
+      }
+      try {
+        const response = await fetch(`${apiBaseUrl}/projects/${projectId}/estimates/`, {
+          headers: buildAuthHeaders(authToken),
+        });
+        const payload = await response.json();
+        if (!response.ok || !Array.isArray(payload.data)) {
+          setApprovedEstimates([]);
+          return;
+        }
+        const approved = (payload.data as ApprovedEstimateWithSchedule[]).filter(
+          (e) => e.billing_periods && e.billing_periods.length > 0,
+        );
+        setApprovedEstimates(approved);
+      } catch {
+        setApprovedEstimates([]);
+      }
+    },
+    [authToken],
+  );
+
   /** Fetch contract breakdown (estimate + COs) for a project. */
   const loadContractBreakdown = useCallback(
     async (projectId: number) => {
@@ -309,8 +362,41 @@ export function useInvoiceData({
       onInitialLoad(rows);
     })();
     void loadContractBreakdown(scopedProjectId);
+    void loadApprovedEstimates(scopedProjectId);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- onInitialLoad is an untracked callback; adding it would re-fire on every render
-  }, [loadContractBreakdown, loadInvoices, scopedProjectId, authToken]);
+  }, [loadApprovedEstimates, loadContractBreakdown, loadInvoices, scopedProjectId, authToken]);
+
+  // --- Derived: available schedule period options ---
+
+  const schedulePeriodOptions: SchedulePeriodOption[] = useMemo(() => {
+    // Collect billing period IDs that already have a non-void invoice.
+    const invoicedPeriodIds = new Set<number>();
+    for (const inv of invoices) {
+      if (inv.billing_period && inv.status !== "void") {
+        invoicedPeriodIds.add(inv.billing_period);
+      }
+    }
+
+    const options: SchedulePeriodOption[] = [];
+    for (const est of approvedEstimates) {
+      const total = parseAmount(est.grand_total);
+      for (const period of est.billing_periods ?? []) {
+        if (invoicedPeriodIds.has(period.id)) continue;
+        const pct = parseAmount(period.percent);
+        options.push({
+          estimateId: est.id,
+          estimateTitle: est.title || `Estimate #${est.id}`,
+          estimateTotal: est.grand_total,
+          billingPeriodId: period.id,
+          description: period.description,
+          percent: period.percent,
+          dueDate: period.due_date,
+          amount: total * pct / 100,
+        });
+      }
+    }
+    return options;
+  }, [approvedEstimates, invoices]);
 
   // --- Return bag ---
 
@@ -330,10 +416,14 @@ export function useInvoiceData({
     setSelectedInvoiceStatusEvents,
     setStatusEventsLoading,
 
+    // Derived
+    schedulePeriodOptions,
+
     // Helpers
     loadDependencies,
     loadInvoices,
     loadContractBreakdown,
+    loadApprovedEstimates,
     loadInvoiceStatusEvents,
   };
 }

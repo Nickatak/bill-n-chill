@@ -62,7 +62,6 @@ import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./projects-console.module.css";
 import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
 import { ProjectListViewer } from "@/shared/project-list-viewer";
-import { DepositPanel } from "./deposit-panel";
 import { ApiResponse, ApprovedEstimate, ProjectFinancialSummary, ProjectRecord } from "../types";
 import {
   PROJECT_STATUS_VALUES,
@@ -97,11 +96,9 @@ export function ProjectsConsole() {
   const [invoiceProgress, setInvoiceProgress] = useState<{ done: number; total: number } | null>(null);
   const [acceptedEstimateTotal, setAcceptedEstimateTotal] = useState("--");
   const [invoiceAllocationTargets, setInvoiceAllocationTargets] = useState<AllocationTarget[]>([]);
-  const [toolbarPanel, setToolbarPanel] = useState<"deposit" | "payment" | null>(null);
+  const [toolbarPanel, setToolbarPanel] = useState<"payment" | null>(null);
   const [approvedEstimates, setApprovedEstimates] = useState<ApprovedEstimate[]>([]);
   const [linkedEstimateIds, setLinkedEstimateIds] = useState<Set<number>>(new Set());
-  /** After a deposit invoice is created, holds the new invoice for payment pivot. */
-  const [depositInvoice, setDepositInvoice] = useState<{ id: number; invoice_number: string; balance_due: string } | null>(null);
   const [isProjectEditOpen, setIsProjectEditOpen] = useState(false);
   const projectEditFormRef = useRef<HTMLFormElement | null>(null);
 
@@ -128,7 +125,6 @@ export function ProjectsConsole() {
   const isSelectedProjectTerminal =
     selectedProject?.status === "completed" || selectedProject?.status === "cancelled";
   const isSelectedProjectProspect = selectedProject?.status === "prospect";
-  const hasApprovedEstimate = approvedEstimates.length > 0;
   const estimateDone = approvedEstimates.filter((e) => linkedEstimateIds.has(e.id)).length;
   const hasPayableInvoices = invoiceAllocationTargets.length > 0;
   const computedProfileStatuses = selectedProject
@@ -803,18 +799,7 @@ export function ProjectsConsole() {
               <div className={styles.actionToolbar} role="toolbar" aria-label="Project actions">
                 <button
                   type="button"
-                  className={`${styles.toolbarAction} ${toolbarPanel === "deposit" && !depositInvoice ? styles.toolbarActionActive : ""}`}
-                  disabled={!hasApprovedEstimate}
-                  onClick={() => {
-                    setDepositInvoice(null);
-                    setToolbarPanel(toolbarPanel === "deposit" ? null : "deposit");
-                  }}
-                >
-                  Invoice Deposit
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.toolbarAction} ${toolbarPanel === "payment" || (toolbarPanel === "deposit" && depositInvoice) ? styles.toolbarActionActive : ""}`}
+                  className={`${styles.toolbarAction} ${toolbarPanel === "payment" ? styles.toolbarActionActive : ""}`}
                   disabled={!hasPayableInvoices || isSelectedProjectProspect}
                   onClick={() => setToolbarPanel(toolbarPanel === "payment" ? null : "payment")}
                 >
@@ -825,41 +810,7 @@ export function ProjectsConsole() {
             </div>
 
             <div className={styles.paymentRecorderSection}>
-              {toolbarPanel === "deposit" && !depositInvoice ? (
-                <DepositPanel
-                  projectId={selectedProject.id}
-                  approvedEstimates={approvedEstimates}
-                  linkedEstimateIds={linkedEstimateIds}
-                  onInvoiceCreated={(invoice) => {
-                    setDepositInvoice(invoice);
-                    // Refresh data so the new invoice shows up in counts + targets.
-                    void loadFinancialSummary();
-                    void loadInvoiceProgress(selectedProject.id);
-                    void loadInvoiceAllocationTargets(selectedProject.id);
-                  }}
-                />
-              ) : toolbarPanel === "deposit" && depositInvoice ? (
-                <PaymentRecorder
-                  projectId={selectedProject.id}
-                  direction="inbound"
-                  allocationTargets={[
-                    {
-                      id: depositInvoice.id,
-                      label: `Invoice ${depositInvoice.invoice_number}`,
-                      balanceDue: depositInvoice.balance_due,
-                    },
-                  ]}
-                  hideHeader
-                  createOnly
-                  hideWorkspaceTitle
-                  onPaymentsChanged={() => {
-                    void loadFinancialSummary();
-                    void loadInvoiceAllocationTargets(selectedProject.id);
-                    setToolbarPanel(null);
-                    setDepositInvoice(null);
-                  }}
-                />
-              ) : toolbarPanel === "payment" ? (
+              {toolbarPanel === "payment" ? (
                 <PaymentRecorder
                   projectId={selectedProject.id}
                   direction="inbound"

@@ -3,6 +3,7 @@
 from rest_framework import serializers
 
 from core.models import Invoice, InvoiceLine, InvoiceStatusEvent, Payment
+from core.serializers.billing_periods import BillingPeriodSerializer
 from core.serializers.mixins import resolve_public_actor_customer_id, resolve_public_actor_display
 
 
@@ -80,6 +81,20 @@ class InvoiceSerializer(serializers.ModelSerializer):
         source="target_payments", many=True, read_only=True,
     )
     public_ref = serializers.CharField(read_only=True)
+    payment_schedule = serializers.SerializerMethodField()
+
+    def get_payment_schedule(self, obj: Invoice) -> dict | None:
+        """Return the linked estimate's billing periods and total, if any."""
+        estimate = obj.related_estimate
+        if not estimate:
+            return None
+        periods = estimate.billing_periods.all().order_by("order")
+        if not periods:
+            return None
+        return {
+            "estimate_total": str(estimate.grand_total),
+            "periods": BillingPeriodSerializer(periods, many=True).data,
+        }
 
     class Meta:
         model = Invoice
@@ -109,6 +124,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "total",
             "balance_due",
             "allocations",
+            "payment_schedule",
             "line_items",
             "created_at",
             "updated_at",
