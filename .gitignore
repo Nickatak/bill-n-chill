@@ -41,6 +41,7 @@ media/
 .vscode/
 .claude/
 HUMAN_MEMORY.md
+docs/legal_questions.md
 
 # Local AI working directory (kept out of repo)
 work/*
