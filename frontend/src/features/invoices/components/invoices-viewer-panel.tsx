@@ -759,34 +759,6 @@ export function InvoicesViewerPanel({
                       <p className={styles.inlineHint}>Loading status history...</p>
                     ) : null}
 
-                    {/* Line Items */}
-                    <div className={styles.invoiceViewerSection}>
-                      <h4 className={styles.invoiceViewerSectionHeading}>Line Items ({invoice.line_items?.length ?? 0})</h4>
-                        <div className={styles.invoiceViewerSectionContent}>
-                          <ReadOnlyLineTable
-                            columns={["Description", "Qty", "Unit", "Unit Price", "Line Total"]}
-                            rows={(invoice.line_items ?? []).map((line) => ({
-                              key: line.id,
-                              cells: [
-                                line.description || "—",
-                                line.quantity,
-                                line.unit,
-                                `$${line.unit_price}`,
-                                `$${line.line_total}`,
-                              ],
-                            }))}
-                            emptyMessage="No line items."
-                            mobileColumnLayout={[
-                              { order: 0, span: "full" },
-                              { order: 1, span: "half" },
-                              { order: 2, span: "half" },
-                              { order: 3, span: "half" },
-                              { order: 4, span: "half", align: "right" },
-                            ]}
-                          />
-                        </div>
-                    </div>
-
                     {renderContractBreakdown()}
                   </div>
                 ) : null}
