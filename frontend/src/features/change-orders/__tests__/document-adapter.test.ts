@@ -114,7 +114,7 @@ describe("createChangeOrderDocumentAdapter", () => {
       const fields = adapter.getMetaFields(changeOrderRecord);
       expect(fields).toEqual([
         { key: "co_id", label: "Change Order", value: "Add bathroom tile" },
-        { key: "origin_estimate", label: "Original Estimate", value: "#42" },
+        { key: "origin_quote", label: "Original Quote", value: "#42" },
         { key: "line_delta_total", label: "Line Delta Total", value: "$2500.00" },
       ]);
     });
@@ -123,7 +123,7 @@ describe("createChangeOrderDocumentAdapter", () => {
       const fields = adapter.getMetaFields(null as never);
       expect(fields).toEqual([
         { key: "co_id", label: "Change Order", value: "Draft" },
-        { key: "origin_estimate", label: "Original Estimate", value: "Not set" },
+        { key: "origin_quote", label: "Original Quote", value: "Not set" },
         { key: "line_delta_total", label: "Line Delta Total", value: "$0.00" },
       ]);
     });

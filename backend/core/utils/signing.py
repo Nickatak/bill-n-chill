@@ -36,7 +36,7 @@ CEREMONY_CONSENT_TEXT_VERSION = compute_consent_text_version(CEREMONY_CONSENT_TE
 # updated_at, created_at, id) are excluded so the hash represents
 # the document content the signer reviewed.
 
-_ESTIMATE_LINE_FIELDS = ("description", "quantity", "unit_price", "markup_percent", "cost_code", "unit")
+_QUOTE_LINE_FIELDS = ("description", "quantity", "unit_price", "markup_percent", "cost_code", "unit")
 _CHANGE_ORDER_LINE_FIELDS = ("description", "amount_delta", "days_delta", "cost_code", "adjustment_reason")
 _INVOICE_LINE_FIELDS = ("description", "quantity", "unit_price", "cost_code", "unit")
 
@@ -56,13 +56,13 @@ def compute_document_content_hash(document_type: str, serialized_data: dict) -> 
     Excludes volatile fields (status, timestamps, IDs) so the hash represents
     exactly what the customer reviewed. Field sets are per-document-type.
     """
-    if document_type == "estimate":
+    if document_type == "quote":
         content = {
             "title": serialized_data.get("title"),
             "version": serialized_data.get("version"),
             "tax_percent": serialized_data.get("tax_percent"),
             "terms_text": serialized_data.get("terms_text"),
-            "line_items": _extract_line_items(serialized_data, _ESTIMATE_LINE_FIELDS),
+            "line_items": _extract_line_items(serialized_data, _QUOTE_LINE_FIELDS),
         }
     elif document_type == "change_order":
         content = {

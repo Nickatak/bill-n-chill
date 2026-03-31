@@ -298,7 +298,7 @@ All: `fetch PATCH /api/v1/invoices/{invoiceId}/`
 
 ---
 
-`BACKEND` — returns active estimate + approved change orders for the project
+`BACKEND` — returns active quote + approved change orders for the project
 
 ---
 

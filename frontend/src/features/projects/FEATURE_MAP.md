@@ -40,8 +40,8 @@ Provide project-shell management, project-level financial snapshot visibility, a
    updates selected project profile/status fields.
 3. `GET /projects/{id}/financial-summary/`:
    loads selected project financial snapshot.
-4. `GET /projects/{id}/estimates/`:
-   loads estimate counts/context for selected project.
+4. `GET /projects/{id}/quotes/`:
+   loads quote counts/context for selected project.
 5. `GET /projects/{id}/accounting-export/?export_format=csv`:
    requests project accounting export artifact.
 6. `GET /projects/{id}/timeline/?category={all|financial|workflow}`:
@@ -58,7 +58,7 @@ Provide project-shell management, project-level financial snapshot visibility, a
   - Remote Data:
     - projects
     - selected-project financial summary
-    - selected-project estimate context
+    - selected-project quote context
     - timeline datasets
   - Local UI State:
     - selected project

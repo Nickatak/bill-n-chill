@@ -27,7 +27,7 @@ export default function TermsPage() {
           <h2>2. What Bill n Chill Does</h2>
           <p>
             Bill n Chill is a construction finance management tool. It helps
-            contractors create estimates, invoices, change orders, and track
+            contractors create quotes, invoices, change orders, and track
             payments. It is a record-keeping and workflow tool — not an
             accounting system, tax advisor, or legal service.
           </p>
@@ -56,7 +56,7 @@ export default function TermsPage() {
         <section>
           <h2>5. Electronic Signatures</h2>
           <p>
-            Bill n Chill facilitates electronic signatures on estimates, change
+            Bill n Chill facilitates electronic signatures on quotes, change
             orders, and invoices through a verification and consent process. By
             using these features, you acknowledge that electronic signatures
             carry legal weight under applicable laws (ESIGN Act / UETA). You

@@ -4,13 +4,13 @@ Last reviewed: 2026-02-28
 
 ## Goal
 
-Ship a usable construction financial workflow core for a small GC team with clear, auditable money movement from estimate to payment.
+Ship a usable construction financial workflow core for a small GC team with clear, auditable money movement from quote to payment.
 
 ## Primary User Profile (Initial ICP)
 
 - Company type: small-to-mid residential GC/remodeler.
 - Team shape: owner/operator + project manager + office/bookkeeping.
-- Current pain: disconnected estimating, change orders, invoicing, and payment status.
+- Current pain: disconnected quoting, change orders, invoicing, and payment status.
 
 Why this ICP first:
 - Faster product cycle.
@@ -41,9 +41,9 @@ bill-n-chill is the operational and financial thread that keeps project scope ch
 2. Project and contract setup
 - Create project, customer, contract value, and baseline start/end dates.
 
-3. Estimating
+3. Quoting
 - Define line items with cost codes and markup.
-- Approve estimates to establish project contract baseline.
+- Approve quotes to establish project contract baseline.
 
 4. Change order workflow
 - Draft, approve/reject, and apply change orders.
@@ -84,7 +84,7 @@ bill-n-chill is the operational and financial thread that keeps project scope ch
 
 ## Post-MVP Priority: External Approval Assurance
 
-Goal: strengthen legal enforceability and signer verification for estimate/change-order approvals shared by public link.
+Goal: strengthen legal enforceability and signer verification for quote/change-order approvals shared by public link.
 
 1. Agreement layer (e-sign)
 - Capture explicit signer assent against a specific document version/hash.
@@ -135,8 +135,8 @@ Theme requirements (unchanged):
 
 ## v1 Functional Acceptance Criteria
 
-1. Estimate approval
-- Approving an estimate establishes the project contract baseline.
+1. Quote approval
+- Approving an quote establishes the project contract baseline.
 
 2. CO propagation
 - Approved change order updates project contract value and financial summary automatically.
@@ -153,7 +153,7 @@ Theme requirements (unchanged):
 ## Delivery Phases
 
 Phase 1: Financial Backbone
-- Projects, customers, estimates, change orders, invoices.
+- Projects, customers, quotes, change orders, invoices.
 
 Phase 2: AP + Payment Operations
 - Vendor bills, payment records, reconciliation views.
@@ -165,7 +165,7 @@ Phase 3: Integrations + Stabilization
 
 1. Data model and API contracts for core entities.
 2. Project financial summary endpoint and UI.
-3. Estimate approval + contract baseline flow.
+3. Quote approval + contract baseline flow.
 4. Change order approval + contract value impact logic.
 5. Invoice and payment workflows.
 6. Accounting export/sync adapter.

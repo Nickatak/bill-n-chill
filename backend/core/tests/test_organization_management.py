@@ -152,9 +152,9 @@ class OrganizationManagementTests(TestCase):
                 "billing_state": "TX",
                 "billing_zip": "78701",
                 "default_invoice_due_delta": 21,
-                "default_estimate_valid_delta": 45,
+                "default_quote_valid_delta": 45,
                 "invoice_terms_and_conditions": "Net 21",
-                "estimate_terms_and_conditions": "Estimate terms and assumptions.",
+                "quote_terms_and_conditions": "Quote terms and assumptions.",
                 "change_order_terms_and_conditions": "CO terms text.",
             },
             content_type="application/json",
@@ -169,9 +169,9 @@ class OrganizationManagementTests(TestCase):
         self.assertEqual(self.organization.billing_zip, "78701")
         self.assertEqual(self.organization.formatted_billing_address, "123 Main St\nAustin, TX 78701")
         self.assertEqual(self.organization.default_invoice_due_delta, 21)
-        self.assertEqual(self.organization.default_estimate_valid_delta, 45)
+        self.assertEqual(self.organization.default_quote_valid_delta, 45)
         self.assertEqual(self.organization.invoice_terms_and_conditions, "Net 21")
-        self.assertEqual(self.organization.estimate_terms_and_conditions, "Estimate terms and assumptions.")
+        self.assertEqual(self.organization.quote_terms_and_conditions, "Quote terms and assumptions.")
         self.assertEqual(self.organization.change_order_terms_and_conditions, "CO terms text.")
 
     def test_organization_profile_patch_validates_delta_range(self):
@@ -184,14 +184,14 @@ class OrganizationManagementTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("default_invoice_due_delta", response.json())
 
-        estimate_delta_response = self.client.patch(
+        quote_delta_response = self.client.patch(
             "/api/v1/organization/",
-            data={"default_estimate_valid_delta": 0},
+            data={"default_quote_valid_delta": 0},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.owner_token.key}",
         )
-        self.assertEqual(estimate_delta_response.status_code, 400)
-        self.assertIn("default_estimate_valid_delta", estimate_delta_response.json())
+        self.assertEqual(quote_delta_response.status_code, 400)
+        self.assertIn("default_quote_valid_delta", quote_delta_response.json())
 
     def test_organization_memberships_list_is_scoped_to_active_org(self):
         response = self.client.get(

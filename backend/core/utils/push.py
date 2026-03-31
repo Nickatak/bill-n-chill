@@ -100,7 +100,7 @@ def build_document_decision_payload(
     """Build a standardized push payload for a document decision event.
 
     Args:
-        document_type: "estimate", "change_order", or "invoice".
+        document_type: "quote", "change_order", or "invoice".
         document_title: Human-readable document identifier.
         customer_name: The customer who made the decision.
         decision: "approve", "reject", or "dispute".

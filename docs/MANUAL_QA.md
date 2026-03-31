@@ -6,8 +6,8 @@ Organized by domain. Check off as you go.
     This was an annoying permissions issue with Caddy (the reverse proxy) from the old build.  This has been resolved.
 - [x] Invoice email sending isn't working.
     Added. Verified working.
-- [x] Public estimate text isn't working.
-    This actually IS working - but I think we want to arrange the order of the tabs on the document settings to reflect our workflow from left->right (Estimates, CO's, Invoices).  I also moved the help-email to the business/org settings page.
+- [x] Public quote text isn't working.
+    This actually IS working - but I think we want to arrange the order of the tabs on the document settings to reflect our workflow from left->right (Quotes, CO's, Invoices).  I also moved the help-email to the business/org settings page.
 - [x] Rough Electrical/Finish Electrical cost codes.
     So, I did add those, I wasn't crazy.  The problem is that I decided to paginate 25 cost codes at a time, and there was a bug where the pagination display wasn't showing - so it looked like said cost codes didn't exist.
 
@@ -21,12 +21,12 @@ Organized by domain. Check off as you go.
     The public documents were drawing from the default T&C at render time.  We've stamped a copy on the actual document itself, same with the logo.  This prevents any post-changing/scammy behavior.
 
 
-- [x] Probably want original estimate line items on both the editor/public for CO.
-    Addressed, added a composite "contract summary" lineitems display for both CO's and invoices where it shows all approved estimate lineitems + approved CO lineitems.
+- [x] Probably want original quote line items on both the editor/public for CO.
+    Addressed, added a composite "contract summary" lineitems display for both CO's and invoices where it shows all approved quote lineitems + approved CO lineitems.
 
 
 - [x] Bug: When adding a new customer + project, the new customer is added to the viewer, BUT the new project (for the customer) is not.
-- [x] Bug: I created a new customer + project (with an email instead of a phone number).  When I go to set the status to SENT on an estimate, I get the `WARNING: This customer has no email on file and will not receive an automated email.` message.  This shouldn't happen - since there is an email. Interestingly, it actually sends anyway.  This behavior is also present with re-send.  This issue is persists across all document types.
+- [x] Bug: I created a new customer + project (with an email instead of a phone number).  When I go to set the status to SENT on an quote, I get the `WARNING: This customer has no email on file and will not receive an automated email.` message.  This shouldn't happen - since there is an email. Interestingly, it actually sends anyway.  This behavior is also present with re-send.  This issue is persists across all document types.
 - [x] Visual bug:  When a logo is present on the public facing document, we probably want to remove the border/box around it (public-document-frame-module .logoBox)
 
 
@@ -130,24 +130,24 @@ Organized by domain. Check off as you go.
 
 ---
 
-## 4. Estimates
+## 4. Quotes
 
 ### Internal
-- [ ] Create estimate for project → line items with cost codes
+- [ ] Create quote for project → line items with cost codes
 - [ ] Save draft → persists line items and totals
-- [ ] Edit existing estimate → changes save
-- [ ] Clone to new version → new estimate created with incremented version
-- [ ] Duplicate estimate → full copy
+- [ ] Edit existing quote → changes save
+- [ ] Clone to new version → new quote created with incremented version
+- [ ] Duplicate quote → full copy
 - [ ] Status: Draft → Sent (generates public link, sends email if customer has email)
 - [ ] No-email warning: Sent selected + customer has no email → inline red warning shown
 - [ ] Status: Sent → Approved (internal approval)
 
 ### Public Preview
-- [ ] Public link loads estimate detail without auth
+- [ ] Public link loads quote detail without auth
 - [ ] OTP requested → email sent to customer
 - [ ] Valid OTP + consent → approve/reject decision submitted
-- [ ] Approval → estimate approved, project auto-activates (if prospect)
-- [ ] Rejection → estimate rejected
+- [ ] Approval → quote approved, project auto-activates (if prospect)
+- [ ] Rejection → quote rejected
 - [ ] Invalid/expired OTP → error
 
 ---
@@ -155,7 +155,7 @@ Organized by domain. Check off as you go.
 ## 5. Change Orders
 
 ### Internal
-- [ ] Create CO linked to origin estimate
+- [ ] Create CO linked to origin quote
 - [ ] Line items show amount delta (original vs new)
 - [ ] Save draft → persists
 - [ ] Clone revision → new revision created
@@ -254,7 +254,7 @@ Organized by domain. Check off as you go.
 - [ ] Invite new member → email sent with invite link
 
 ### Document Settings Tab
-- [ ] Load invoice/estimate/CO terms and conditions
+- [ ] Load invoice/quote/CO terms and conditions
 - [ ] Edit and save
 
 ---
@@ -289,7 +289,7 @@ Test with each role. Key denials to verify:
 |--------|-------|----|--------|-------------|--------|
 | Edit org identity | yes | no | no | no | no |
 | Invite users | yes | yes | no | no | no |
-| Approve estimates | yes | yes | no | no | no |
+| Approve quotes | yes | yes | no | no | no |
 | Send invoices | yes | yes | yes | no | no |
 | Pay vendor bills | yes | yes | no | yes | no |
 | Create customers | yes | yes | yes | yes | no |
@@ -297,7 +297,7 @@ Test with each role. Key denials to verify:
 
 - [ ] Viewer cannot create/edit/approve/send anything
 - [ ] Worker cannot approve or pay
-- [ ] Bookkeeping cannot send estimates/COs
+- [ ] Bookkeeping cannot send quotes/COs
 - [ ] PM cannot edit org identity (name, logo)
 - [ ] Owner can do everything
 
@@ -324,7 +324,7 @@ Test with each role. Key denials to verify:
 - [ ] Public tokens are document-specific, not org-specific
 
 ### Print
-- [ ] Print button works on estimates, invoices, COs, vendor bills
+- [ ] Print button works on quotes, invoices, COs, vendor bills
 - [ ] Toolbar hidden in print
 - [ ] Line items render correctly in print
 
@@ -338,5 +338,5 @@ Test with each role. Key denials to verify:
 - [ ] Registration verification email sends and contains correct link
 - [ ] Password reset email sends and contains correct link
 - [ ] Invite email sends and contains correct link
-- [ ] Document sent emails fire on estimate/invoice/CO status change to sent/pending
+- [ ] Document sent emails fire on quote/invoice/CO status change to sent/pending
 - [ ] Emails include org name, document details, public link

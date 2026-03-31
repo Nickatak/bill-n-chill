@@ -22,7 +22,7 @@ from core.models import (
     ChangeOrderSnapshot,
     ChangeOrderStatusEvent,
     CostCode,
-    Estimate,
+    Quote,
     OrganizationMembership,
     Project,
 )
@@ -55,12 +55,12 @@ def _prefetch_change_order_qs(queryset: QuerySet) -> QuerySet:
     """Apply standard select/prefetch for change order serialization.
 
     Prevents N+1 queries when serializing change orders with their
-    related project, customer, origin estimate, line items, and cost codes.
+    related project, customer, origin quote, line items, and cost codes.
     """
     return queryset.select_related(
         "project",
         "project__customer",
-        "origin_estimate",
+        "origin_quote",
         "requested_by",
         "approved_by",
     ).prefetch_related(
@@ -231,8 +231,8 @@ def _handle_co_document_save(
     """Apply content field updates and line items to a change order (save concern).
 
     Handles title, reason, terms_text, amount_delta, days_delta,
-    origin_estimate, and line items with amount consistency validation.
-    Enforces origin-estimate immutability and line/amount-delta agreement.
+    origin_quote, and line items with amount consistency validation.
+    Enforces origin-quote immutability and line/amount-delta agreement.
     Does not perform status transitions or snapshot recording.
     """
     current_amount_delta = quantize_money(change_order.amount_delta)
@@ -268,38 +268,38 @@ def _handle_co_document_save(
                 status=400,
             )
 
-    # Origin estimate validation
+    # Origin quote validation
     update_fields = ["updated_at"]
-    if "origin_estimate" in data:
-        if change_order.origin_estimate_id and data["origin_estimate"] != change_order.origin_estimate_id:
+    if "origin_quote" in data:
+        if change_order.origin_quote_id and data["origin_quote"] != change_order.origin_quote_id:
             return Response(
-                {"error": {"code": "validation_error", "message": "origin_estimate cannot be changed after being set.", "fields": {"origin_estimate": ["Create a new revision to change estimate linkage."]}}},
+                {"error": {"code": "validation_error", "message": "origin_quote cannot be changed after being set.", "fields": {"origin_quote": ["Create a new revision to change quote linkage."]}}},
                 status=400,
             )
-        if data["origin_estimate"] is None:
-            if change_order.origin_estimate_id is not None:
+        if data["origin_quote"] is None:
+            if change_order.origin_quote_id is not None:
                 return Response(
-                    {"error": {"code": "validation_error", "message": "origin_estimate cannot be cleared once set.", "fields": {"origin_estimate": ["Create a new revision to remove estimate linkage."]}}},
+                    {"error": {"code": "validation_error", "message": "origin_quote cannot be cleared once set.", "fields": {"origin_quote": ["Create a new revision to remove quote linkage."]}}},
                     status=400,
                 )
-        elif change_order.origin_estimate_id is None:
+        elif change_order.origin_quote_id is None:
             try:
-                origin_estimate = Estimate.objects.get(
-                    id=data["origin_estimate"],
+                origin_quote = Quote.objects.get(
+                    id=data["origin_quote"],
                     project=change_order.project,
                 )
-            except Estimate.DoesNotExist:
+            except Quote.DoesNotExist:
                 return Response(
-                    {"error": {"code": "validation_error", "message": "origin_estimate is invalid for this project.", "fields": {"origin_estimate": ["Use an estimate from this project."]}}},
+                    {"error": {"code": "validation_error", "message": "origin_quote is invalid for this project.", "fields": {"origin_quote": ["Use an quote from this project."]}}},
                     status=400,
                 )
-            if origin_estimate.status != Estimate.Status.APPROVED:
+            if origin_quote.status != Quote.Status.APPROVED:
                 return Response(
-                    {"error": {"code": "validation_error", "message": "Change orders require an approved origin estimate.", "fields": {"origin_estimate": ["Only approved estimates can be used as CO origin."]}}},
+                    {"error": {"code": "validation_error", "message": "Change orders require an approved origin quote.", "fields": {"origin_quote": ["Only approved quotes can be used as CO origin."]}}},
                     status=400,
                 )
-            change_order.origin_estimate = origin_estimate
-            update_fields.append("origin_estimate")
+            change_order.origin_quote = origin_quote
+            update_fields.append("origin_quote")
 
     # Field updates
     if "title" in data:

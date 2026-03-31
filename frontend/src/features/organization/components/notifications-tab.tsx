@@ -53,7 +53,7 @@ export function NotificationsTab({ authToken }: NotificationsTabProps) {
       <p className={styles.emptyText}>
         {isSubscribed
           ? "Notifications are enabled on this device. You\u2019ll be notified when a customer approves, rejects, or disputes a document."
-          : "Get notified instantly when a customer acts on an estimate, change order, or invoice. Notifications are per-device."}
+          : "Get notified instantly when a customer acts on an quote, change order, or invoice. Notifications are per-device."}
       </p>
 
       {error ? <p className={styles.errorText}>{error}</p> : null}

@@ -10,13 +10,13 @@ import {
   eventActorHref,
   statusEventActionLabel,
   approvalMeta,
-  approvedRollingDeltaForEstimate,
-  originalBudgetTotalForEstimate,
-  currentApprovedBudgetTotalForEstimate,
+  approvedRollingDeltaForQuote,
+  originalBudgetTotalForQuote,
+  currentApprovedBudgetTotalForQuote,
   lastStatusEventForChangeOrder,
   toLinePayload,
 } from "../components/change-orders-display";
-import type { AuditEventRecord, ChangeOrderRecord, OriginEstimateRecord } from "../types";
+import type { AuditEventRecord, ChangeOrderRecord, OriginQuoteRecord } from "../types";
 
 const LABELS = CHANGE_ORDER_STATUS_LABELS_FALLBACK;
 
@@ -47,7 +47,7 @@ function makeCO(overrides: Partial<ChangeOrderRecord> = {}): ChangeOrderRecord {
     family_key: "abc",
     amount_delta: "500.00",
     days_delta: 0,
-    origin_estimate: 10,
+    origin_quote: 10,
     line_items: [],
     created_at: "2026-03-15T12:00:00Z",
     updated_at: "2026-03-15T12:00:00Z",
@@ -270,7 +270,7 @@ describe("statusEventActionLabel", () => {
 
 describe("approvalMeta", () => {
   it("includes date and email when both present", () => {
-    const est = { approved_at: "2026-03-15T00:00:00Z", approved_by_email: "jane@test.com" } as OriginEstimateRecord;
+    const est = { approved_at: "2026-03-15T00:00:00Z", approved_by_email: "jane@test.com" } as OriginQuoteRecord;
     const result = approvalMeta(est);
     expect(result).toContain("approved on");
     expect(result).toContain("Mar");
@@ -278,7 +278,7 @@ describe("approvalMeta", () => {
   });
 
   it("omits email when not present", () => {
-    const est = { approved_at: "2026-03-15T00:00:00Z", approved_by_email: null } as OriginEstimateRecord;
+    const est = { approved_at: "2026-03-15T00:00:00Z", approved_by_email: null } as OriginQuoteRecord;
     const result = approvalMeta(est);
     expect(result).toContain("approved on");
     expect(result).not.toContain("by");
@@ -289,38 +289,38 @@ describe("approvalMeta", () => {
 // Financial helpers
 // ---------------------------------------------------------------------------
 
-describe("approvedRollingDeltaForEstimate", () => {
-  it("sums deltas of approved COs for the given estimate", () => {
+describe("approvedRollingDeltaForQuote", () => {
+  it("sums deltas of approved COs for the given quote", () => {
     const cos = [
-      makeCO({ id: 1, origin_estimate: 10, status: "approved", amount_delta: "500.00" }),
-      makeCO({ id: 2, origin_estimate: 10, status: "approved", amount_delta: "-100.00" }),
-      makeCO({ id: 3, origin_estimate: 10, status: "draft", amount_delta: "999.00" }), // excluded
-      makeCO({ id: 4, origin_estimate: 20, status: "approved", amount_delta: "300.00" }), // wrong estimate
+      makeCO({ id: 1, origin_quote: 10, status: "approved", amount_delta: "500.00" }),
+      makeCO({ id: 2, origin_quote: 10, status: "approved", amount_delta: "-100.00" }),
+      makeCO({ id: 3, origin_quote: 10, status: "draft", amount_delta: "999.00" }), // excluded
+      makeCO({ id: 4, origin_quote: 20, status: "approved", amount_delta: "300.00" }), // wrong quote
     ];
-    expect(approvedRollingDeltaForEstimate(10, cos)).toBe("400.00");
+    expect(approvedRollingDeltaForQuote(10, cos)).toBe("400.00");
   });
 
   it("returns '0.00' when no approved COs exist", () => {
-    expect(approvedRollingDeltaForEstimate(10, [])).toBe("0.00");
+    expect(approvedRollingDeltaForQuote(10, [])).toBe("0.00");
   });
 });
 
-describe("originalBudgetTotalForEstimate", () => {
+describe("originalBudgetTotalForQuote", () => {
   it("looks up the total from the map", () => {
-    expect(originalBudgetTotalForEstimate(10, { 10: 5000 })).toBe("5000.00");
+    expect(originalBudgetTotalForQuote(10, { 10: 5000 })).toBe("5000.00");
   });
 
-  it("returns '0.00' for unknown estimate", () => {
-    expect(originalBudgetTotalForEstimate(99, { 10: 5000 })).toBe("0.00");
+  it("returns '0.00' for unknown quote", () => {
+    expect(originalBudgetTotalForQuote(99, { 10: 5000 })).toBe("0.00");
   });
 });
 
-describe("currentApprovedBudgetTotalForEstimate", () => {
+describe("currentApprovedBudgetTotalForQuote", () => {
   it("adds original total and approved CO deltas", () => {
     const cos = [
-      makeCO({ origin_estimate: 10, status: "approved", amount_delta: "500.00" }),
+      makeCO({ origin_quote: 10, status: "approved", amount_delta: "500.00" }),
     ];
-    const result = currentApprovedBudgetTotalForEstimate(10, cos, { 10: 5000 });
+    const result = currentApprovedBudgetTotalForQuote(10, cos, { 10: 5000 });
     expect(result).toBe("5500.00");
   });
 });

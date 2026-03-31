@@ -66,7 +66,7 @@ describe("HomeAuthConsole", () => {
             token: "login-token",
             user: { email: "nick@test.com", role: "owner" },
             organization: { id: 1, display_name: "Acme" },
-            capabilities: { estimates: ["view", "create"] },
+            capabilities: { quotes: ["view", "create"] },
           },
         }),
     });

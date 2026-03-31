@@ -60,7 +60,7 @@ required note, for example).
 Everything an authorized user does is captured in append-only records that cannot be
 modified or deleted through the application:
 
-- **InvoiceStatusEvent / EstimateStatusEvent** — lifecycle transitions with full context
+- **InvoiceStatusEvent / QuoteStatusEvent** — lifecycle transitions with full context
 - **ChangeOrderSnapshot / VendorBillSnapshot** — complete entity state at each
   significant transition
 - **OrganizationRecord / OrganizationMembershipRecord** — org and membership changes
@@ -122,7 +122,7 @@ replay" or "point-in-time rollback" feature — but the data model already suppo
 
 ### Direct Invoicing (DECISION_RECORD_DIRECT_INVOICING)
 
-We allow invoices without estimates/budgets. The `line_type = "direct"` marker is a
+We allow invoices without quotes/budgets. The `line_type = "direct"` marker is a
 permanent forensic record that the user chose to bill without financial controls. We
 don't prevent it — we record it.
 

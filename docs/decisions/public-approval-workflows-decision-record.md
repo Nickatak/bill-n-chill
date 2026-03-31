@@ -1,4 +1,4 @@
-# Decision Record: Public Approval Workflows (Estimate, Change Order, Invoice)
+# Decision Record: Public Approval Workflows (Quote, Change Order, Invoice)
 
 Date: 2026-02-26
 Status: Accepted
@@ -6,7 +6,7 @@ Status: Accepted
 ## Decision
 
 - Implement public, token-based customer decision endpoints for:
-  - estimates (`approve` / `reject`)
+  - quotes (`approve` / `reject`)
   - change orders (`approve` / `reject`)
   - invoices (`approve` / `dispute`)
 - Restrict public decisions to explicit "awaiting customer action" states.
@@ -15,10 +15,10 @@ Status: Accepted
 
 ## Context
 
-- The product already had public read-only estimate/invoice share links.
+- The product already had public read-only quote/invoice share links.
 - We needed actionable public approval to reduce back-and-forth and preserve audit trace.
 - Approval semantics differ by object type:
-  - estimates establish the project contract baseline,
+  - quotes establish the project contract baseline,
   - change orders affect financial deltas against the contract value,
   - invoices represent payment/dispute signals.
 
@@ -32,13 +32,13 @@ Status: Accepted
 
 ## Implemented Behavior
 
-### Estimates
+### Quotes
 
-- Endpoint: `POST /api/v1/public/estimates/<token>/decision/`
+- Endpoint: `POST /api/v1/public/quotes/<token>/decision/`
 - Allowed from: `sent`
 - Decisions:
-  - `approve` -> `approved` + estimate status event
-  - `reject` -> `rejected` + estimate status event
+  - `approve` -> `approved` + quote status event
+  - `reject` -> `rejected` + quote status event
 
 ### Change Orders
 
@@ -78,7 +78,7 @@ Status: Accepted
 
 ## Validation
 
-- Backend tests added for estimate/change-order/invoice public decision flows.
+- Backend tests added for quote/change-order/invoice public decision flows.
 - Targeted frontend lint passed for new/updated public approval components.
 
 ## Follow-up Recommendations

@@ -993,10 +993,10 @@ class ReportingPackTests(TestCase):
     def test_quick_jump_search_returns_cross_entity_results(self):
         self.project.name = "Kitchen Main Project"
         self.project.save(update_fields=["name", "updated_at"])
-        estimate = Estimate.objects.create(
+        quote = Quote.objects.create(
             project=self.project,
             version=1,
-            status=Estimate.Status.DRAFT,
+            status=Quote.Status.DRAFT,
             title="Kitchen Scope",
             created_by=self.user,
         )
@@ -1053,13 +1053,13 @@ class ReportingPackTests(TestCase):
         self.assertGreaterEqual(data["item_count"], 6)
         kinds = {item["kind"] for item in data["items"]}
         self.assertIn("project", kinds)
-        self.assertIn("estimate", kinds)
+        self.assertIn("quote", kinds)
         self.assertIn("change_order", kinds)
         self.assertIn("invoice", kinds)
         self.assertIn("vendor_bill", kinds)
         self.assertIn("payment", kinds)
         endpoints = {item["detail_endpoint"] for item in data["items"]}
-        self.assertIn(f"/api/v1/estimates/{estimate.id}/", endpoints)
+        self.assertIn(f"/api/v1/quotes/{quote.id}/", endpoints)
         self.assertIn(f"/api/v1/change-orders/{change_order.id}/", endpoints)
         self.assertIn(f"/api/v1/invoices/{invoice.id}/", endpoints)
         self.assertIn(f"/api/v1/vendor-bills/{vendor_bill.id}/", endpoints)
@@ -1092,10 +1092,10 @@ class ReportingPackTests(TestCase):
             contract_value_current="1000.00",
             created_by=self.other_user,
         )
-        Estimate.objects.create(
+        Quote.objects.create(
             project=other_project,
             version=1,
-            status=Estimate.Status.DRAFT,
+            status=Quote.Status.DRAFT,
             title="Other Kitchen Scope",
             created_by=self.other_user,
         )
@@ -1142,17 +1142,17 @@ class ProjectTimelineTests(TestCase):
         )
 
     def test_project_timeline_returns_workflow_events(self):
-        estimate = Estimate.objects.create(
+        quote = Quote.objects.create(
             project=self.project,
             version=1,
-            status=Estimate.Status.SENT,
-            title="Timeline Estimate",
+            status=Quote.Status.SENT,
+            title="Timeline Quote",
             created_by=self.user,
         )
-        EstimateStatusEvent.objects.create(
-            estimate=estimate,
-            from_status=Estimate.Status.DRAFT,
-            to_status=Estimate.Status.SENT,
+        QuoteStatusEvent.objects.create(
+            quote=quote,
+            from_status=Quote.Status.DRAFT,
+            to_status=Quote.Status.SENT,
             note="Sent for review",
             changed_by=self.user,
         )
@@ -1167,7 +1167,7 @@ class ProjectTimelineTests(TestCase):
         self.assertEqual(data["category"], "all")
         self.assertEqual(data["item_count"], 1)
         self.assertEqual(data["items"][0]["category"], "workflow")
-        self.assertEqual(data["items"][0]["event_type"], "estimate_status")
+        self.assertEqual(data["items"][0]["event_type"], "quote_status")
         self.assertIn("ui_route", data["items"][0])
 
     def test_project_timeline_category_filter_validation_and_scope(self):

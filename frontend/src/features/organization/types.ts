@@ -17,9 +17,9 @@ export type OrganizationProfile = {
   license_number: string;
   tax_id: string;
   default_invoice_due_delta: number;
-  default_estimate_valid_delta: number;
+  default_quote_valid_delta: number;
   invoice_terms_and_conditions: string;
-  estimate_terms_and_conditions: string;
+  quote_terms_and_conditions: string;
   change_order_terms_and_conditions: string;
   created_at: string;
   updated_at: string;

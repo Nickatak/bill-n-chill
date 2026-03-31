@@ -11,7 +11,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import Estimate, Invoice, InvoiceStatusEvent, SigningCeremonyRecord
+from core.models import Quote, Invoice, InvoiceStatusEvent, SigningCeremonyRecord
 from core.policies import get_invoice_policy_contract
 from core.serializers import (
     InvoiceSerializer,
@@ -426,41 +426,41 @@ def project_invoices_view(request, project_id: int):
                 status=400,
             )
 
-        # --- Validate related_estimate and billing_period if provided ---
-        related_estimate = None
+        # --- Validate related_quote and billing_period if provided ---
+        related_quote = None
         billing_period = None
-        if ingress.related_estimate_id:
+        if ingress.related_quote_id:
             try:
-                related_estimate = Estimate.objects.get(
-                    id=ingress.related_estimate_id,
+                related_quote = Quote.objects.get(
+                    id=ingress.related_quote_id,
                     project=project,
                 )
-            except Estimate.DoesNotExist:
+            except Quote.DoesNotExist:
                 return Response(
                     {
                         "error": {
                             "code": "validation_error",
-                            "message": "Estimate not found for this project.",
-                            "fields": {"related_estimate": ["Estimate not found for this project."]},
+                            "message": "Quote not found for this project.",
+                            "fields": {"related_quote": ["Quote not found for this project."]},
                         }
                     },
                     status=400,
                 )
-            # Validate billing_period belongs to the related estimate.
+            # Validate billing_period belongs to the related quote.
             if ingress.billing_period_id:
                 from core.models import BillingPeriod
                 try:
                     billing_period = BillingPeriod.objects.get(
                         id=ingress.billing_period_id,
-                        estimate=related_estimate,
+                        quote=related_quote,
                     )
                 except BillingPeriod.DoesNotExist:
                     return Response(
                         {
                             "error": {
                                 "code": "validation_error",
-                                "message": "Billing period not found for this estimate.",
-                                "fields": {"billing_period": ["Billing period not found for this estimate."]},
+                                "message": "Billing period not found for this quote.",
+                                "fields": {"billing_period": ["Billing period not found for this quote."]},
                             }
                         },
                         status=400,
@@ -480,16 +480,16 @@ def project_invoices_view(request, project_id: int):
                         status=409,
                     )
             else:
-                # No billing period — guard: one invoice per estimate.
+                # No billing period — guard: one invoice per quote.
                 if Invoice.objects.filter(
-                    related_estimate=related_estimate,
+                    related_quote=related_quote,
                 ).exclude(status=Invoice.Status.VOID).exists():
                     return Response(
                         {
                             "error": {
                                 "code": "conflict",
-                                "message": "An invoice already exists for this estimate.",
-                                "fields": {"related_estimate": ["An active invoice is already linked to this estimate."]},
+                                "message": "An invoice already exists for this quote.",
+                                "fields": {"related_quote": ["An active invoice is already linked to this quote."]},
                             }
                         },
                         status=409,
@@ -518,7 +518,7 @@ def project_invoices_view(request, project_id: int):
                 footer_text=ingress.footer_text,
                 notes_text=ingress.notes_text,
                 tax_percent=ingress.tax_percent,
-                related_estimate=related_estimate,
+                related_quote=related_quote,
                 billing_period=billing_period,
                 created_by=request.user,
             )

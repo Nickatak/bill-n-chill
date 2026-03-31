@@ -9,7 +9,7 @@
  * 3. Signing ceremony: document summary, type name, consent checkbox.
  * 4. Submit decision via parent callback.
  *
- * Used by estimate, change order, and invoice public preview pages.
+ * Used by quote, change order, and invoice public preview pages.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -39,7 +39,7 @@ export type CeremonyPayload = {
 
 type SigningCeremonyProps = {
   publicToken: string;
-  documentType: "estimate" | "change_order" | "invoice";
+  documentType: "quote" | "change_order" | "invoice";
   documentSummary: { type: string; title: string; total: string };
   customerEmailAvailable: boolean;
   consentText: string;

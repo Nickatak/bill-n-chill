@@ -75,8 +75,8 @@ function makeChangeOrder(overrides: Record<string, unknown> = {}) {
     days_delta: 5,
     reason: "Client requested upgrade",
     terms_text: "",
-    origin_estimate: 42,
-    origin_estimate_version: 1,
+    origin_quote: 42,
+    origin_quote_version: 1,
     requested_by: 1,
     requested_by_email: "owner@test.com",
     approved_by: null,
@@ -90,7 +90,7 @@ function makeChangeOrder(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeEstimate(overrides: Record<string, unknown> = {}) {
+function makeQuote(overrides: Record<string, unknown> = {}) {
   return {
     id: 42,
     title: "Foundation Work",
@@ -108,7 +108,7 @@ function setupDefaultFetch(overrides: {
   projects?: unknown[];
   changeOrders?: unknown[];
   costCodes?: unknown[];
-  estimates?: unknown[];
+  quotes?: unknown[];
 } = {}) {
   mockFetch.mockImplementation((url: string) => {
     if (url.includes("/contracts/change-orders")) {
@@ -123,10 +123,10 @@ function setupDefaultFetch(overrides: {
         json: () => Promise.resolve({ data: overrides.changeOrders ?? [makeChangeOrder()] }),
       });
     }
-    if (url.includes("/projects/") && url.includes("/estimates")) {
+    if (url.includes("/projects/") && url.includes("/quotes")) {
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ data: overrides.estimates ?? [makeEstimate()] }),
+        json: () => Promise.resolve({ data: overrides.quotes ?? [makeQuote()] }),
       });
     }
     if (url.includes("/projects/") && url.includes("/audit-events")) {
@@ -135,7 +135,7 @@ function setupDefaultFetch(overrides: {
         json: () => Promise.resolve({ data: [] }),
       });
     }
-    if (url.includes("/estimates/") && url.includes("/status-events")) {
+    if (url.includes("/quotes/") && url.includes("/status-events")) {
       return Promise.resolve({
         ok: true,
         json: () => Promise.resolve({
@@ -276,13 +276,13 @@ describe("ChangeOrdersConsole", () => {
     expect(screen.queryByRole("button", { name: /Create Change Order/i })).not.toBeInTheDocument();
   });
 
-  it("shows empty state when no change orders exist for the origin estimate", async () => {
+  it("shows empty state when no change orders exist for the origin quote", async () => {
     setupDefaultFetch({ changeOrders: [] });
     render(<ChangeOrdersConsole scopedProjectId={7} />);
 
     await waitFor(() =>
       expect(
-        screen.getByText(/No change orders have been created yet for this approved origin estimate/i),
+        screen.getByText(/No change orders have been created yet for this approved origin quote/i),
       ).toBeTruthy(),
     );
   });

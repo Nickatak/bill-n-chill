@@ -12,11 +12,11 @@ export type OrganizationPublicContext = {
   billing_address: string;
   help_email: string;
   invoice_terms_and_conditions: string;
-  estimate_terms_and_conditions: string;
+  quote_terms_and_conditions: string;
   change_order_terms_and_conditions: string;
 };
 
-/** Cost code reference used in line items across estimates, invoices, etc. */
+/** Cost code reference used in line items across quotes, invoices, etc. */
 export type CostCode = {
   id: number;
   code: string;

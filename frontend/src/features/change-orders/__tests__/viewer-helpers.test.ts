@@ -31,7 +31,7 @@ function makeCO(overrides: Partial<ChangeOrderRecord> = {}): ChangeOrderRecord {
     sender_name: "",
     sender_address: "",
     sender_logo_url: "",
-    origin_estimate: 42,
+    origin_quote: 42,
     requested_by: 1,
     requested_by_email: "test@example.com",
     approved_by: null,
@@ -104,7 +104,7 @@ describe("sortChangeOrdersForViewer", () => {
 describe("computeWorkingTotals", () => {
   const originTotals: Record<number, number> = { 42: 50000 };
 
-  it("returns zeros when no estimate is selected", () => {
+  it("returns zeros when no quote is selected", () => {
     const result = computeWorkingTotals([], null, 1, 0, false, originTotals);
     expect(result).toEqual({ preApproval: "0.00", postApproval: "0.00" });
   });
@@ -125,8 +125,8 @@ describe("computeWorkingTotals", () => {
 
   it("computes totals with existing approved COs", () => {
     const cos = [
-      makeCO({ id: 5, status: "approved", amount_delta: "3000.00", origin_estimate: 42 }),
-      makeCO({ id: 10, status: "draft", amount_delta: "2000.00", origin_estimate: 42 }),
+      makeCO({ id: 5, status: "approved", amount_delta: "3000.00", origin_quote: 42 }),
+      makeCO({ id: 10, status: "draft", amount_delta: "2000.00", origin_quote: 42 }),
     ];
     const result = computeWorkingTotals(cos, 42, 10, 2000, false, originTotals);
     // approvedRolling = 3000 (CO#5 is approved)
@@ -138,8 +138,8 @@ describe("computeWorkingTotals", () => {
 
   it("subtracts selected CO delta from pre-approval when CO is approved", () => {
     const cos = [
-      makeCO({ id: 5, status: "approved", amount_delta: "3000.00", origin_estimate: 42 }),
-      makeCO({ id: 10, status: "approved", amount_delta: "2000.00", origin_estimate: 42 }),
+      makeCO({ id: 5, status: "approved", amount_delta: "3000.00", origin_quote: 42 }),
+      makeCO({ id: 10, status: "approved", amount_delta: "2000.00", origin_quote: 42 }),
     ];
     const result = computeWorkingTotals(cos, 42, 10, 2000, true, originTotals);
     // approvedRolling = 3000 + 2000 = 5000
@@ -150,28 +150,28 @@ describe("computeWorkingTotals", () => {
     expect(result.postApproval).toBe("55000.00");
   });
 
-  it("ignores COs for different estimates", () => {
+  it("ignores COs for different quotes", () => {
     const cos = [
-      makeCO({ id: 5, status: "approved", amount_delta: "3000.00", origin_estimate: 99 }),
-      makeCO({ id: 10, status: "draft", amount_delta: "1000.00", origin_estimate: 42 }),
+      makeCO({ id: 5, status: "approved", amount_delta: "3000.00", origin_quote: 99 }),
+      makeCO({ id: 10, status: "draft", amount_delta: "1000.00", origin_quote: 42 }),
     ];
     const result = computeWorkingTotals(cos, 42, 10, 1000, false, originTotals);
-    // CO#5 is for estimate 99, not 42, so approvedRolling = 0
+    // CO#5 is for quote 99, not 42, so approvedRolling = 0
     expect(result.preApproval).toBe("50000.00");
     expect(result.postApproval).toBe("51000.00");
   });
 
   it("handles negative deltas", () => {
     const cos = [
-      makeCO({ id: 10, status: "draft", amount_delta: "-2000.00", origin_estimate: 42 }),
+      makeCO({ id: 10, status: "draft", amount_delta: "-2000.00", origin_quote: 42 }),
     ];
     const result = computeWorkingTotals(cos, 42, 10, -2000, false, originTotals);
     expect(result.preApproval).toBe("50000.00");
     expect(result.postApproval).toBe("48000.00");
   });
 
-  it("handles missing estimate in totals map", () => {
-    const cos = [makeCO({ id: 10, status: "draft", amount_delta: "1000.00", origin_estimate: 99 })];
+  it("handles missing quote in totals map", () => {
+    const cos = [makeCO({ id: 10, status: "draft", amount_delta: "1000.00", origin_quote: 99 })];
     const result = computeWorkingTotals(cos, 99, 10, 1000, false, originTotals);
     // originTotals[99] is undefined → 0
     expect(result.preApproval).toBe("0.00");

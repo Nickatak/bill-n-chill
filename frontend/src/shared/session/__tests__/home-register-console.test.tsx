@@ -61,7 +61,7 @@ function authSuccessResponse(
           token: "new-token",
           user: { email: "nick@test.com", role: "pm" },
           organization: { id: 2, display_name: "Acme Corp" },
-          capabilities: { estimates: ["view"] },
+          capabilities: { quotes: ["view"] },
           ...overrides,
         },
       }),

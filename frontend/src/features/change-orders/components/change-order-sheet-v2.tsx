@@ -1,7 +1,7 @@
 /**
  * Change order line items sheet with flat ordering, sections, and DnD.
  *
- * Mirrors the estimate-sheet-v2 pattern: sections and line items share
+ * Mirrors the quote-sheet-v2 pattern: sections and line items share
  * an ordering space, DnD reordering via drag handles, and an imperative
  * handle (getOrderPayload) for the parent console to read on submit.
  *
@@ -26,7 +26,7 @@ import { formatDecimal } from "@/shared/money-format";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
 import lineStyles from "./co-line-row.module.css";
 
-import { CostCodeCombobox } from "@/features/estimates/components/cost-code-combobox";
+import { CostCodeCombobox } from "@/features/quotes/components/cost-code-combobox";
 import type { ChangeOrderLineInput, ChangeOrderSectionRecord, CostCodeOption } from "../types";
 
 // ---------------------------------------------------------------------------

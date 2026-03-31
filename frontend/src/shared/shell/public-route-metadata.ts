@@ -1,7 +1,7 @@
 /**
  * Server-side metadata resolvers for public (tokenized) document routes.
  *
- * Public estimate, invoice, and change-order pages use `slug--token`
+ * Public quote, invoice, and change-order pages use `slug--token`
  * URLs. These helpers fetch minimal payloads from the public API at
  * build/request time so Next.js can populate `<title>` without
  * requiring authentication.
@@ -15,7 +15,7 @@ type PublicApiEnvelope<T> = {
   data?: T;
 };
 
-type PublicEstimatePayload = {
+type PublicQuotePayload = {
   title?: string;
   project_context?: { name?: string };
 };
@@ -89,24 +89,24 @@ export function composePublicDocumentMetadataTitle(
 }
 
 /**
- * Resolve a human-readable title for a public estimate page.
- * Falls back through: estimate title -> project name -> null.
+ * Resolve a human-readable title for a public quote page.
+ * Falls back through: quote title -> project name -> null.
  */
-export async function resolvePublicEstimateMetadataTitle(
+export async function resolvePublicQuoteMetadataTitle(
   publicToken: string,
 ): Promise<string | null> {
-  const data = await loadPublicPayload<PublicEstimatePayload>(`/public/estimates/${publicToken}/`);
+  const data = await loadPublicPayload<PublicQuotePayload>(`/public/quotes/${publicToken}/`);
   if (!data) {
     return null;
   }
 
-  const estimateTitle = trimmedValue(data.title);
-  if (estimateTitle) {
-    return estimateTitle;
+  const quoteTitle = trimmedValue(data.title);
+  if (quoteTitle) {
+    return quoteTitle;
   }
 
   const projectName = trimmedValue(data.project_context?.name);
-  return projectName ? `${projectName} Estimate` : null;
+  return projectName ? `${projectName} Quote` : null;
 }
 
 /**

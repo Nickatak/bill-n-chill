@@ -16,7 +16,7 @@ class Project(StatusTransitionMixin, models.Model):
     - Starts as a project shell (often via lead conversion).
     - Tracks site/service address separately from customer billing address.
     - Tracks contract baseline/current values.
-    - Owns downstream estimates, budgets, change orders, and invoices.
+    - Owns downstream quotes, budgets, change orders, and invoices.
 
     Status intent:
     - `prospect`: shell exists but execution has not started.

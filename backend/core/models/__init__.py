@@ -2,13 +2,13 @@ from core.models.accounts_payable import VendorBill, VendorBillLine
 from core.models.accounts_receivable import Invoice, InvoiceLine
 from core.models.billing_periods import BillingPeriod
 from core.models.change_orders import ChangeOrder, ChangeOrderLine, ChangeOrderSection
-from core.models.estimating import Estimate, EstimateLineItem, EstimateSection
+from core.models.quoting import Quote, QuoteLineItem, QuoteSection
 from core.models.financial_auditing import (
     AccountingSyncRecord,
     ChangeOrderSnapshot,
     ChangeOrderStatusEvent,
     CustomerRecord,
-    EstimateStatusEvent,
+    QuoteStatusEvent,
     InvoiceStatusEvent,
     LeadContactRecord,
     OrganizationMembershipRecord,
@@ -49,10 +49,10 @@ __all__ = [
     "OrganizationMembership",
     "RoleTemplate",
     "Vendor",
-    "Estimate",
-    "EstimateLineItem",
-    "EstimateSection",
-    "EstimateStatusEvent",
+    "Quote",
+    "QuoteLineItem",
+    "QuoteSection",
+    "QuoteStatusEvent",
     "ChangeOrderSnapshot",
     "ChangeOrderStatusEvent",
     "CustomerRecord",

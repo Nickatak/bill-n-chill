@@ -2,7 +2,7 @@
  * Generic document creator component.
  *
  * Renders a slot-based form layout shared by all financial document editors
- * (invoices, estimates, change orders). Each document type provides its own
+ * (invoices, quotes, change orders). Each document type provides its own
  * adapter and section renderers; this component owns the section iteration,
  * visibility gating, and action-button bar.
  */

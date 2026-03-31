@@ -17,7 +17,7 @@ type PublicOrganizationContext = {
   billing_address?: string | null;
   help_email?: string | null;
   invoice_terms_and_conditions?: string | null;
-  estimate_terms_and_conditions?: string | null;
+  quote_terms_and_conditions?: string | null;
   change_order_terms_and_conditions?: string | null;
 };
 
@@ -134,13 +134,13 @@ export function resolvePublicRecipient(
  */
 export function resolveDefaultTerms(
   organizationContext: PublicOrganizationContext | null | undefined,
-  documentType: "estimate" | "invoice" | "change_order",
+  documentType: "quote" | "invoice" | "change_order",
 ): string {
   if (!organizationContext) {
     return "";
   }
-  if (documentType === "estimate") {
-    return normalizeValue(organizationContext.estimate_terms_and_conditions);
+  if (documentType === "quote") {
+    return normalizeValue(organizationContext.quote_terms_and_conditions);
   }
   if (documentType === "invoice") {
     return normalizeValue(organizationContext.invoice_terms_and_conditions);

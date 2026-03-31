@@ -15,7 +15,7 @@ from rest_framework.response import Response
 
 from core.models import (
     CostCode,
-    Estimate,
+    Quote,
     Organization,
     OrganizationMembership,
     Project,
@@ -46,28 +46,28 @@ def _validate_project_for_user(project_id: int, user: AbstractUser) -> Project |
         return None
 
 
-def _validate_estimate_for_user(
-    estimate_id: int,
+def _validate_quote_for_user(
+    quote_id: int,
     user: AbstractUser,
     *,
     prefetch_lines: bool = False,
-) -> Estimate | None:
-    """Look up an estimate by ID, authorized via its project's org scope.
+) -> Quote | None:
+    """Look up an quote by ID, authorized via its project's org scope.
 
-    The estimate is accessible if its project belongs to the requesting user's
+    The quote is accessible if its project belongs to the requesting user's
     organization.  Optionally prefetches line items and their cost codes for
-    views that need the full estimate detail (clone, duplicate, detail).
+    views that need the full quote detail (clone, duplicate, detail).
 
     Returns ``None`` if not found or not authorized.
     """
     membership = _ensure_org_membership(user)
-    estimate_qs = Estimate.objects.select_related("project", "project__customer").filter(
-        id=estimate_id,
+    quote_qs = Quote.objects.select_related("project", "project__customer").filter(
+        id=quote_id,
         project__organization_id=membership.organization_id,
     )
     if prefetch_lines:
-        estimate_qs = estimate_qs.prefetch_related("line_items", "line_items__cost_code")
-    return estimate_qs.first()
+        quote_qs = quote_qs.prefetch_related("line_items", "line_items__cost_code")
+    return quote_qs.first()
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ def _validate_estimate_for_user(
 def _promote_prospect_to_active(project: Project) -> bool:
     """Silently promote a prospect project to active.
 
-    Called when a financial commitment is made: sending an estimate or
+    Called when a financial commitment is made: sending an quote or
     invoice, creating a vendor bill, or creating a receipt.  Any of these
     actions imply the project is no longer speculative.
 
@@ -137,7 +137,7 @@ def _serialize_public_organization_context(
             "billing_address": "",
             "help_email": "",
             "invoice_terms_and_conditions": "",
-            "estimate_terms_and_conditions": "",
+            "quote_terms_and_conditions": "",
             "change_order_terms_and_conditions": "",
         }
 
@@ -151,7 +151,7 @@ def _serialize_public_organization_context(
         "billing_address": organization.formatted_billing_address,
         "help_email": (organization.help_email or "").strip(),
         "invoice_terms_and_conditions": (organization.invoice_terms_and_conditions or "").strip(),
-        "estimate_terms_and_conditions": (organization.estimate_terms_and_conditions or "").strip(),
+        "quote_terms_and_conditions": (organization.quote_terms_and_conditions or "").strip(),
         "change_order_terms_and_conditions": (organization.change_order_terms_and_conditions or "").strip(),
     }
 
@@ -159,7 +159,7 @@ def _serialize_public_organization_context(
 def _serialize_public_project_context(project: Project) -> dict[str, Any]:
     """Serialize project and customer fields for public-facing document contexts.
 
-    Provides the minimal project + customer info needed by public estimate,
+    Provides the minimal project + customer info needed by public quote,
     change order, and invoice preview pages (name, status, customer contact).
     """
     customer = project.customer
@@ -316,9 +316,9 @@ def _check_project_accepts_document(
     """Guard against creating new documents on terminal-status projects.
 
     Rules:
-    - **Cancelled** projects block all new documents (estimates, change orders,
+    - **Cancelled** projects block all new documents (quotes, change orders,
       invoices, vendor bills).  Payments are NOT routed through this guard.
-    - **Completed** projects block estimates and change orders but allow
+    - **Completed** projects block quotes and change orders but allow
       invoices and vendor bills (final retainage / late sub bills are common).
 
     Returns an error ``Response`` if the project status forbids creation,
@@ -338,7 +338,7 @@ def _check_project_accepts_document(
             status=400,
         )
 
-    if status == Project.Status.COMPLETED and document_type in ("estimates", "change orders"):
+    if status == Project.Status.COMPLETED and document_type in ("quotes", "change orders"):
         return Response(
             {
                 "error": {

@@ -20,7 +20,7 @@ import styles from "./auth-hint.module.css";
 /**
  * Render the workflow navigation region based on session state.
  *
- * Public document routes (tokenized estimate/invoice/CO views) hide
+ * Public document routes (tokenized quote/invoice/CO views) hide
  * the shell completely so customers see a clean read-only page.
  * Unauthenticated users on internal routes see a sign-in hint.
  * Authenticated users get the full navbar and breadcrumb trail.

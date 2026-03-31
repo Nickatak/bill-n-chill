@@ -11,10 +11,10 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.models import ChangeOrder, Estimate, Project
+from core.models import ChangeOrder, Quote, Project
 from core.serializers import (
     ChangeOrderSerializer,
-    EstimateLineItemSerializer,
+    QuoteLineItemSerializer,
     ProjectFinancialSummarySerializer,
     ProjectProfileSerializer,
     ProjectSerializer,
@@ -33,7 +33,7 @@ def projects_list_view(request):
     """List all projects for the caller's organization.
 
     Each project is annotated with its ``accepted_contract_total`` (sum of
-    the latest approved estimate grand total per title family).
+    the latest approved quote grand total per title family).
 
     Flow:
         1. Scope to user's org, load customer relations.
@@ -385,15 +385,15 @@ def project_accounting_export_view(request, project_id):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def project_contract_breakdown_view(request, project_id):
-    """Return the active estimate and approved change orders for a project.
+    """Return the active quote and approved change orders for a project.
 
-    Returns the most recently approved estimate with its line items, plus all
+    Returns the most recently approved quote with its line items, plus all
     approved change orders linked to the project with their line items.  If no
-    approved estimate exists, returns nulls.
+    approved quote exists, returns nulls.
 
     Flow:
         1. Look up project scoped to user's org.
-        2. Find the most recently approved estimate (if any).
+        2. Find the most recently approved quote (if any).
         3. Fetch all approved change orders for the project.
         4. Return combined payload.
 
@@ -403,7 +403,7 @@ def project_contract_breakdown_view(request, project_id):
 
     Success 200::
 
-        { "data": { "active_estimate": { ... }, "approved_change_orders": [{ ... }, ...] } }
+        { "data": { "active_quote": { ... }, "approved_change_orders": [{ ... }, ...] } }
 
     Errors:
         - 404: Project not found.
@@ -417,24 +417,24 @@ def project_contract_breakdown_view(request, project_id):
             status=404,
         )
 
-    # Find the most recently approved estimate.
-    active_estimate = (
-        Estimate.objects.filter(project=project, status=Estimate.Status.APPROVED)
+    # Find the most recently approved quote.
+    active_quote = (
+        Quote.objects.filter(project=project, status=Quote.Status.APPROVED)
         .prefetch_related("line_items", "line_items__cost_code")
         .order_by("-created_at", "-id")
         .first()
     )
 
-    if not active_estimate:
-        return Response({"data": {"active_estimate": None, "approved_change_orders": []}})
+    if not active_quote:
+        return Response({"data": {"active_quote": None, "approved_change_orders": []}})
 
-    estimate_data = {
-        "id": active_estimate.id,
-        "title": active_estimate.title,
-        "version": active_estimate.version,
-        "grand_total": str(active_estimate.grand_total),
-        "line_items": EstimateLineItemSerializer(
-            active_estimate.line_items.select_related("cost_code").all(), many=True
+    quote_data = {
+        "id": active_quote.id,
+        "title": active_quote.title,
+        "version": active_quote.version,
+        "grand_total": str(active_quote.grand_total),
+        "line_items": QuoteLineItemSerializer(
+            active_quote.line_items.select_related("cost_code").all(), many=True
         ).data,
     }
 
@@ -449,7 +449,7 @@ def project_contract_breakdown_view(request, project_id):
 
     return Response({
         "data": {
-            "active_estimate": estimate_data,
+            "active_quote": quote_data,
             "approved_change_orders": [ChangeOrderSerializer(change_order).data for change_order in approved_cos],
         }
     })

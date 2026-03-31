@@ -10,7 +10,7 @@ import {
 
 describe("parsePublicTokenFromRef", () => {
   it("extracts token from slug--token format", () => {
-    expect(parsePublicTokenFromRef("my-estimate--aBcDeFgH")).toBe("aBcDeFgH");
+    expect(parsePublicTokenFromRef("my-quote--aBcDeFgH")).toBe("aBcDeFgH");
   });
 
   it("extracts longer token", () => {
@@ -51,8 +51,8 @@ describe("parsePublicTokenFromRef", () => {
 describe("composePublicDocumentMetadataTitle", () => {
   it("composes resolved title with fallback label", () => {
     expect(
-      composePublicDocumentMetadataTitle("Kitchen Remodel", "Estimate"),
-    ).toBe("Kitchen Remodel | Estimate");
+      composePublicDocumentMetadataTitle("Kitchen Remodel", "Quote"),
+    ).toBe("Kitchen Remodel | Quote");
   });
 
   it("returns fallback label when resolved title is null", () => {

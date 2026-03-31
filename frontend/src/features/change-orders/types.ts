@@ -4,8 +4,8 @@ import type { OrganizationBrandingDefaults } from "@/shared/document-creator";
 
 export type ProjectRecord = { id: number; name: string; customer_display_name: string };
 
-/** A single line item from an approved origin estimate, used in contract breakdown displays. */
-export type OriginEstimateLineItem = {
+/** A single line item from an approved origin quote, used in contract breakdown displays. */
+export type OriginQuoteLineItem = {
   id: number;
   cost_code_code?: string;
   cost_code_name?: string;
@@ -17,15 +17,15 @@ export type OriginEstimateLineItem = {
   line_total: string;
 };
 
-/** An approved estimate linked as the origin/baseline for change orders. */
-export type OriginEstimateRecord = {
+/** An approved quote linked as the origin/baseline for change orders. */
+export type OriginQuoteRecord = {
   id: number;
   title: string;
   version: number;
   approved_at: string | null;
   approved_by_email: string | null;
   grand_total: string;
-  line_items: OriginEstimateLineItem[];
+  line_items: OriginQuoteLineItem[];
 };
 
 /** A project-level audit event record from the status-events timeline API. */
@@ -97,8 +97,8 @@ export type ChangeOrderRecord = {
   sender_address: string;
   sender_logo_url: string;
   contract_pdf_url?: string;
-  origin_estimate: number | null;
-  origin_estimate_version?: number | null;
+  origin_quote: number | null;
+  origin_quote_version?: number | null;
   requested_by: number;
   requested_by_email: string;
   approved_by: number | null;
@@ -121,7 +121,7 @@ export type ChangeOrderRecord = {
   organization_context?: OrganizationPublicContext;
   ceremony_consent_text?: string;
   ceremony_consent_text_version?: string;
-  origin_estimate_context?: {
+  origin_quote_context?: {
     id: number;
     title: string;
     version: number;
@@ -160,7 +160,7 @@ export type ChangeOrderPolicyContract = {
   editing_rules?: {
     edit_requires_draft_status: boolean;
   };
-  origin_estimate_rules?: {
+  origin_quote_rules?: {
     required_on_create: boolean;
     must_be_approved: boolean;
     must_match_change_order_project: boolean;

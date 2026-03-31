@@ -10,7 +10,7 @@ _Regenerate: `python scripts/generate_ai_index.py`_
 - [Models — Accounts Receivable](#models-accounts-receivable)
 - [Models — Cash Management](#models-cash-management)
 - [Models — Change Orders](#models-change-orders)
-- [Models — Estimating](#models-estimating)
+- [Models — Quoting](#models-quoting)
 - [Models — Financial Auditing](#models-financial-auditing)
 - [Models — Core](#models-core)
 - [Models — Shared Operations](#models-shared-operations)
@@ -23,7 +23,7 @@ _Regenerate: `python scripts/generate_ai_index.py`_
 - [Views — Shared](#views-shared)
 - [Views — Cash Management](#views-cash-management)
 - [Views — Change Orders](#views-change-orders)
-- [Views — Estimating](#views-estimating)
+- [Views — Quoting](#views-quoting)
 - [Views — Shared Operations](#views-shared-operations)
 
 ## Models — Shared Operations
@@ -41,10 +41,10 @@ _AccountingSyncEvent model — operational sync-attempt log for external account
 
 
 ### `backend/core/models/shared_operations/cost_code.py`
-_CostCode model — reusable financial classification for estimating and billing line items._
+_CostCode model — reusable financial classification for quoting and billing line items._
 
 **class CostCode(models.Model)**
-> Reusable financial classification used across estimating/budgeting/billing line items.
+> Reusable financial classification used across quoting/budgeting/billing line items.
 - _class_ `CostCodeQuerySet(models.QuerySet)` — 
 - _class_ `Meta` — ordering, unique_together
 - `seed_defaults(organization, created_by)` `@classmethod` — Seed the default cost codes for an organization.
@@ -69,7 +69,7 @@ _Document access session — OTP-verified sessions for public document decisions
 
 **class DocumentAccessSession(models.Model)**
 > Tracks OTP verification and session state for public document decisions.
-- _class_ `DocumentType(models.TextChoices)` — ESTIMATE, CHANGE_ORDER, INVOICE
+- _class_ `DocumentType(models.TextChoices)` — QUOTE, CHANGE_ORDER, INVOICE
 - _class_ `Meta` — ordering
 - `save()` — Auto-generate OTP code, session token, and expiry on initial save.
 - `_generate_unique_code()` — Generate a 6-digit code unique among unexpired sessions for this document.
@@ -227,31 +227,31 @@ _Vendor model — org-scoped payee record for accounts payable._
 - `__str__()`
 
 
-## Models — Estimating
+## Models — Quoting
 
-### `backend/core/models/estimating/estimate.py`
-_Estimate model — mutable operational record for customer-facing project cost proposals._
+### `backend/core/models/quoting/quote.py`
+_Quote model — mutable operational record for customer-facing project cost proposals._
 
 **Depends on:**
 - `from core.models.mixins import StatusTransitionMixin`
 - `from core.utils.tokens import generate_public_token`
 
-**class Estimate(StatusTransitionMixin, models.Model)**
+**class Quote(StatusTransitionMixin, models.Model)**
 > Customer-facing scope and price proposal for a project.
 - _class_ `Status(models.TextChoices)` — DRAFT, SENT, APPROVED, REJECTED, VOID, ARCHIVED
 - _class_ `Meta` — ordering, unique_together
 - `__str__()`
-- `public_slug()` `@property` — URL-safe slug derived from the estimate title.
+- `public_slug()` `@property` — URL-safe slug derived from the quote title.
 - `public_ref()` `@property` — Combined slug--token identifier for public sharing URLs.
 - `clean()` — Validate status transitions before save.
 - `save()` — Auto-generate public token if missing, then validate and persist.
 
 
-### `backend/core/models/estimating/estimate_line_item.py`
-_EstimateLineItem model — individual priced scope row within an estimate version._
+### `backend/core/models/quoting/quote_line_item.py`
+_QuoteLineItem model — individual priced scope row within an quote version._
 
-**class EstimateLineItem(models.Model)**
-> Customer-facing priced scope row inside an estimate version.
+**class QuoteLineItem(models.Model)**
+> Customer-facing priced scope row inside an quote version.
 - _class_ `Meta` — ordering
 - `__str__()`
 
@@ -272,7 +272,7 @@ _ChangeOrder model — post-baseline contract delta request for scope, time, and
 - `__str__()`
 - `public_slug()` `@property` — URL-safe slug derived from family key.
 - `public_ref()` `@property` — Combined slug--token identifier for public sharing URLs.
-- `clean()` — Validate approval fields, origin estimate, and status transitions.
+- `clean()` — Validate approval fields, origin quote, and status transitions.
 - `build_snapshot()` — Point-in-time snapshot for immutable audit records.
 - `save()` — Auto-generate public token if missing, then validate and persist.
 
@@ -412,13 +412,13 @@ _CustomerRecord model — immutable audit capture for customer lifecycle events.
 - `__str__()`
 
 
-### `backend/core/models/financial_auditing/estimate_status_event.py`
-_EstimateStatusEvent model — immutable audit trail of estimate status transitions._
+### `backend/core/models/financial_auditing/quote_status_event.py`
+_QuoteStatusEvent model — immutable audit trail of quote status transitions._
 
-**class EstimateStatusEvent(models.Model)**
-> Audit trail of estimate status transitions.
+**class QuoteStatusEvent(models.Model)**
+> Audit trail of quote status transitions.
 - _class_ `Meta` — ordering
-- `record(estimate, from_status, to_status, note, changed_by, ip_address, user_agent)` `@classmethod` — Append an immutable estimate status transition row.
+- `record(quote, from_status, to_status, note, changed_by, ip_address, user_agent)` `@classmethod` — Append an immutable quote status transition row.
 - `__str__()`
 
 
@@ -611,37 +611,37 @@ _Customer intake and management serializers for CRUD and quick-add flows._
 - `_is_valid_email(value: str)` — Return whether value passes Django email validation.
 - `_is_valid_phone(value: str)` — Return whether value matches allowed phone number format (7-15 digits).
 
-### `backend/core/serializers/estimates.py`
-_Estimate serializers for read, write, duplication, and status-event representations._
+### `backend/core/serializers/quotes.py`
+_Quote serializers for read, write, duplication, and status-event representations._
 
 **Depends on:**
-- `from core.models import Estimate, EstimateLineItem, EstimateStatusEvent`
+- `from core.models import Quote, QuoteLineItem, QuoteStatusEvent`
 - `from core.serializers.mixins import resolve_public_actor_customer_id, resolve_public_actor_display`
 
-**class EstimateLineItemSerializer(serializers.ModelSerializer)**
-> Read-only estimate line item with cost code details.
+**class QuoteLineItemSerializer(serializers.ModelSerializer)**
+> Read-only quote line item with cost code details.
 - _class_ `Meta` — model, fields, read_only_fields
 
-**class EstimateSerializer(serializers.ModelSerializer)**
-> Read-only estimate with nested line items.
+**class QuoteSerializer(serializers.ModelSerializer)**
+> Read-only quote with nested line items.
 - _class_ `Meta` — model, fields, read_only_fields
 
-**class EstimateStatusEventSerializer(serializers.ModelSerializer)**
-> Read-only estimate status event with computed action type and actor display.
+**class QuoteStatusEventSerializer(serializers.ModelSerializer)**
+> Read-only quote status event with computed action type and actor display.
 - _class_ `Meta` — model, fields, read_only_fields
-- `get_action_type(obj: EstimateStatusEvent)` — Classify the event as create, transition, resend, notate, or unchanged.
-- `get_changed_by_display(obj: EstimateStatusEvent)` — Return a human-readable display name for the actor who changed the status.
-- `get_changed_by_customer_id(obj: EstimateStatusEvent)` — Return the customer ID if the actor acted via a public token.
+- `get_action_type(obj: QuoteStatusEvent)` — Classify the event as create, transition, resend, notate, or unchanged.
+- `get_changed_by_display(obj: QuoteStatusEvent)` — Return a human-readable display name for the actor who changed the status.
+- `get_changed_by_customer_id(obj: QuoteStatusEvent)` — Return the customer ID if the actor acted via a public token.
 
-**class EstimateLineItemInputSerializer(serializers.Serializer)**
-> Write serializer for a single estimate line item in a create/update payload.
+**class QuoteLineItemInputSerializer(serializers.Serializer)**
+> Write serializer for a single quote line item in a create/update payload.
 
-**class EstimateWriteSerializer(serializers.Serializer)**
-> Write serializer for creating or updating an estimate with line items.
+**class QuoteWriteSerializer(serializers.Serializer)**
+> Write serializer for creating or updating an quote with line items.
 - `validate_title(value: str)`
 - `validate_status(value: str)`
 
-- `_estimate_customer(obj)` — Return the customer associated with the status event's estimate project.
+- `_quote_customer(obj)` — Return the customer associated with the status event's quote project.
 
 ### `backend/core/serializers/invoices.py`
 _Invoice serializers for read, write, and status-event representations._
@@ -852,14 +852,14 @@ _Change-order policy contracts shared with UI consumers._
 - `_status_order()`
 - `get_change_order_policy_contract()` — Return the canonical change-order workflow policy for UI consumers.
 
-### `backend/core/policies/estimates.py`
-_Estimate policy contracts shared with UI consumers._
+### `backend/core/policies/quotes.py`
+_Quote policy contracts shared with UI consumers._
 
 **Depends on:**
-- `from core.models import Estimate`
+- `from core.models import Quote`
 - `from core.policies._base import _build_base_policy_contract`
 
-- `get_estimate_policy_contract()` — Return canonical estimate workflow policy for UI consumers.
+- `get_quote_policy_contract()` — Return canonical quote workflow policy for UI consumers.
 
 ### `backend/core/policies/invoices.py`
 _Invoice policy contracts shared with UI consumers._
@@ -930,12 +930,12 @@ _Shared helpers for authentication and registration views._
 _Cross-domain shared helpers and re-exports for the view layer._
 
 **Depends on:**
-- `from core.models import CostCode, Estimate, Organization, OrganizationMembership, Project`
+- `from core.models import CostCode, Quote, Organization, OrganizationMembership, Project`
 - `from core.rbac import _capability_gate`
 - `from core.user_helpers import _ensure_org_membership`
 
 - `_validate_project_for_user(project_id: int, user: AbstractUser)` — Look up a project by ID, scoped to the user's organization.
-- `_validate_estimate_for_user(estimate_id: int, user: AbstractUser, prefetch_lines: bool)` — Look up an estimate by ID, authorized via its project's org scope.
+- `_validate_quote_for_user(quote_id: int, user: AbstractUser, prefetch_lines: bool)` — Look up an quote by ID, authorized via its project's org scope.
 - `_promote_prospect_to_active(project: Project)` — Silently promote a prospect project to active.
 - `_resolve_organization_for_public_actor(actor_user: AbstractUser)` — Resolve the primary organization for a public-facing actor user.
 - `_serialize_public_organization_context(organization: Organization | None)` — Serialize organization branding fields for public-facing document contexts.
@@ -965,7 +965,7 @@ _Public document signing — OTP request and verification views._
 _Shared helpers for public document signing views._
 
 **Depends on:**
-- `from core.models import ChangeOrder, DocumentAccessSession, Estimate, Invoice`
+- `from core.models import ChangeOrder, DocumentAccessSession, Quote, Invoice`
 - `from core.utils.signing import CEREMONY_CONSENT_TEXT, CEREMONY_CONSENT_TEXT_VERSION`
 
 - `_resolve_document_and_email(document_type: str, public_token: str)` — Look up a document by type + public_token and extract the customer email.
@@ -1093,8 +1093,8 @@ _Domain-specific helpers for organization management views._
 _Project CRUD and detail endpoints._
 
 **Depends on:**
-- `from core.models import ChangeOrder, Estimate, Project`
-- `from core.serializers import ChangeOrderSerializer, EstimateLineItemSerializer, ProjectFinancialSummarySerializer, ProjectProfileSerializer, ProjectSerializer`
+- `from core.models import ChangeOrder, Quote, Project`
+- `from core.serializers import ChangeOrderSerializer, QuoteLineItemSerializer, ProjectFinancialSummarySerializer, ProjectProfileSerializer, ProjectSerializer`
 - `from core.views.helpers import _capability_gate, _ensure_org_membership`
 - `from core.views.shared_operations.projects_helpers import _build_project_financial_summary_data, _prefetch_project_qs, _project_accepted_contract_totals_map`
 
@@ -1102,14 +1102,14 @@ _Project CRUD and detail endpoints._
 - `project_detail_view(project_id)` `@api_view(['GET', 'PATCH'])` `@permission_classes([IsAuthenticated])` — Fetch or update a project profile.
 - `project_financial_summary_view(project_id)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Return normalized AR/AP/CO financial summary with traceability for one project.
 - `project_accounting_export_view(project_id)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Export project accounting summary as JSON or CSV.
-- `project_contract_breakdown_view(project_id)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Return the active estimate and approved change orders for a project.
+- `project_contract_breakdown_view(project_id)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Return the active quote and approved change orders for a project.
 - `project_audit_events_view(project_id)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Audit events endpoint — removed.
 
 ### `backend/core/views/shared_operations/projects_helpers.py`
 _Domain-specific helpers for project views._
 
 **Depends on:**
-- `from core.models import ChangeOrder, Estimate, Invoice, Payment, Project, VendorBill`
+- `from core.models import ChangeOrder, Quote, Invoice, Payment, Project, VendorBill`
 
 - `_prefetch_project_qs(queryset: QuerySet)` — Apply standard select/prefetch for project serialization.
 - `_parse_optional_date(value: str)` — Parse an ISO date string into a ``date`` object.
@@ -1121,7 +1121,7 @@ _Domain-specific helpers for project views._
 _Cross-project reporting and dashboard endpoints._
 
 **Depends on:**
-- `from core.models import ChangeOrder, ChangeOrderSnapshot, Estimate, EstimateStatusEvent, Invoice, InvoiceStatusEvent, Payment, PaymentRecord, Project, VendorBill, VendorBillSnapshot`
+- `from core.models import ChangeOrder, ChangeOrderSnapshot, Quote, QuoteStatusEvent, Invoice, InvoiceStatusEvent, Payment, PaymentRecord, Project, VendorBill, VendorBillSnapshot`
 - `from core.serializers import AttentionFeedSerializer, ChangeImpactSummarySerializer, PortfolioSnapshotSerializer, ProjectTimelineSerializer, QuickJumpSearchSerializer`
 - `from core.views.helpers import _ensure_org_membership`
 - `from core.views.shared_operations.projects_helpers import _build_project_financial_summary_data, _date_filter_from_query`
@@ -1154,49 +1154,49 @@ _Domain-specific helpers for vendor views._
 
 - `_find_duplicate_vendors(user: AbstractUser, name: str, exclude_vendor_id: int | None)` — Find org-scoped vendors matching by name for duplicate detection.
 
-## Views — Estimating
+## Views — Quoting
 
-### `backend/core/views/estimating/estimates.py`
-_Estimate authoring and public sharing endpoints._
+### `backend/core/views/quoting/quotes.py`
+_Quote authoring and public sharing endpoints._
 
 **Depends on:**
-- `from core.models import Estimate, EstimateStatusEvent, SigningCeremonyRecord`
-- `from core.policies import get_estimate_policy_contract`
-- `from core.serializers import EstimateSerializer, EstimateStatusEventSerializer, EstimateWriteSerializer`
+- `from core.models import Quote, QuoteStatusEvent, SigningCeremonyRecord`
+- `from core.policies import get_quote_policy_contract`
+- `from core.serializers import QuoteSerializer, QuoteStatusEventSerializer, QuoteWriteSerializer`
 - `from core.utils.request import get_client_ip`
 - `from core.utils.signing import compute_document_content_hash`
-- `from core.views.estimating.estimates_helpers import ESTIMATE_DECISION_TO_STATUS, _apply_estimate_lines_and_totals, _archive_estimate_family, _estimate_stored_signature, _handle_estimate_document_save, _handle_estimate_status_note, _handle_estimate_status_transition, _line_items_signature, _next_estimate_family_version, _prefetch_estimate_qs`
-- `from core.views.helpers import _build_public_decision_note, _capability_gate, _check_project_accepts_document, _ensure_org_membership, _promote_prospect_to_active, _resolve_organization_for_public_actor, _serialize_public_organization_context, _serialize_public_project_context, _validate_estimate_for_user, _validate_project_for_user`
+- `from core.views.quoting.quotes_helpers import QUOTE_DECISION_TO_STATUS, _apply_quote_lines_and_totals, _archive_quote_family, _quote_stored_signature, _handle_quote_document_save, _handle_quote_status_note, _handle_quote_status_transition, _line_items_signature, _next_quote_family_version, _prefetch_quote_qs`
+- `from core.views.helpers import _build_public_decision_note, _capability_gate, _check_project_accepts_document, _ensure_org_membership, _promote_prospect_to_active, _resolve_organization_for_public_actor, _serialize_public_organization_context, _serialize_public_project_context, _validate_quote_for_user, _validate_project_for_user`
 - `from core.views.public_signing_helpers import get_ceremony_context, validate_ceremony_on_decision`
 
-- `public_estimate_detail_view(public_token)` `@api_view(['GET'])` `@permission_classes([AllowAny])` — Return public estimate detail for customer share links.
-- `public_estimate_decision_view(public_token)` `@api_view(['POST'])` `@permission_classes([AllowAny])` — Apply a customer approve/reject decision through a public estimate link.
-- `estimate_contract_view(_request)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Return the canonical estimate workflow policy contract.
-- `project_estimates_view(project_id)` `@api_view(['GET', 'POST'])` `@permission_classes([IsAuthenticated])` — List project estimates or create a new estimate version.
-- `estimate_detail_view(estimate_id)` `@api_view(['GET', 'PATCH'])` `@permission_classes([IsAuthenticated])` — Fetch or update a single estimate with draft-locking enforcement.
-- `estimate_status_events_view(estimate_id)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Return the immutable status-transition audit trail for an estimate.
+- `public_quote_detail_view(public_token)` `@api_view(['GET'])` `@permission_classes([AllowAny])` — Return public quote detail for customer share links.
+- `public_quote_decision_view(public_token)` `@api_view(['POST'])` `@permission_classes([AllowAny])` — Apply a customer approve/reject decision through a public quote link.
+- `quote_contract_view(_request)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Return the canonical quote workflow policy contract.
+- `project_quotes_view(project_id)` `@api_view(['GET', 'POST'])` `@permission_classes([IsAuthenticated])` — List project quotes or create a new quote version.
+- `quote_detail_view(quote_id)` `@api_view(['GET', 'PATCH'])` `@permission_classes([IsAuthenticated])` — Fetch or update a single quote with draft-locking enforcement.
+- `quote_status_events_view(quote_id)` `@api_view(['GET'])` `@permission_classes([IsAuthenticated])` — Return the immutable status-transition audit trail for an quote.
 
-### `backend/core/views/estimating/estimates_helpers.py`
-_Domain-specific helpers for estimate views._
+### `backend/core/views/quoting/quotes_helpers.py`
+_Domain-specific helpers for quote views._
 
 **Depends on:**
-- `from core.models import Estimate, EstimateLineItem, EstimateStatusEvent, Project`
-- `from core.serializers import EstimateSerializer`
+- `from core.models import Quote, QuoteLineItem, QuoteStatusEvent, Project`
+- `from core.serializers import QuoteSerializer`
 - `from core.user_helpers import _ensure_org_membership`
 - `from core.utils.money import MONEY_ZERO, quantize_money`
 - `from core.views.helpers import _promote_prospect_to_active, _resolve_cost_codes_for_user`
 
-- `_prefetch_estimate_qs(queryset: QuerySet)` — Apply standard select/prefetch for estimate serialization.
+- `_prefetch_quote_qs(queryset: QuerySet)` — Apply standard select/prefetch for quote serialization.
 - `_line_items_signature(line_items_data: list[dict])` — Build a normalized signature from raw line-item input dicts.
-- `_estimate_stored_signature(estimate: Estimate)` — Build a normalized signature from an existing estimate's line items.
-- `_archive_estimate_family(project: Project, user: AbstractUser, title: str, exclude_ids: list[int], note: str)` — Archive all same-title estimates in a family except the excluded IDs.
-- `_next_estimate_family_version(project: Project, title: str)` — Return the next version number for an estimate family identified by title.
-- `_sync_project_contract_baseline_if_unset(estimate: Estimate)` — Set the project's contract values from the estimate if both are still zero.
+- `_quote_stored_signature(quote: Quote)` — Build a normalized signature from an existing quote's line items.
+- `_archive_quote_family(project: Project, user: AbstractUser, title: str, exclude_ids: list[int], note: str)` — Archive all same-title quotes in a family except the excluded IDs.
+- `_next_quote_family_version(project: Project, title: str)` — Return the next version number for an quote family identified by title.
+- `_sync_project_contract_baseline_if_unset(quote: Quote)` — Set the project's contract values from the quote if both are still zero.
 - `_calculate_line_totals(line_items_data: list[dict])` — Compute per-line totals with markup and return normalized items.
-- `_apply_estimate_lines_and_totals(estimate: Estimate, line_items_data: list[dict], tax_percent: Decimal, user: AbstractUser)` — Replace an estimate's line items and recompute all totals.
-- `_handle_estimate_document_save(estimate: Estimate, data: dict[str, Any])` — Apply field updates, line items, and totals to an estimate (save concern).
-- `_handle_estimate_status_transition(estimate: Estimate, data: dict[str, Any], previous_status: str, next_status: str, is_resend: bool)` — Handle an estimate status transition with identity freeze, audit, and email.
-- `_handle_estimate_status_note(estimate: Estimate, data: dict[str, Any])` — Append an audit note to the estimate timeline without changing status.
+- `_apply_quote_lines_and_totals(quote: Quote, line_items_data: list[dict], tax_percent: Decimal, user: AbstractUser)` — Replace an quote's line items and recompute all totals.
+- `_handle_quote_document_save(quote: Quote, data: dict[str, Any])` — Apply field updates, line items, and totals to an quote (save concern).
+- `_handle_quote_status_transition(quote: Quote, data: dict[str, Any], previous_status: str, next_status: str, is_resend: bool)` — Handle an quote status transition with identity freeze, audit, and email.
+- `_handle_quote_status_note(quote: Quote, data: dict[str, Any])` — Append an audit note to the quote timeline without changing status.
 
 ## Views — Change Orders
 
@@ -1204,9 +1204,9 @@ _Domain-specific helpers for estimate views._
 _Change-order creation, revision, and lifecycle endpoints._
 
 **Depends on:**
-- `from core.models import ChangeOrder, ChangeOrderSnapshot, ChangeOrderStatusEvent, Estimate, Project, SigningCeremonyRecord`
+- `from core.models import ChangeOrder, ChangeOrderSnapshot, ChangeOrderStatusEvent, Quote, Project, SigningCeremonyRecord`
 - `from core.policies import get_change_order_policy_contract`
-- `from core.serializers import ChangeOrderSerializer, ChangeOrderStatusEventSerializer, ChangeOrderWriteSerializer, EstimateLineItemSerializer`
+- `from core.serializers import ChangeOrderSerializer, ChangeOrderStatusEventSerializer, ChangeOrderWriteSerializer, QuoteLineItemSerializer`
 - `from core.serializers import ChangeOrderSerializer`
 - `from core.utils.money import MONEY_ZERO, quantize_money`
 - `from core.utils.request import get_client_ip`
@@ -1226,7 +1226,7 @@ _Change-order creation, revision, and lifecycle endpoints._
 _Domain-specific helpers for change-order views._
 
 **Depends on:**
-- `from core.models import ChangeOrder, ChangeOrderLine, ChangeOrderSnapshot, ChangeOrderStatusEvent, CostCode, Estimate, OrganizationMembership, Project`
+- `from core.models import ChangeOrder, ChangeOrderLine, ChangeOrderSnapshot, ChangeOrderStatusEvent, CostCode, Quote, OrganizationMembership, Project`
 - `from core.serializers import ChangeOrderSerializer`
 - `from core.utils.money import MONEY_ZERO, quantize_money`
 
@@ -1257,7 +1257,7 @@ _Invoice ingress adapter for normalizing external write payloads._
 _Accounts receivable invoice endpoints and state transitions._
 
 **Depends on:**
-- `from core.models import Estimate, Invoice, InvoiceStatusEvent, SigningCeremonyRecord`
+- `from core.models import Quote, Invoice, InvoiceStatusEvent, SigningCeremonyRecord`
 - `from core.policies import get_invoice_policy_contract`
 - `from core.serializers import InvoiceSerializer, InvoiceStatusEventSerializer, InvoiceWriteSerializer`
 - `from core.utils.request import get_client_ip`
@@ -1550,18 +1550,18 @@ _Management command to completely wipe a user account and all associated org dat
 _Seed four demo accounts representing different adoption stages of the platform._
 
 **Depends on:**
-- `from core.models import ChangeOrder, ChangeOrderLine, CostCode, Customer, Estimate, EstimateLineItem, EstimateStatusEvent, Invoice, InvoiceLine, OrganizationMembership, OrganizationMembershipRecord, Payment, Project, RoleTemplate, Vendor, VendorBill, VendorBillLine`
+- `from core.models import ChangeOrder, ChangeOrderLine, CostCode, Customer, Quote, QuoteLineItem, QuoteStatusEvent, Invoice, InvoiceLine, OrganizationMembership, OrganizationMembershipRecord, Payment, Project, RoleTemplate, Vendor, VendorBill, VendorBillLine`
 - `from core.user_helpers import _ensure_org_membership`
 
 **class Command(BaseCommand)**
 - `_get_or_create_user(email, onboarding_completed)`
-- `_cost_codes(user)` — Return two cost codes for estimate line seeding.
+- `_cost_codes(user)` — Return two cost codes for quote line seeding.
 - `_add_team_member(owner_membership, email, full_name, role)` — Create a user and add them as a team member on the owner's org.
 - `_make_customer(user, name)`
 - `_make_project(user, customer, name, status)`
-- `_make_estimate(user, project, title, version, status, subtotal, code1, code2)`
-- `_sync_estimate_lines(estimate, code1, code2, subtotal)`
-- `_sync_estimate_status_history(estimate, target_status, user)`
+- `_make_quote(user, project, title, version, status, subtotal, code1, code2)`
+- `_sync_quote_lines(quote, code1, code2, subtotal)`
+- `_sync_quote_status_history(quote, target_status, user)`
 - `_make_change_order(user, project, family_key, title, status, amount)`
 - `_make_invoice(user, project, customer, number, status, total, balance_due)`
 - `_make_vendor_bill(user, project, vendor, bill_number, status, total, balance_due)`
@@ -1580,7 +1580,7 @@ _Seed four demo accounts representing different adoption stages of the platform.
 ### `backend/core/tests/common.py`
 
 **Depends on:**
-- `from core.models import AccountingSyncEvent, AccountingSyncRecord, ChangeOrderSnapshot, ChangeOrderStatusEvent, CustomerRecord, ChangeOrder, ChangeOrderLine, CostCode, Customer, DocumentAccessSession, EmailRecord, EmailVerificationToken, Estimate, EstimateLineItem, EstimateStatusEvent, Invoice, InvoiceLine, InvoiceStatusEvent, LeadContactRecord, OrganizationMembershipRecord, OrganizationRecord, Payment, PaymentRecord, Project, Organization, OrganizationInvite, OrganizationMembership, RoleTemplate, SigningCeremonyRecord, VendorBill, VendorBillLine, VendorBillSnapshot, Vendor`
+- `from core.models import AccountingSyncEvent, AccountingSyncRecord, ChangeOrderSnapshot, ChangeOrderStatusEvent, CustomerRecord, ChangeOrder, ChangeOrderLine, CostCode, Customer, DocumentAccessSession, EmailRecord, EmailVerificationToken, Quote, QuoteLineItem, QuoteStatusEvent, Invoice, InvoiceLine, InvoiceStatusEvent, LeadContactRecord, OrganizationMembershipRecord, OrganizationRecord, Payment, PaymentRecord, Project, Organization, OrganizationInvite, OrganizationMembership, RoleTemplate, SigningCeremonyRecord, VendorBill, VendorBillLine, VendorBillSnapshot, Vendor`
 
 - `_bootstrap_org(user)` — Bootstrap an organization for a test user and return it.
 
@@ -1606,10 +1606,10 @@ _Seed four demo accounts representing different adoption stages of the platform.
 **class ChangeOrderTests(TestCase)**
 - `setUp()`
 - `_bootstrap_primary_membership()`
-- `_create_estimate(project_id: int, cost_code_id: int, token: str, title: str)`
-- `_create_estimate_family(title: str)`
-- `_approve_estimate(estimate_id: int, token: str)`
-- `_create_other_estimate_family()` — Create an approved estimate on other_project for cross-project tests.
+- `_create_quote(project_id: int, cost_code_id: int, token: str, title: str)`
+- `_create_quote_family(title: str)`
+- `_approve_quote(quote_id: int, token: str)`
+- `_create_other_quote_family()` — Create an approved quote on other_project for cross-project tests.
 - `_create_change_order(title, amount_delta)`
 - `_assert_validation_error(response)`
 - `test_change_order_contract_requires_authentication()`
@@ -1622,16 +1622,16 @@ _Seed four demo accounts representing different adoption stages of the platform.
 - `test_change_order_create_allows_per_change_order_reason_override()`
 - `test_change_order_patch_allows_reason_updates()`
 - `test_change_order_create_with_line_items_scaffold()`
-- `test_change_order_create_with_origin_estimate_link()`
-- `test_change_order_create_requires_origin_estimate()`
-- `test_change_order_create_rejects_non_approved_origin_estimate()`
+- `test_change_order_create_with_origin_quote_link()`
+- `test_change_order_create_requires_origin_quote()`
+- `test_change_order_create_rejects_non_approved_origin_quote()`
 - `test_change_order_create_rejects_line_total_mismatch()`
 - `test_change_order_patch_updates_line_items_scaffold()`
-- `test_change_order_patch_rejects_origin_estimate_change_or_clear()`
+- `test_change_order_patch_rejects_origin_quote_change_or_clear()`
 - `test_change_order_create_allows_duplicate_cost_codes()`
 - `test_change_order_create_line_with_cost_code()`
 - `test_change_order_model_blocks_invalid_status_transition_on_save()`
-- `test_change_order_model_rejects_cross_project_origin_estimate_on_direct_save()`
+- `test_change_order_model_rejects_cross_project_origin_quote_on_direct_save()`
 - `test_change_order_status_lifecycle_validation()`
 - `test_sent_cannot_transition_back_to_draft()`
 - `test_change_order_patch_rejects_content_edits_when_sent()`
@@ -1710,7 +1710,7 @@ _Seed four demo accounts representing different adoption stages of the platform.
 
 **Depends on:**
 - `from core.tests.common import *`
-- `from core.models import ChangeOrder, Estimate, Invoice, Payment, VendorBill`
+- `from core.models import ChangeOrder, Quote, Invoice, Payment, VendorBill`
 
 **class AdoptionStageSeedTests(TestCase)**
 - `test_new_account_has_no_data()`
@@ -1776,45 +1776,45 @@ _Seed four demo accounts representing different adoption stages of the platform.
 - `test_login_legacy_user_returns_200()` — Legacy/seed users have is_active=True by default — login works.
 
 
-### `backend/core/tests/test_estimates.py`
+### `backend/core/tests/test_quotes.py`
 
 **Depends on:**
-- `from core.serializers import EstimateWriteSerializer`
+- `from core.serializers import QuoteWriteSerializer`
 - `from core.tests.common import *`
 
-**class EstimateTests(TestCase)**
+**class QuoteTests(TestCase)**
 - `setUp()`
 - `_bootstrap_primary_membership()`
-- `test_public_estimate_detail_view_allows_unauthenticated_access()`
-- `test_public_estimate_detail_view_not_found()`
-- `test_public_estimate_decision_view_approves_sent_estimate()`
-- `test_public_estimate_decision_view_rejects_sent_estimate()`
-- `test_estimate_contract_requires_authentication()`
-- `test_estimate_contract_matches_model_transition_policy()`
-- `test_project_estimates_create()`
-- `test_project_estimates_create_persists_valid_through()`
-- `test_project_estimates_create_uses_organization_validation_delta_when_valid_through_omitted()`
-- `test_project_estimates_create_uses_organization_default_terms_when_omitted()`
-- `test_project_estimates_rejects_per_estimate_terms_overrides()`
-- `test_project_estimates_patch_rejects_terms_edit_when_non_draft()`
-- `test_project_estimates_create_rounds_tax_half_up_to_cents()`
-- `test_project_estimates_create_requires_title()`
-- `test_project_estimates_create_archives_previous_family()`
-- `test_project_estimates_create_requires_explicit_confirmation_for_existing_title_family()`
-- `test_project_estimates_create_blocks_existing_title_family_after_approval()`
-- `test_project_estimates_create_rejects_user_archived_status()`
-- `test_project_estimates_list_scoped_by_project_and_user()`
-- `test_estimate_status_write_contract_distinguishes_void_from_archived()`
-- `test_estimate_status_transition_validates_allowed_paths()`
-- `test_estimate_patch_approval_promotes_project_to_active()`
-- `test_estimate_status_transition_allows_sent_to_void()`
-- `test_estimate_status_transition_rejects_user_archived_patch()`
-- `test_estimate_status_transition_creates_audit_events()`
-- `test_estimate_resend_records_sent_to_sent_status_event()`
-- `test_estimate_terminal_status_note_records_same_status_event()`
-- `test_estimate_values_locked_after_send()`
-- `test_estimate_title_cannot_change_after_creation_even_in_draft()`
-- `test_estimate_cannot_transition_from_sent_back_to_draft()`
+- `test_public_quote_detail_view_allows_unauthenticated_access()`
+- `test_public_quote_detail_view_not_found()`
+- `test_public_quote_decision_view_approves_sent_quote()`
+- `test_public_quote_decision_view_rejects_sent_quote()`
+- `test_quote_contract_requires_authentication()`
+- `test_quote_contract_matches_model_transition_policy()`
+- `test_project_quotes_create()`
+- `test_project_quotes_create_persists_valid_through()`
+- `test_project_quotes_create_uses_organization_validation_delta_when_valid_through_omitted()`
+- `test_project_quotes_create_uses_organization_default_terms_when_omitted()`
+- `test_project_quotes_rejects_per_quote_terms_overrides()`
+- `test_project_quotes_patch_rejects_terms_edit_when_non_draft()`
+- `test_project_quotes_create_rounds_tax_half_up_to_cents()`
+- `test_project_quotes_create_requires_title()`
+- `test_project_quotes_create_archives_previous_family()`
+- `test_project_quotes_create_requires_explicit_confirmation_for_existing_title_family()`
+- `test_project_quotes_create_blocks_existing_title_family_after_approval()`
+- `test_project_quotes_create_rejects_user_archived_status()`
+- `test_project_quotes_list_scoped_by_project_and_user()`
+- `test_quote_status_write_contract_distinguishes_void_from_archived()`
+- `test_quote_status_transition_validates_allowed_paths()`
+- `test_quote_patch_approval_promotes_project_to_active()`
+- `test_quote_status_transition_allows_sent_to_void()`
+- `test_quote_status_transition_rejects_user_archived_patch()`
+- `test_quote_status_transition_creates_audit_events()`
+- `test_quote_resend_records_sent_to_sent_status_event()`
+- `test_quote_terminal_status_note_records_same_status_event()`
+- `test_quote_values_locked_after_send()`
+- `test_quote_title_cannot_change_after_creation_even_in_draft()`
+- `test_quote_cannot_transition_from_sent_back_to_draft()`
 
 - `_verified_session(public_token, document_type, document_id, email)` — Create a verified OTP session for public decision tests.
 
@@ -1970,15 +1970,15 @@ _Tests for RBAC Phase 4: Invite Flow (create, list, revoke, verify, Flow B, Flow
 - `test_line_missing_description_rejected()` — Lines without a description are rejected.
 - `test_create_invoice_on_prospect_project_activates_it()` — Creating an invoice on a prospect project promotes it to active.
 - `test_create_invoice_on_active_project_stays_active()` — Creating an invoice on an already-active project doesn't change status.
-- `_create_approved_estimate(project)` — Create an approved estimate on the given (or default) project.
-- `test_create_invoice_with_related_estimate()` — POST with related_estimate links the invoice to the estimate.
+- `_create_approved_quote(project)` — Create an approved quote on the given (or default) project.
+- `test_create_invoice_with_related_quote()` — POST with related_quote links the invoice to the quote.
 - `test_create_invoice_with_initial_status_sent()` — POST with initial_status=sent creates invoice and transitions to sent atomically.
 - `test_create_invoice_with_initial_status_sent_freezes_org_identity()` — initial_status=sent should freeze org identity fields on the invoice.
-- `test_related_estimate_must_belong_to_same_project()` — related_estimate from a different project is rejected.
-- `test_related_estimate_must_be_approved()` — related_estimate that is not approved is rejected.
-- `test_duplicate_related_estimate_blocked()` — Second invoice with same related_estimate is rejected (409).
-- `test_duplicate_related_estimate_allowed_after_void()` — Voiding the linked invoice allows re-creating with the same estimate.
-- `test_invoice_list_includes_related_estimate_field()` — GET invoice list includes the related_estimate field.
+- `test_related_quote_must_belong_to_same_project()` — related_quote from a different project is rejected.
+- `test_related_quote_must_be_approved()` — related_quote that is not approved is rejected.
+- `test_duplicate_related_quote_blocked()` — Second invoice with same related_quote is rejected (409).
+- `test_duplicate_related_quote_allowed_after_void()` — Voiding the linked invoice allows re-creating with the same quote.
+- `test_invoice_list_includes_related_quote_field()` — GET invoice list includes the related_quote field.
 
 - `_verified_session(public_token, document_type, document_id, email)` — Create a verified OTP session for public decision tests.
 
@@ -2208,7 +2208,7 @@ _Tests for public document signing — OTP verification, signing ceremony, and c
 
 **class SigningUtilitiesTests(TestCase)**
 > Tests for content hashing, email masking, and consent text utilities.
-- `test_compute_estimate_content_hash_is_deterministic()`
+- `test_compute_quote_content_hash_is_deterministic()`
 - `test_compute_change_order_content_hash_is_deterministic()`
 - `test_compute_invoice_content_hash_is_deterministic()`
 - `test_content_hash_changes_with_content()`
@@ -2248,12 +2248,12 @@ _Tests for public document signing — OTP verification, signing ceremony, and c
 > Edge case tests for public signing — double-approve, cross-doc reuse, OTP limits, etc.
 - `setUp()`
 - `_ceremony_payload(session)`
-- `test_double_approve_returns_409_conflict()` — Approving an already-approved estimate returns 409.
-- `test_session_token_scoped_to_document()` — A session token for estimate_a cannot be used on estimate_b's decision endpoint.
+- `test_double_approve_returns_409_conflict()` — Approving an already-approved quote returns 409.
+- `test_session_token_scoped_to_document()` — A session token for quote_a cannot be used on quote_b's decision endpoint.
 - `test_max_otp_attempts_then_new_otp_succeeds()` — After max failed attempts, requesting a new OTP and verifying it works.
-- `test_reject_decision_creates_ceremony_record()` — Rejecting an estimate creates a SigningCeremonyRecord with decision='reject'.
+- `test_reject_decision_creates_ceremony_record()` — Rejecting an quote creates a SigningCeremonyRecord with decision='reject'.
 - `test_empty_whitespace_otp_code_returns_400()` — Submitting a whitespace-only OTP code returns 400 validation_error.
-- `test_decision_on_draft_estimate_returns_409()` — Attempting a decision on a DRAFT estimate returns 409 conflict.
+- `test_decision_on_draft_quote_returns_409()` — Attempting a decision on a DRAFT quote returns 409 conflict.
 - `test_max_attempts_blocks_correct_code()` — Even the correct OTP code is rejected after max failed attempts.
 
 - `_create_verified_session(public_token, document_type, document_id, email)` — Create a DocumentAccessSession that has been OTP-verified with an active session.
@@ -2442,7 +2442,7 @@ _Tests for reporting and dashboard endpoints._
 
 **class ProjectTimelineEventsTests(ReportingTestBase)**
 - `test_returns_empty_timeline_for_project_with_no_events()`
-- `test_returns_estimate_status_events()`
+- `test_returns_quote_status_events()`
 - `test_workflow_category_filter()`
 - `test_financial_category_filter_excludes_workflow_events()`
 - `test_invalid_category_returns_400()`

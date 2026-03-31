@@ -1,5 +1,5 @@
 from core.tests.test_change_orders import ChangeOrderTests
-from core.tests.test_estimates import EstimateTests
+from core.tests.test_quotes import QuoteTests
 from core.tests.test_health_auth import AuthEndpointTests, HealthEndpointTests
 from core.tests.test_customer_intake import CustomerIntakeQuickAddTests
 from core.tests.test_invoices import InvoiceTests
@@ -22,7 +22,7 @@ __all__ = [
     "ProjectProfileTests",
     "CostCodeTests",
     "VendorTests",
-    "EstimateTests",
+    "QuoteTests",
     "ChangeOrderTests",
     "InvoiceTests",
     "AdoptionStageSeedTests",

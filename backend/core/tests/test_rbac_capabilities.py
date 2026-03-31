@@ -33,7 +33,7 @@ class ResolveUserCapabilitiesTests(TestCase):
         )
 
     def test_resolves_from_assigned_role_template(self):
-        custom_caps = {"estimates": ["view", "create"], "projects": ["view"]}
+        custom_caps = {"quotes": ["view", "create"], "projects": ["view"]}
         template = RoleTemplate.objects.create(
             name="Custom",
             slug="custom-test",
@@ -44,7 +44,7 @@ class ResolveUserCapabilitiesTests(TestCase):
         self._make_membership(role="worker", role_template=template)
 
         caps = _resolve_user_capabilities(self.user)
-        self.assertEqual(caps["estimates"], ["view", "create"])
+        self.assertEqual(caps["quotes"], ["view", "create"])
         self.assertEqual(caps["projects"], ["view"])
         self.assertNotIn("invoices", caps)
 
@@ -53,7 +53,7 @@ class ResolveUserCapabilitiesTests(TestCase):
 
         caps = _resolve_user_capabilities(self.user)
         # Viewer system template has view-only on everything
-        self.assertEqual(caps.get("estimates"), ["view"])
+        self.assertEqual(caps.get("quotes"), ["view"])
         self.assertEqual(caps.get("invoices"), ["view"])
         self.assertEqual(caps.get("users"), [])
 
@@ -61,9 +61,9 @@ class ResolveUserCapabilitiesTests(TestCase):
         self._make_membership(role="owner")
 
         caps = _resolve_user_capabilities(self.user)
-        self.assertIn("create", caps["estimates"])
-        self.assertIn("approve", caps["estimates"])
-        self.assertIn("send", caps["estimates"])
+        self.assertIn("create", caps["quotes"])
+        self.assertIn("approve", caps["quotes"])
+        self.assertIn("send", caps["quotes"])
         self.assertIn("edit", caps["org_identity"])
         self.assertIn("edit_role", caps["users"])
         self.assertIn("payments", caps)
@@ -78,14 +78,14 @@ class ResolveUserCapabilitiesTests(TestCase):
     def test_per_membership_overrides_merge_additively(self):
         self._make_membership(
             role="viewer",
-            capability_flags_json={"estimates": ["create", "edit"]},
+            capability_flags_json={"quotes": ["create", "edit"]},
         )
 
         caps = _resolve_user_capabilities(self.user)
         # Should have both system viewer "view" and override "create", "edit"
-        self.assertIn("view", caps["estimates"])
-        self.assertIn("create", caps["estimates"])
-        self.assertIn("edit", caps["estimates"])
+        self.assertIn("view", caps["quotes"])
+        self.assertIn("create", caps["quotes"])
+        self.assertIn("edit", caps["quotes"])
         # Other resources should still be view-only
         self.assertEqual(caps.get("invoices"), ["view"])
 
@@ -98,7 +98,7 @@ class ResolveUserCapabilitiesTests(TestCase):
         # resolve_user_capabilities bootstraps membership via _ensure_org_membership
         caps = _resolve_user_capabilities(orphan)
         # Bootstrapped users get owner role
-        self.assertIn("create", caps.get("estimates", []))
+        self.assertIn("create", caps.get("quotes", []))
 
     def test_inactive_membership_bootstraps_via_ensure(self):
         # OneToOneField means _ensure_org_membership can't create a second
@@ -110,7 +110,7 @@ class ResolveUserCapabilitiesTests(TestCase):
         )
         caps = _resolve_user_capabilities(fresh_user)
         # Bootstrapped as owner
-        self.assertIn("create", caps.get("estimates", []))
+        self.assertIn("create", caps.get("quotes", []))
         self.assertIn("edit", caps.get("org_identity", []))
 
     def test_bookkeeping_has_invoice_create_but_not_send(self):
@@ -125,7 +125,7 @@ class ResolveUserCapabilitiesTests(TestCase):
         self._make_membership(role="worker")
 
         caps = _resolve_user_capabilities(self.user)
-        self.assertNotIn("approve", caps.get("estimates", []))
+        self.assertNotIn("approve", caps.get("quotes", []))
         self.assertNotIn("approve", caps.get("vendor_bills", []))
         self.assertNotIn("pay", caps.get("vendor_bills", []))
 
@@ -151,9 +151,9 @@ class CapabilityGateTests(TestCase):
             role="owner",
             status=OrganizationMembership.Status.ACTIVE,
         )
-        error, caps = _capability_gate(self.user, "estimates", "create")
+        error, caps = _capability_gate(self.user, "quotes", "create")
         self.assertIsNone(error)
-        self.assertIn("create", caps["estimates"])
+        self.assertIn("create", caps["quotes"])
 
     def test_gate_denies_when_capability_missing(self):
         OrganizationMembership.objects.create(
@@ -162,10 +162,10 @@ class CapabilityGateTests(TestCase):
             role="viewer",
             status=OrganizationMembership.Status.ACTIVE,
         )
-        error, caps = _capability_gate(self.user, "estimates", "create")
+        error, caps = _capability_gate(self.user, "quotes", "create")
         self.assertIsNotNone(error)
         self.assertEqual(error["error"]["code"], "forbidden")
-        self.assertIn("estimates.create", error["error"]["fields"]["capability"][0])
+        self.assertIn("quotes.create", error["error"]["fields"]["capability"][0])
 
     def test_gate_denies_for_unknown_resource(self):
         OrganizationMembership.objects.create(
@@ -184,10 +184,10 @@ class CapabilityGateTests(TestCase):
             role="viewer",
             status=OrganizationMembership.Status.ACTIVE,
         )
-        error, caps = _capability_gate(self.user, "estimates", "create")
+        error, caps = _capability_gate(self.user, "quotes", "create")
         self.assertIsNotNone(error)
         # Still returns the user's capabilities so caller can inspect
-        self.assertIn("estimates", caps)
+        self.assertIn("quotes", caps)
 
 
 class OrgProfileCapabilityGateTests(TestCase):
@@ -307,8 +307,8 @@ class AuthCapabilitiesResponseTests(TestCase):
         self.assertIn("capabilities", data)
         caps = data["capabilities"]
         # New user gets owner role → should have full capabilities
-        self.assertIn("estimates", caps)
-        self.assertIn("create", caps["estimates"])
+        self.assertIn("quotes", caps)
+        self.assertIn("create", caps["quotes"])
         self.assertIn("payments", caps)
 
     def test_verify_email_response_includes_capabilities(self):
@@ -333,7 +333,7 @@ class AuthCapabilitiesResponseTests(TestCase):
         data = response.json()["data"]
         self.assertIn("capabilities", data)
         caps = data["capabilities"]
-        self.assertIn("estimates", caps)
+        self.assertIn("quotes", caps)
         self.assertIn("payments", caps)
 
     def test_me_response_includes_capabilities(self):
@@ -355,7 +355,7 @@ class AuthCapabilitiesResponseTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()["data"]
         self.assertIn("capabilities", data)
-        self.assertIn("estimates", data["capabilities"])
+        self.assertIn("quotes", data["capabilities"])
 
     def test_viewer_capabilities_are_view_only(self):
         owner = User.objects.create_user(
@@ -379,7 +379,7 @@ class AuthCapabilitiesResponseTests(TestCase):
         self.assertEqual(response.status_code, 200)
         caps = response.json()["data"]["capabilities"]
         # Viewer should only have view actions
-        for resource in ["estimates", "change_orders", "invoices", "vendor_bills"]:
+        for resource in ["quotes", "change_orders", "invoices", "vendor_bills"]:
             self.assertEqual(caps[resource], ["view"], f"{resource} should be view-only for viewer")
 
 

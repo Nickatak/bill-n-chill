@@ -21,8 +21,8 @@ Last reviewed: 2026-03-04
   - [Project Profile and Baseline (PRJ-01)](#project-profile-and-baseline-prj-01)
   - [Customer Management (OPS-01)](#customer-management-ops-01)
   - [Cost Code Management (EST-01)](#cost-code-management-est-01)
-  - [Estimate Authoring and Versioning (EST-02)](#estimate-authoring-and-versioning-est-02)
-  - [Estimate Approval Lifecycle (EST-03)](#estimate-approval-lifecycle-est-03)
+  - [Quote Authoring and Versioning (EST-02)](#quote-authoring-and-versioning-est-02)
+  - [Quote Approval Lifecycle (EST-03)](#quote-approval-lifecycle-est-03)
   - [Change Order Lifecycle (CO-01)](#change-order-lifecycle-co-01)
   - [Change Order Financial Propagation (CO-02)](#change-order-financial-propagation-co-02)
   - [Change Order Decision Snapshots (CO-03)](#change-order-decision-snapshots-co-03)
@@ -81,7 +81,7 @@ Source of truth: `backend/core/urls.py`.
 │   ├── {project_id}/timeline/
 │   ├── {project_id}/accounting-export/
 │   ├── {project_id}/accounting-sync-events/
-│   ├── {project_id}/estimates/
+│   ├── {project_id}/quotes/
 │   ├── {project_id}/change-orders/
 │   ├── {project_id}/invoices/
 │   ├── {project_id}/vendor-bills/
@@ -93,16 +93,16 @@ Source of truth: `backend/core/urls.py`.
 ├── search/
 │   └── quick-jump/
 ├── contracts/
-│   ├── estimates/
+│   ├── quotes/
 │   ├── change-orders/
 │   ├── invoices/
 │   ├── vendor-bills/
 │   └── payments/
 ├── public/
-│   ├── estimates/{public_token}/
-│   ├── estimates/{public_token}/otp/
-│   ├── estimates/{public_token}/otp/verify/
-│   ├── estimates/{public_token}/decision/
+│   ├── quotes/{public_token}/
+│   ├── quotes/{public_token}/otp/
+│   ├── quotes/{public_token}/otp/verify/
+│   ├── quotes/{public_token}/decision/
 │   ├── change-orders/{public_token}/
 │   ├── change-orders/{public_token}/otp/
 │   ├── change-orders/{public_token}/otp/verify/
@@ -111,8 +111,8 @@ Source of truth: `backend/core/urls.py`.
 │   ├── invoices/{public_token}/otp/
 │   ├── invoices/{public_token}/otp/verify/
 │   └── invoices/{public_token}/decision/
-├── estimates/
-│   └── {estimate_id}/
+├── quotes/
+│   └── {quote_id}/
 │       ├── status-events/
 │       ├── clone-version/
 │       └── duplicate/
@@ -164,7 +164,7 @@ Error:
 
 - All persisted money values are currency precision (`2` decimal places).
 - All server-side computed money values are quantized with `ROUND_HALF_UP` to `$0.01`.
-- This applies to estimate, invoice, payment allocation, change-order, and vendor-bill calculations.
+- This applies to quote, invoice, payment allocation, change-order, and vendor-bill calculations.
 - Contract: API money responses must always serialize as fixed two-decimal strings (example: `"1000.00"`).
 
 ## Core Health Endpoint
@@ -201,7 +201,7 @@ bill-n-chill currently uses DRF token authentication for API access.
           "display_name": "Pm Organization"
         },
         "capabilities": {
-          "estimates": ["view", "create", "edit", "approve", "send"],
+          "quotes": ["view", "create", "edit", "approve", "send"],
           "invoices": ["view", "create", "edit", "approve", "send"],
           "...": "..."
         }
@@ -254,7 +254,7 @@ All write endpoints are gated by capability checks, not role strings.
   - `error.fields.capability = ["Required: {resource}.{action}."]`
 - Capability surface (resources and actions):
   ```
-  estimates:        view, create, edit, approve, send
+  quotes:        view, create, edit, approve, send
   change_orders:    view, create, edit, approve, send
   invoices:         view, create, edit, approve, send
   vendor_bills:     view, create, edit, approve, pay
@@ -272,7 +272,7 @@ All write endpoints are gated by capability checks, not role strings.
 ## Auditability and Traceability Standards
 
 - Financially relevant mutations must append immutable capture rows (status events, snapshots, or record models).
-- Public-link decisions (`estimate`, `change-order`, `invoice`) must write explicit auditable event context.
+- Public-link decisions (`quote`, `change-order`, `invoice`) must write explicit auditable event context.
 - Project-level read surfaces must provide traceability from summary metrics to source records.
 - Compatibility timeline/index surfaces are read-only and append-only from API perspective.
 
@@ -299,7 +299,7 @@ This section defines endpoint-by-endpoint request/response, validation, and work
   - Auth required
   - Capability gate: field-level split
     - **Identity fields** (`display_name`, `logo_url`, `billing_address`): requires `org_identity.edit` (owner only).
-    - **Preset fields** (`help_email`, `default_invoice_due_delta`, `default_estimate_valid_delta`, `invoice_terms_and_conditions`, `estimate_terms_and_conditions`, `change_order_terms_and_conditions`): requires `org_presets.edit` (owner + PM).
+    - **Preset fields** (`help_email`, `default_invoice_due_delta`, `default_quote_valid_delta`, `invoice_terms_and_conditions`, `quote_terms_and_conditions`, `change_order_terms_and_conditions`): requires `org_presets.edit` (owner + PM).
   - Audit behavior:
     - appends immutable `OrganizationRecord(event_type=updated, capture_source=manual_ui)`
 
@@ -453,40 +453,40 @@ Resolution fields accepted by `POST /api/v1/customers/quick-add/`:
     - preview mode returns row-level `would_create` / `would_update`
     - apply mode creates/updates rows and returns row-level results.
 
-## Estimate Authoring and Versioning (EST-02)
+## Quote Authoring and Versioning (EST-02)
 
-- `GET /api/v1/projects/{project_id}/estimates/`
+- `GET /api/v1/projects/{project_id}/quotes/`
   - Auth required
-  - Returns estimate versions for the selected project.
+  - Returns quote versions for the selected project.
 
-- `POST /api/v1/projects/{project_id}/estimates/`
+- `POST /api/v1/projects/{project_id}/quotes/`
   - Auth required
-  - Creates a new estimate version with:
+  - Creates a new quote version with:
     - `title`
     - `tax_percent`
     - `line_items[]` (cost code, description, quantity, unit, unit_cost, markup_percent)
-  - Server computes line totals and estimate totals.
+  - Server computes line totals and quote totals.
 
-- `GET /api/v1/estimates/{estimate_id}/`
+- `GET /api/v1/quotes/{quote_id}/`
   - Auth required
-  - Returns one estimate with line items.
+  - Returns one quote with line items.
 
-- `GET /api/v1/public/estimates/{public_token}/`
+- `GET /api/v1/public/quotes/{public_token}/`
   - No auth required
-  - Returns public estimate view payload for controlled external sharing.
+  - Returns public quote view payload for controlled external sharing.
 
-- `PATCH /api/v1/estimates/{estimate_id}/`
+- `PATCH /api/v1/quotes/{quote_id}/`
   - Auth required
-  - Supports updating estimate status/title/tax and replacing line items.
+  - Supports updating quote status/title/tax and replacing line items.
   - Note: `archived` is system-controlled and cannot be set directly by API consumers.
 
-- `POST /api/v1/estimates/{estimate_id}/clone-version/`
+- `POST /api/v1/quotes/{quote_id}/clone-version/`
   - Auth required
-  - Creates a new draft version cloned from the selected estimate.
+  - Creates a new draft version cloned from the selected quote.
 
-## Estimate Approval Lifecycle (EST-03)
+## Quote Approval Lifecycle (EST-03)
 
-- `PATCH /api/v1/estimates/{estimate_id}/`
+- `PATCH /api/v1/quotes/{quote_id}/`
   - Auth required
   - Supports status transitions with optional audit note:
     - `status`
@@ -498,11 +498,11 @@ Resolution fields accepted by `POST /api/v1/customers/quick-add/`:
     - `approved -> (no further transitions)`
     - `void -> (no further transitions)`
   - Internal/system transition:
-    - `draft|sent -> archived` is used for superseded estimate-family history and is not user-settable.
+    - `draft|sent -> archived` is used for superseded quote-family history and is not user-settable.
 
-- `GET /api/v1/estimates/{estimate_id}/status-events/`
+- `GET /api/v1/quotes/{quote_id}/status-events/`
   - Auth required
-  - Returns audit trail entries for estimate status changes, including actor, timestamp, and note.
+  - Returns audit trail entries for quote status changes, including actor, timestamp, and note.
 
 ## Change Order Lifecycle (CO-01)
 
@@ -517,7 +517,7 @@ Current product posture:
     - `revision_number` = revision inside family
     - `is_latest_revision` marks editable/latest record
   - Traceability fields:
-    - `origin_estimate` (nullable)
+    - `origin_quote` (nullable)
     - `previous_change_order` (nullable explicit pointer to prior revision)
 
 - `POST /api/v1/projects/{project_id}/change-orders/`
@@ -527,7 +527,7 @@ Current product posture:
     - `amount_delta` (required)
     - `days_delta` (optional, default `0`)
     - `reason` (optional)
-    - `origin_estimate` (optional; estimate id from same project)
+    - `origin_quote` (optional; quote id from same project)
     - `line_items[]` (optional scaffold):
       - `description` (optional)
       - `amount_delta` (required)
@@ -545,7 +545,7 @@ Current product posture:
     - keeps `family_key` (family)
     - increments `revision_number`
     - sets `previous_change_order` to source revision
-    - copies title/amount/days/reason/origin-estimate and line items
+    - copies title/amount/days/reason/origin-quote and line items
 
 - `PATCH /api/v1/change-orders/{change_order_id}/`
   - Auth required
@@ -620,7 +620,7 @@ CO-02 extends existing CO endpoints with propagation behavior.
   - linked line-item rows
   - actor/timestamp metadata
   - decision context (`previous_status`, `applied_financial_delta`)
-  - `origin_estimate_version` for historical replay/traceability (not primary operational usage)
+  - `origin_quote_version` for historical replay/traceability (not primary operational usage)
 
 ## Reporting Pack v1 (RPT-01)
 
@@ -672,7 +672,7 @@ CO-02 extends existing CO endpoints with propagation behavior.
   - Auth required
   - Global lightweight search across:
     - projects
-    - estimates
+    - quotes
     - change orders
     - invoices
     - vendor bills
@@ -763,7 +763,7 @@ CO-02 extends existing CO endpoints with propagation behavior.
 ### Invoice Lineage Decision
 
 - Invoice lines are billing-time composition rows and may regroup/split partial scope across invoice cycles.
-- Non-estimate billing is allowed only as explicit `adjustment` lines with required reason metadata.
+- Non-quote billing is allowed only as explicit `adjustment` lines with required reason metadata.
 - External/public invoice views should hide internal-only metadata fields (for example `internal_note`).
 
 ## Unapproved Scope Billing Protection (INV-02)
@@ -1114,7 +1114,7 @@ Each bucket contains:
 - `GET /api/v1/projects/{project_id}/timeline/`
   - Auth required
   - Returns a read-only project timeline merged from:
-    - workflow estimate status events (`EstimateStatusEvent`)
+    - workflow quote status events (`QuoteStatusEvent`)
   - Query params:
     - `category` (optional; default `all`)
       - allowed: `all`, `financial`, `workflow`

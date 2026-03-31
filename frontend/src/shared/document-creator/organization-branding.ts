@@ -2,7 +2,7 @@
  * Organization branding resolution for the internal document composer.
  *
  * Normalizes the raw organization branding defaults from the API into a
- * display-ready shape used by invoice/estimate/change-order composer headers.
+ * display-ready shape used by invoice/quote/change-order composer headers.
  */
 
 import { toAddressLines } from "../utils/address";

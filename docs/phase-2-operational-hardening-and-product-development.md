@@ -37,7 +37,7 @@ Transition from MVP demonstration quality to reliable daily-use quality while co
 - Convert current route consoles into clearer task-based user flows.
 - Add explicit guidance, success criteria, and next-step prompts per workflow page.
 - Improve field-first ergonomics for quick-add, status updates, and payment visibility.
-- Improve desktop information density for estimate/invoice operations.
+- Improve desktop information density for quote/invoice operations.
 - Add more realistic scenario fixtures aligned to GC/PM operating patterns.
 
 ### 3) Quality + Release Discipline

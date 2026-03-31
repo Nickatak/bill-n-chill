@@ -26,8 +26,8 @@
  *
  * ## State (useState) — 14 calls
  *
- * Data: projects, summary, estimate/CO/bill/invoice progress,
- *       acceptedEstimateTotal, invoiceAllocationTargets
+ * Data: projects, summary, quote/CO/bill/invoice progress,
+ *       acceptedQuoteTotal, invoiceAllocationTargets
  * Selection: selectedProjectId, isProjectEditOpen
  * Filters: projectSearch, projectStatusFilters
  * Form: projectName, projectStatus
@@ -36,7 +36,7 @@
  *
  * - loadProjects() — fetches all projects, auto-selects based on URL scope
  * - loadFinancialSummary() — fetches /projects/:id/financial-summary/
- * - loadEstimateProgress / loadCoProgress / loadBillProgress / loadInvoiceProgress — fetches workflow progress
+ * - loadQuoteProgress / loadCoProgress / loadBillProgress / loadInvoiceProgress — fetches workflow progress
  * - hydrateForm(project) — populates name + status fields
  * - handleProjectSave(event) — PATCHes project profile
  * - toggleProjectStatusFilter(status) — toggles a status pill in/out
@@ -62,7 +62,7 @@ import { useStatusMessage } from "@/shared/hooks/use-status-message";
 import styles from "./projects-console.module.css";
 import { PaymentRecorder, type AllocationTarget } from "@/features/payments";
 import { ProjectListViewer } from "@/shared/project-list-viewer";
-import { ApiResponse, ApprovedEstimate, ProjectFinancialSummary, ProjectRecord } from "../types";
+import { ApiResponse, ApprovedQuote, ProjectFinancialSummary, ProjectRecord } from "../types";
 import {
   PROJECT_STATUS_VALUES,
   DEFAULT_PROJECT_STATUS_FILTERS,
@@ -90,15 +90,15 @@ export function ProjectsConsole() {
     DEFAULT_PROJECT_STATUS_FILTERS,
   );
   const [summary, setSummary] = useState<ProjectFinancialSummary | null>(null);
-  const [estimateProgress, setEstimateProgress] = useState<{ total: number } | null>(null);
+  const [quoteProgress, setQuoteProgress] = useState<{ total: number } | null>(null);
   const [coProgress, setCoProgress] = useState<{ done: number; total: number } | null>(null);
   const [billProgress, setBillProgress] = useState<{ done: number; total: number } | null>(null);
   const [invoiceProgress, setInvoiceProgress] = useState<{ done: number; total: number } | null>(null);
-  const [acceptedEstimateTotal, setAcceptedEstimateTotal] = useState("--");
+  const [acceptedQuoteTotal, setAcceptedQuoteTotal] = useState("--");
   const [invoiceAllocationTargets, setInvoiceAllocationTargets] = useState<AllocationTarget[]>([]);
   const [toolbarPanel, setToolbarPanel] = useState<"payment" | null>(null);
-  const [approvedEstimates, setApprovedEstimates] = useState<ApprovedEstimate[]>([]);
-  const [linkedEstimateIds, setLinkedEstimateIds] = useState<Set<number>>(new Set());
+  const [approvedQuotes, setApprovedQuotes] = useState<ApprovedQuote[]>([]);
+  const [linkedQuoteIds, setLinkedQuoteIds] = useState<Set<number>>(new Set());
   const [isProjectEditOpen, setIsProjectEditOpen] = useState(false);
   const projectEditFormRef = useRef<HTMLFormElement | null>(null);
 
@@ -125,7 +125,7 @@ export function ProjectsConsole() {
   const isSelectedProjectTerminal =
     selectedProject?.status === "completed" || selectedProject?.status === "cancelled";
   const isSelectedProjectProspect = selectedProject?.status === "prospect";
-  const estimateDone = approvedEstimates.filter((e) => linkedEstimateIds.has(e.id)).length;
+  const quoteDone = approvedQuotes.filter((e) => linkedQuoteIds.has(e.id)).length;
   const hasPayableInvoices = invoiceAllocationTargets.length > 0;
   const computedProfileStatuses = selectedProject
     ? allowedProfileStatuses(selectedProject.status as ProjectStatusValue)
@@ -165,7 +165,7 @@ export function ProjectsConsole() {
   const acceptedContractRaw =
     summary?.accepted_contract_total ??
     selectedProject?.accepted_contract_total ??
-    acceptedEstimateTotal;
+    acceptedQuoteTotal;
   const acceptedContractDisplay = summary ? formatCurrency(parseMoneyValue(acceptedContractRaw)) : "--";
   const invoicedDisplay = summary ? formatCurrency(parseMoneyValue(summary.invoiced_to_date)) : "--";
   const paidDisplay = summary ? formatCurrency(parseMoneyValue(summary.paid_to_date)) : "--";
@@ -234,7 +234,7 @@ export function ProjectsConsole() {
       } else {
         setSelectedProjectId("");
         setSummary(null);
-        setEstimateProgress(null);
+        setQuoteProgress(null);
         setCoProgress(null);
         setBillProgress(null);
         setInvoiceProgress(null);
@@ -265,39 +265,39 @@ export function ProjectsConsole() {
     }
   }
 
-  /** Loads estimate progress (total non-void, approved list) for the pipeline. */
-  async function loadEstimateProgress(projectId: number) {
+  /** Loads quote progress (total non-void, approved list) for the pipeline. */
+  async function loadQuoteProgress(projectId: number) {
     try {
-      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/estimates/`, {
+      const response = await fetch(`${normalizedBaseUrl}/projects/${projectId}/quotes/`, {
         headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setEstimateProgress(null);
+        setQuoteProgress(null);
         return;
       }
       const rows = (payload.data as Array<{ id?: number; status?: string; title?: string; grand_total?: string | number }>) ?? [];
       let total = 0;
       let acceptedTotal = 0;
-      const approvedList: ApprovedEstimate[] = [];
-      for (const estimate of rows) {
-        if (estimate.status === "void" || estimate.status === "draft") continue;
+      const approvedList: ApprovedQuote[] = [];
+      for (const quote of rows) {
+        if (quote.status === "void" || quote.status === "draft") continue;
         total += 1;
-        if (estimate.status === "approved") {
-          acceptedTotal += parseMoneyValue(estimate.grand_total);
+        if (quote.status === "approved") {
+          acceptedTotal += parseMoneyValue(quote.grand_total);
           approvedList.push({
-            id: estimate.id ?? 0,
-            title: estimate.title ?? "",
-            grand_total: String(estimate.grand_total ?? "0"),
+            id: quote.id ?? 0,
+            title: quote.title ?? "",
+            grand_total: String(quote.grand_total ?? "0"),
           });
         }
       }
-      setEstimateProgress({ total });
-      setAcceptedEstimateTotal(formatCurrency(acceptedTotal));
-      setApprovedEstimates(approvedList);
+      setQuoteProgress({ total });
+      setAcceptedQuoteTotal(formatCurrency(acceptedTotal));
+      setApprovedQuotes(approvedList);
     } catch {
-      setEstimateProgress(null);
-      setAcceptedEstimateTotal("--");
+      setQuoteProgress(null);
+      setAcceptedQuoteTotal("--");
     }
   }
 
@@ -392,7 +392,7 @@ export function ProjectsConsole() {
         invoice_number?: string;
         balance_due?: string;
         status?: string;
-        related_estimate?: number | null;
+        related_quote?: number | null;
       }>) ?? [];
       setInvoiceAllocationTargets(
         rows
@@ -403,14 +403,14 @@ export function ProjectsConsole() {
             balanceDue: inv.balance_due ?? "0.00",
           })),
       );
-      // Track which estimates already have a non-void linked invoice.
+      // Track which quotes already have a non-void linked invoice.
       const linked = new Set<number>();
       for (const inv of rows) {
-        if (inv.related_estimate && inv.status !== "void") {
-          linked.add(inv.related_estimate);
+        if (inv.related_quote && inv.status !== "void") {
+          linked.add(inv.related_quote);
         }
       }
-      setLinkedEstimateIds(linked);
+      setLinkedQuoteIds(linked);
     } catch {
       setInvoiceAllocationTargets([]);
     }
@@ -435,7 +435,7 @@ export function ProjectsConsole() {
       return;
     }
     void loadFinancialSummary();
-    void loadEstimateProgress(projectId);
+    void loadQuoteProgress(projectId);
     void loadCoProgress(projectId);
     void loadBillProgress(projectId);
     void loadInvoiceProgress(projectId);
@@ -460,11 +460,11 @@ export function ProjectsConsole() {
     hydrateForm(fallbackProject);
 
     setSummary(null);
-    setEstimateProgress(null);
+    setQuoteProgress(null);
     setCoProgress(null);
     setBillProgress(null);
     setInvoiceProgress(null);
-    setAcceptedEstimateTotal("--");
+    setAcceptedQuoteTotal("--");
   }, [selectedProjectId, statusFilteredProjects]);
 
   // Scroll the profile form into view when it opens, so users don't miss it off-screen.
@@ -501,11 +501,11 @@ export function ProjectsConsole() {
 
     // Clear stale financial data so it re-loads for the new project.
     setSummary(null);
-    setEstimateProgress(null);
+    setQuoteProgress(null);
     setCoProgress(null);
     setBillProgress(null);
     setInvoiceProgress(null);
-    setAcceptedEstimateTotal("--");
+    setAcceptedQuoteTotal("--");
   }
 
   /** Toggles the project profile editor open/closed, pre-selecting the first allowed status. */
@@ -669,27 +669,27 @@ export function ProjectsConsole() {
                 ) : null}
               </div>
               <nav className={styles.pipeline} aria-label="Project workflow">
-                <Link href={`/projects/${selectedProject.id}/estimates`} className={styles.pipelineStage}>
+                <Link href={`/projects/${selectedProject.id}/quotes`} className={styles.pipelineStage}>
                   <svg className={styles.pipelineIcon} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
                     <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
                   </svg>
-                  <span className={styles.pipelineLabel}>Estimates</span>
+                  <span className={styles.pipelineLabel}>Quotes</span>
                   <div className={styles.progressSection}>
-                    {estimateProgress && estimateProgress.total > 0 ? (
+                    {quoteProgress && quoteProgress.total > 0 ? (
                       <>
                         <div className={styles.progressTrack}>
                           <div
                             className={styles.progressFill}
-                            style={{ width: `${(estimateDone / estimateProgress.total) * 100}%` }}
+                            style={{ width: `${(quoteDone / quoteProgress.total) * 100}%` }}
                           />
                         </div>
                         <span className={styles.progressText}>
-                          {estimateDone} of {estimateProgress.total} invoiced
+                          {quoteDone} of {quoteProgress.total} invoiced
                         </span>
                       </>
                     ) : (
-                      <span className={styles.progressHint}>Create an estimate</span>
+                      <span className={styles.progressHint}>Create an quote</span>
                     )}
                   </div>
                 </Link>
@@ -757,7 +757,7 @@ export function ProjectsConsole() {
                         </span>
                       </>
                     ) : (
-                      <span className={styles.progressHint}>Invoice an approved estimate</span>
+                      <span className={styles.progressHint}>Invoice an approved quote</span>
                     )}
                   </div>
                 </Link>

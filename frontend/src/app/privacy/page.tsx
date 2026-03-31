@@ -18,7 +18,7 @@ export default function PrivacyPage() {
             When you create an account, we collect your email address and a
             hashed password. As you use the service, we store the business data
             you enter: organization details, customer information, project
-            records, financial documents (estimates, invoices, change orders,
+            records, financial documents (quotes, invoices, change orders,
             vendor bills), and payment records.
           </p>
           <p>

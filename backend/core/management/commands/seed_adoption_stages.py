@@ -1,7 +1,7 @@
 """Seed four demo accounts representing different adoption stages of the platform.
 
 new@test.com   — Fresh signup. Empty workspace (org + cost codes only).
-early@test.com — ~2 months in. A few customers, first projects, first estimates.
+early@test.com — ~2 months in. A few customers, first projects, first quotes.
 mid@test.com   — ~8 months in. One of each status for every entity type.
 late@test.com  — ~2 years in. Full portfolio with history across all domains.
 
@@ -22,9 +22,9 @@ from core.models import (
     ChangeOrderLine,
     CostCode,
     Customer,
-    Estimate,
-    EstimateLineItem,
-    EstimateStatusEvent,
+    Quote,
+    QuoteLineItem,
+    QuoteStatusEvent,
     Invoice,
     InvoiceLine,
     OrganizationMembership,
@@ -65,7 +65,7 @@ class Command(BaseCommand):
         return user, token, membership
 
     def _cost_codes(self, user):
-        """Return two cost codes for estimate line seeding."""
+        """Return two cost codes for quote line seeding."""
         membership = _ensure_org_membership(user)
         codes = list(
             CostCode.objects.filter(organization=membership.organization, is_active=True)
@@ -157,8 +157,8 @@ class Command(BaseCommand):
         p.save()
         return p
 
-    def _make_estimate(self, user, project, title, version, status, subtotal, code1, code2):
-        est, _ = Estimate.objects.get_or_create(
+    def _make_quote(self, user, project, title, version, status, subtotal, code1, code2):
+        est, _ = Quote.objects.get_or_create(
             created_by=user, project=project, title=title, version=version,
             defaults={
                 "status": status,
@@ -179,22 +179,22 @@ class Command(BaseCommand):
             "status", "subtotal", "markup_total", "tax_percent",
             "tax_total", "grand_total", "updated_at",
         ])
-        self._sync_estimate_lines(est, code1, code2, subtotal)
-        self._sync_estimate_status_history(est, status, user)
+        self._sync_quote_lines(est, code1, code2, subtotal)
+        self._sync_quote_status_history(est, status, user)
         return est
 
-    def _sync_estimate_lines(self, estimate, code1, code2, subtotal):
+    def _sync_quote_lines(self, quote, code1, code2, subtotal):
         subtotal = Decimal(subtotal).quantize(Decimal("0.01"))
         primary_total = (subtotal * Decimal("0.40")).quantize(Decimal("0.01"))
         secondary_total = subtotal - primary_total
         specs = [
-            (code1, f"{estimate.title} — {code1.name}", primary_total),
-            (code2, f"{estimate.title} — {code2.name}", secondary_total),
+            (code1, f"{quote.title} — {code1.name}", primary_total),
+            (code2, f"{quote.title} — {code2.name}", secondary_total),
         ]
         keep_ids = []
         for cost_code, description, line_total in specs:
-            line, _ = EstimateLineItem.objects.get_or_create(
-                estimate=estimate, cost_code=cost_code, description=description,
+            line, _ = QuoteLineItem.objects.get_or_create(
+                quote=quote, cost_code=cost_code, description=description,
                 defaults={
                     "quantity": Decimal("1.00"),
                     "unit": "ea",
@@ -212,49 +212,49 @@ class Command(BaseCommand):
                 "quantity", "unit", "unit_price", "markup_percent", "line_total", "updated_at",
             ])
             keep_ids.append(line.id)
-        EstimateLineItem.objects.filter(estimate=estimate).exclude(id__in=keep_ids).delete()
+        QuoteLineItem.objects.filter(quote=quote).exclude(id__in=keep_ids).delete()
 
-    def _sync_estimate_status_history(self, estimate, target_status, user):
+    def _sync_quote_status_history(self, quote, target_status, user):
         history = {
-            Estimate.Status.DRAFT: [
-                (None, Estimate.Status.DRAFT, "Estimate created."),
+            Quote.Status.DRAFT: [
+                (None, Quote.Status.DRAFT, "Quote created."),
             ],
-            Estimate.Status.SENT: [
-                (None, Estimate.Status.DRAFT, "Estimate created."),
-                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to customer."),
+            Quote.Status.SENT: [
+                (None, Quote.Status.DRAFT, "Quote created."),
+                (Quote.Status.DRAFT, Quote.Status.SENT, "Quote sent to customer."),
             ],
-            Estimate.Status.APPROVED: [
-                (None, Estimate.Status.DRAFT, "Estimate created."),
-                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to customer."),
-                (Estimate.Status.SENT, Estimate.Status.APPROVED, "Estimate approved by customer."),
+            Quote.Status.APPROVED: [
+                (None, Quote.Status.DRAFT, "Quote created."),
+                (Quote.Status.DRAFT, Quote.Status.SENT, "Quote sent to customer."),
+                (Quote.Status.SENT, Quote.Status.APPROVED, "Quote approved by customer."),
             ],
-            Estimate.Status.REJECTED: [
-                (None, Estimate.Status.DRAFT, "Estimate created."),
-                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to customer."),
-                (Estimate.Status.SENT, Estimate.Status.REJECTED, "Estimate rejected by customer."),
+            Quote.Status.REJECTED: [
+                (None, Quote.Status.DRAFT, "Quote created."),
+                (Quote.Status.DRAFT, Quote.Status.SENT, "Quote sent to customer."),
+                (Quote.Status.SENT, Quote.Status.REJECTED, "Quote rejected by customer."),
             ],
-            Estimate.Status.ARCHIVED: [
-                (None, Estimate.Status.DRAFT, "Estimate created."),
-                (Estimate.Status.DRAFT, Estimate.Status.SENT, "Estimate sent to customer."),
-                (Estimate.Status.SENT, Estimate.Status.REJECTED, "Estimate rejected by customer."),
-                (Estimate.Status.REJECTED, Estimate.Status.ARCHIVED, "Rejected version archived."),
+            Quote.Status.ARCHIVED: [
+                (None, Quote.Status.DRAFT, "Quote created."),
+                (Quote.Status.DRAFT, Quote.Status.SENT, "Quote sent to customer."),
+                (Quote.Status.SENT, Quote.Status.REJECTED, "Quote rejected by customer."),
+                (Quote.Status.REJECTED, Quote.Status.ARCHIVED, "Rejected version archived."),
             ],
-            Estimate.Status.VOID: [
-                (None, Estimate.Status.DRAFT, "Estimate created."),
-                (Estimate.Status.DRAFT, Estimate.Status.VOID, "Estimate voided."),
+            Quote.Status.VOID: [
+                (None, Quote.Status.DRAFT, "Quote created."),
+                (Quote.Status.DRAFT, Quote.Status.VOID, "Quote voided."),
             ],
         }
-        events = history.get(target_status, history[Estimate.Status.DRAFT])
-        EstimateStatusEvent.objects.filter(estimate=estimate).delete()
+        events = history.get(target_status, history[Quote.Status.DRAFT])
+        QuoteStatusEvent.objects.filter(quote=quote).delete()
         for from_s, to_s, note in events:
-            EstimateStatusEvent.objects.create(
-                estimate=estimate, from_status=from_s, to_status=to_s,
+            QuoteStatusEvent.objects.create(
+                quote=quote, from_status=from_s, to_status=to_s,
                 note=note, changed_by=user,
             )
 
     def _make_change_order(self, user, project, family_key, title, status, amount, **kwargs):
-        origin_estimate = kwargs.get("origin_estimate") or Estimate.objects.filter(
-            project=project, status=Estimate.Status.APPROVED,
+        origin_quote = kwargs.get("origin_quote") or Quote.objects.filter(
+            project=project, status=Quote.Status.APPROVED,
         ).order_by("-version").first()
         code1, code2 = self._cost_codes(user)
         co, _ = ChangeOrder.objects.get_or_create(
@@ -268,7 +268,7 @@ class Command(BaseCommand):
                 "requested_by": user,
                 "approved_by": user if status == ChangeOrder.Status.APPROVED else None,
                 "approved_at": timezone.now() if status == ChangeOrder.Status.APPROVED else None,
-                "origin_estimate": origin_estimate,
+                "origin_quote": origin_quote,
             },
         )
         co.title = title
@@ -279,7 +279,7 @@ class Command(BaseCommand):
         co.requested_by = user
         co.approved_by = user if status == ChangeOrder.Status.APPROVED else None
         co.approved_at = timezone.now() if status == ChangeOrder.Status.APPROVED else None
-        co.origin_estimate = origin_estimate
+        co.origin_quote = origin_quote
         co.save()
         # Seed a single line item matching the CO delta
         ChangeOrderLine.objects.filter(change_order=co).delete()
@@ -452,7 +452,7 @@ class Command(BaseCommand):
     # ── Stage: Early ─────────────────────────────────────────────────────
 
     def _seed_early(self):
-        """~2 months in. First customers, first projects, first estimates."""
+        """~2 months in. First customers, first projects, first quotes."""
         user, token, membership = self._get_or_create_user("early@test.com")
         code1, code2 = self._cost_codes(user)
 
@@ -482,11 +482,11 @@ class Command(BaseCommand):
             contract_value_original=Decimal("8500.00"),
             contract_value_current=Decimal("8500.00"))
 
-        # 2 estimates: 1 draft (prospect), 1 sent (active)
-        self._make_estimate(user, p_prospect, "Kitchen Remodel Scope", 1,
-            Estimate.Status.DRAFT, Decimal("12000.00"), code1, code2)
-        self._make_estimate(user, p_active, "Bathroom Renovation Scope", 1,
-            Estimate.Status.SENT, Decimal("8500.00"), code1, code2)
+        # 2 quotes: 1 draft (prospect), 1 sent (active)
+        self._make_quote(user, p_prospect, "Kitchen Remodel Scope", 1,
+            Quote.Status.DRAFT, Decimal("12000.00"), code1, code2)
+        self._make_quote(user, p_active, "Bathroom Renovation Scope", 1,
+            Quote.Status.SENT, Decimal("8500.00"), code1, code2)
 
         # 1 custom vendor
         Vendor.objects.get_or_create(
@@ -498,7 +498,7 @@ class Command(BaseCommand):
         )
 
         self.stdout.write(self.style.SUCCESS(
-            "  early@test.com — 4 customers, 2 projects, 2 estimates, 1 vendor"
+            "  early@test.com — 4 customers, 2 projects, 2 quotes, 1 vendor"
         ))
         return user, token
 
@@ -556,25 +556,25 @@ class Command(BaseCommand):
             contract_value_original=Decimal("15000.00"),
             contract_value_current=Decimal("15000.00"))
 
-        # Estimate family on active project (v1 archived → v2 rejected → v3 approved)
-        self._make_estimate(user, p_active1, "Baker Office Scope", 1,
-            Estimate.Status.ARCHIVED, Decimal("22000.00"), code1, code2)
-        self._make_estimate(user, p_active1, "Baker Office Scope", 2,
-            Estimate.Status.REJECTED, Decimal("23500.00"), code1, code2)
-        self._make_estimate(user, p_active1, "Baker Office Scope", 3,
-            Estimate.Status.APPROVED, Decimal("24000.00"), code1, code2)
+        # Quote family on active project (v1 archived → v2 rejected → v3 approved)
+        self._make_quote(user, p_active1, "Baker Office Scope", 1,
+            Quote.Status.ARCHIVED, Decimal("22000.00"), code1, code2)
+        self._make_quote(user, p_active1, "Baker Office Scope", 2,
+            Quote.Status.REJECTED, Decimal("23500.00"), code1, code2)
+        self._make_quote(user, p_active1, "Baker Office Scope", 3,
+            Quote.Status.APPROVED, Decimal("24000.00"), code1, code2)
 
-        # More estimates in other statuses
-        self._make_estimate(user, p_prospect, "Anderson Bath Scope", 1,
-            Estimate.Status.DRAFT, Decimal("14000.00"), code1, code2)
-        self._make_estimate(user, p_active2, "Clark Kitchen Scope", 1,
-            Estimate.Status.SENT, Decimal("18000.00"), code1, code2)
-        self._make_estimate(user, p_completed, "Evans Garage Scope", 1,
-            Estimate.Status.APPROVED, Decimal("32000.00"), code1, code2)
-        self._make_estimate(user, p_cancelled, "Foster Basement Scope", 1,
-            Estimate.Status.VOID, Decimal("15000.00"), code1, code2)
-        self._make_estimate(user, p_hold, "Davis Deck Scope", 1,
-            Estimate.Status.APPROVED, Decimal("9500.00"), code1, code2)
+        # More quotes in other statuses
+        self._make_quote(user, p_prospect, "Anderson Bath Scope", 1,
+            Quote.Status.DRAFT, Decimal("14000.00"), code1, code2)
+        self._make_quote(user, p_active2, "Clark Kitchen Scope", 1,
+            Quote.Status.SENT, Decimal("18000.00"), code1, code2)
+        self._make_quote(user, p_completed, "Evans Garage Scope", 1,
+            Quote.Status.APPROVED, Decimal("32000.00"), code1, code2)
+        self._make_quote(user, p_cancelled, "Foster Basement Scope", 1,
+            Quote.Status.VOID, Decimal("15000.00"), code1, code2)
+        self._make_quote(user, p_hold, "Davis Deck Scope", 1,
+            Quote.Status.APPROVED, Decimal("9500.00"), code1, code2)
 
         # Change orders: draft, pending, approved, rejected, void
         self._make_change_order(user, p_active1, "1", "Add conference room outlets",
@@ -789,26 +789,26 @@ class Command(BaseCommand):
                 contract_value_current=Decimal(current))
             late_projects.append(p)
 
-        # Estimates for every project — active/completed get full families
+        # Quotes for every project — active/completed get full families
         for i, p in enumerate(late_projects):
             base_amount = Decimal(str(3000 + i * 2500))
             if p.status in {Project.Status.ACTIVE, Project.Status.COMPLETED}:
                 # Full v1→v2→v3 family
-                self._make_estimate(user, p, f"{p.name} Scope", 1,
-                    Estimate.Status.ARCHIVED, base_amount * Decimal("0.90"), code1, code2)
-                self._make_estimate(user, p, f"{p.name} Scope", 2,
-                    Estimate.Status.REJECTED, base_amount * Decimal("0.95"), code1, code2)
-                self._make_estimate(user, p, f"{p.name} Scope", 3,
-                    Estimate.Status.APPROVED, base_amount, code1, code2)
+                self._make_quote(user, p, f"{p.name} Scope", 1,
+                    Quote.Status.ARCHIVED, base_amount * Decimal("0.90"), code1, code2)
+                self._make_quote(user, p, f"{p.name} Scope", 2,
+                    Quote.Status.REJECTED, base_amount * Decimal("0.95"), code1, code2)
+                self._make_quote(user, p, f"{p.name} Scope", 3,
+                    Quote.Status.APPROVED, base_amount, code1, code2)
             elif p.status == Project.Status.PROSPECT:
-                self._make_estimate(user, p, f"{p.name} Scope", 1,
-                    Estimate.Status.DRAFT, base_amount, code1, code2)
+                self._make_quote(user, p, f"{p.name} Scope", 1,
+                    Quote.Status.DRAFT, base_amount, code1, code2)
             elif p.status == Project.Status.ON_HOLD:
-                self._make_estimate(user, p, f"{p.name} Scope", 1,
-                    Estimate.Status.APPROVED, base_amount, code1, code2)
+                self._make_quote(user, p, f"{p.name} Scope", 1,
+                    Quote.Status.APPROVED, base_amount, code1, code2)
             elif p.status == Project.Status.CANCELLED:
-                self._make_estimate(user, p, f"{p.name} Scope", 1,
-                    Estimate.Status.VOID, base_amount, code1, code2)
+                self._make_quote(user, p, f"{p.name} Scope", 1,
+                    Quote.Status.VOID, base_amount, code1, code2)
 
         # Change orders on active + completed projects
         co_specs = [

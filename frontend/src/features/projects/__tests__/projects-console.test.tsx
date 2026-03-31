@@ -84,13 +84,13 @@ function makeFinancialSummary(overrides: Record<string, unknown> = {}) {
 
 /**
  * Route-aware fetch mock. The component fires up to 7 requests on mount
- * (projects list, financial summary, estimates, change orders, vendor bills,
+ * (projects list, financial summary, quotes, change orders, vendor bills,
  * invoices for counts, invoices for allocation targets).
  */
 function setupDefaultFetch(overrides: {
   projects?: unknown[];
   summary?: Record<string, unknown>;
-  estimates?: unknown[];
+  quotes?: unknown[];
   changeOrders?: unknown[];
   vendorBills?: unknown[];
   invoices?: unknown[];
@@ -102,12 +102,12 @@ function setupDefaultFetch(overrides: {
         json: () => Promise.resolve({ data: overrides.summary ?? makeFinancialSummary() }),
       });
     }
-    if (url.includes("/estimates/")) {
+    if (url.includes("/quotes/")) {
       return Promise.resolve({
         ok: true,
         json: () =>
           Promise.resolve({
-            data: overrides.estimates ?? [
+            data: overrides.quotes ?? [
               { status: "draft", grand_total: "5000.00" },
               { status: "approved", grand_total: "25000.00" },
             ],
@@ -196,7 +196,7 @@ describe("ProjectsConsole", () => {
     });
 
     // Pipeline stage links are rendered with the project id
-    expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
+    expect(screen.getByRole("link", { name: /Quotes/ })).toHaveAttribute("href", "/projects/1/quotes");
     expect(screen.getByRole("link", { name: /Change Orders/ })).toHaveAttribute("href", "/projects/1/change-orders");
   });
 
@@ -214,9 +214,9 @@ describe("ProjectsConsole", () => {
     expect(screen.getByText("Remaining to Invoice")).toBeInTheDocument();
   });
 
-  it("displays estimate and CO workflow progress bars", async () => {
+  it("displays quote and CO workflow progress bars", async () => {
     setupDefaultFetch({
-      estimates: [
+      quotes: [
         { status: "draft", grand_total: "5000.00" },
         { status: "draft", grand_total: "3000.00" },
         { status: "sent", grand_total: "7000.00" },
@@ -230,7 +230,7 @@ describe("ProjectsConsole", () => {
     });
     render(<ProjectsConsole />);
 
-    // Estimates: drafts skipped → 2 total (sent + approved), 0 invoiced
+    // Quotes: drafts skipped → 2 total (sent + approved), 0 invoiced
     await waitFor(() => {
       expect(screen.getByText(/0 of 2 invoiced/)).toBeInTheDocument();
     });
@@ -371,7 +371,7 @@ describe("ProjectsConsole", () => {
     expect(screen.getAllByText(/Kitchen Remodel/).length).toBeGreaterThanOrEqual(2);
 
     // First matching project is auto-selected — pipeline links point to project 1
-    expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
+    expect(screen.getByRole("link", { name: /Quotes/ })).toHaveAttribute("href", "/projects/1/quotes");
   });
 
   // ---------------------------------------------------------------------------
@@ -386,7 +386,7 @@ describe("ProjectsConsole", () => {
       expect(screen.getByText("Kitchen Remodel")).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
+    expect(screen.getByRole("link", { name: /Quotes/ })).toHaveAttribute("href", "/projects/1/quotes");
     expect(screen.getByRole("link", { name: /Change Orders/ })).toHaveAttribute("href", "/projects/1/change-orders");
     expect(screen.getByRole("link", { name: /Invoices/ })).toHaveAttribute("href", "/projects/1/invoices");
     expect(screen.getByRole("link", { name: /Expenses/ })).toHaveAttribute("href", "/projects/1/bills");
@@ -550,14 +550,14 @@ describe("ProjectsConsole", () => {
 
     await waitFor(() => {
       // Project 1 auto-selected — pipeline links point to project 1
-      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
+      expect(screen.getByRole("link", { name: /Quotes/ })).toHaveAttribute("href", "/projects/1/quotes");
     });
 
     // Click on Deck Build card (role="button")
     fireEvent.click(screen.getByText(/Deck Build/));
 
     await waitFor(() => {
-      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/2/estimates");
+      expect(screen.getByRole("link", { name: /Quotes/ })).toHaveAttribute("href", "/projects/2/quotes");
     });
   });
 
@@ -671,7 +671,7 @@ describe("ProjectsConsole", () => {
 
     // After search + fallback reselection, Deck Build should be selected
     await waitFor(() => {
-      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/2/estimates");
+      expect(screen.getByRole("link", { name: /Quotes/ })).toHaveAttribute("href", "/projects/2/quotes");
     });
     expect(screen.queryAllByText(/Kitchen Remodel/)).toHaveLength(0);
   });
@@ -694,7 +694,7 @@ describe("ProjectsConsole", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/2/estimates");
+      expect(screen.getByRole("link", { name: /Quotes/ })).toHaveAttribute("href", "/projects/2/quotes");
     });
     expect(screen.queryAllByText(/Kitchen Remodel/)).toHaveLength(0);
   });
@@ -715,7 +715,7 @@ describe("ProjectsConsole", () => {
 
     // Wait for project 1 to be selected (pipeline link confirms selection)
     await waitFor(() => {
-      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
+      expect(screen.getByRole("link", { name: /Quotes/ })).toHaveAttribute("href", "/projects/1/quotes");
     });
 
     // Project from customer 20 should not appear
@@ -734,7 +734,7 @@ describe("ProjectsConsole", () => {
 
     // Project 2 pre-selected despite being "completed" (not in default filters)
     await waitFor(() => {
-      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/2/estimates");
+      expect(screen.getByRole("link", { name: /Quotes/ })).toHaveAttribute("href", "/projects/2/quotes");
     });
 
     // "Old Bathroom" visible because filter was expanded to include "completed"
@@ -757,7 +757,7 @@ describe("ProjectsConsole", () => {
 
     // Project 1 (active) auto-selected
     await waitFor(() => {
-      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/1/estimates");
+      expect(screen.getByRole("link", { name: /Quotes/ })).toHaveAttribute("href", "/projects/1/quotes");
     });
 
     // Toggle off "active" — project 1 becomes hidden
@@ -766,7 +766,7 @@ describe("ProjectsConsole", () => {
 
     // Should fall back to project 2 (first visible prospect)
     await waitFor(() => {
-      expect(screen.getByRole("link", { name: /Estimates/ })).toHaveAttribute("href", "/projects/2/estimates");
+      expect(screen.getByRole("link", { name: /Quotes/ })).toHaveAttribute("href", "/projects/2/quotes");
     });
   });
 

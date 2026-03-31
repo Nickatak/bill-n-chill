@@ -69,7 +69,7 @@ Renders prev/next buttons with "Page X of Y (Z total)" label. Hidden when total 
 - **Invoices console** — paginates the filtered/searched invoice list in the rail
 - **Change orders** — same pattern for the CO rail
 
-Additional consoles (vendor bills, estimates) can adopt the same hook when needed.
+Additional consoles (vendor bills, quotes) can adopt the same hook when needed.
 
 ## Tradeoffs
 

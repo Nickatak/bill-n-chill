@@ -16,7 +16,7 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
     """Post-baseline contract delta request for scope/time/cost changes.
 
     Business workflow:
-    - Represents change governance after baseline, not a full estimate restart.
+    - Represents change governance after baseline, not a full quote restart.
     - Routed through draft -> sent -> approved/rejected/void lifecycle.
     - Approved amount deltas propagate to project contract value.
 
@@ -78,8 +78,8 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
     sender_name = models.CharField(max_length=255, blank=True, default="")
     sender_address = models.TextField(blank=True, default="")
     sender_logo_url = models.URLField(blank=True, default="")
-    origin_estimate = models.ForeignKey(
-        "Estimate",
+    origin_quote = models.ForeignKey(
+        "Quote",
         on_delete=models.PROTECT,
         related_name="originated_change_orders",
         null=True,
@@ -132,8 +132,8 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
         return f"{self.public_slug}--{self.public_token}"
 
     def clean(self):
-        """Validate approval fields, origin estimate, and status transitions."""
-        from core.models.estimating.estimate import Estimate
+        """Validate approval fields, origin quote, and status transitions."""
+        from core.models.quoting.quote import Quote
 
         errors = {}
 
@@ -156,17 +156,17 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
                     "approved_at must be empty unless status is approved."
                 )
 
-        if self.origin_estimate_id is not None:
+        if self.origin_quote_id is not None:
             origin_project_id = (
-                Estimate.objects.filter(id=self.origin_estimate_id).values_list("project_id", flat=True).first()
+                Quote.objects.filter(id=self.origin_quote_id).values_list("project_id", flat=True).first()
             )
             if origin_project_id is None:
-                errors.setdefault("origin_estimate", []).append(
-                    "origin_estimate does not exist."
+                errors.setdefault("origin_quote", []).append(
+                    "origin_quote does not exist."
                 )
             elif self.project_id and origin_project_id != self.project_id:
-                errors.setdefault("origin_estimate", []).append(
-                    "origin_estimate must belong to the same project."
+                errors.setdefault("origin_quote", []).append(
+                    "origin_quote must belong to the same project."
                 )
 
         self.validate_status_transition(errors)
@@ -176,12 +176,12 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
 
     def build_snapshot(self) -> dict:
         """Point-in-time snapshot for immutable audit records."""
-        from core.models.estimating.estimate import Estimate
+        from core.models.quoting.quote import Quote
 
-        origin_estimate_version = None
-        if self.origin_estimate_id is not None:
-            origin_estimate_version = (
-                Estimate.objects.filter(id=self.origin_estimate_id)
+        origin_quote_version = None
+        if self.origin_quote_id is not None:
+            origin_quote_version = (
+                Quote.objects.filter(id=self.origin_quote_id)
                 .values_list("version", flat=True)
                 .first()
             )
@@ -222,8 +222,8 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
                 "sender_name": self.sender_name,
                 "sender_address": self.sender_address,
                 "sender_logo_url": self.sender_logo_url,
-                "origin_estimate_id": self.origin_estimate_id,
-                "origin_estimate_version": origin_estimate_version,
+                "origin_quote_id": self.origin_quote_id,
+                "origin_quote_version": origin_quote_version,
                 "approved_by_id": self.approved_by_id,
                 "approved_at": self.approved_at.isoformat() if self.approved_at else None,
             },

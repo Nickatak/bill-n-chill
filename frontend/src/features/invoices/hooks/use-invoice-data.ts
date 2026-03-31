@@ -15,7 +15,7 @@
  * - invoices                        — invoice list for the scoped project
  * - organizationInvoiceDefaults     — org-level invoice settings (due delta, terms)
  * - costCodes                       — active cost codes for line item selection
- * - contractBreakdown               — estimate + CO breakdown for the project
+ * - contractBreakdown               — quote + CO breakdown for the project
  * - selectedInvoiceStatusEvents     — status history for the selected invoice
  * - statusEventsLoading             — loading flag for status events fetch
  *
@@ -30,7 +30,7 @@
  *     callers can act on them (e.g. auto-select first invoice).
  *
  * - loadContractBreakdown(projectId)
- *     Fetches contract breakdown (estimate + COs) for a project.
+ *     Fetches contract breakdown (quote + COs) for a project.
  *
  * - loadInvoiceStatusEvents(invoiceId)
  *     Fetches status history events for an invoice.
@@ -69,9 +69,9 @@ export type SchedulePeriodLineItem = {
 };
 
 export type SchedulePeriodOption = {
-  estimateId: number;
-  estimateTitle: string;
-  estimateTotal: string;
+  quoteId: number;
+  quoteTitle: string;
+  quoteTotal: string;
   billingPeriodId: number;
   description: string;
   percent: string;
@@ -80,7 +80,7 @@ export type SchedulePeriodOption = {
   lineItems: SchedulePeriodLineItem[];
 };
 
-type ContractBreakdownEstimateLine = {
+type ContractBreakdownQuoteLine = {
   id: number;
   cost_code?: number | null;
   cost_code_code?: string;
@@ -92,15 +92,15 @@ type ContractBreakdownEstimateLine = {
   line_total: string;
 };
 
-type ContractBreakdownEstimate = {
+type ContractBreakdownQuote = {
   id: number;
   title: string;
   version: number;
   grand_total: string;
-  line_items: ContractBreakdownEstimateLine[];
+  line_items: ContractBreakdownQuoteLine[];
 };
 
-type EstimateWithSchedule = {
+type QuoteWithSchedule = {
   id: number;
   title: string;
   grand_total: string;
@@ -140,7 +140,7 @@ type ContractBreakdownCO = {
 };
 
 export type ContractBreakdown = {
-  active_estimate: ContractBreakdownEstimate | null;
+  active_quote: ContractBreakdownQuote | null;
   approved_change_orders: ContractBreakdownCO[];
 };
 
@@ -197,7 +197,7 @@ export function useInvoiceData({
     InvoiceStatusEventRecord[]
   >([]);
   const [statusEventsLoading, setStatusEventsLoading] = useState(false);
-  const [estimatesWithSchedule, setEstimatesWithSchedule] = useState<EstimateWithSchedule[]>([]);
+  const [quotesWithSchedule, setQuotesWithSchedule] = useState<QuoteWithSchedule[]>([]);
 
   // --- Functions ---
 
@@ -281,34 +281,34 @@ export function useInvoiceData({
     [authToken, scopedProjectId, status],
   );
 
-  /** Fetch approved estimates with billing periods for the scoped project. */
-  const loadEstimatesWithSchedule = useCallback(
+  /** Fetch approved quotes with billing periods for the scoped project. */
+  const loadQuotesWithSchedule = useCallback(
     async (projectId: number) => {
       if (!authToken || !projectId) {
-        setEstimatesWithSchedule([]);
+        setQuotesWithSchedule([]);
         return;
       }
       try {
-        const response = await fetch(`${apiBaseUrl}/projects/${projectId}/estimates/`, {
+        const response = await fetch(`${apiBaseUrl}/projects/${projectId}/quotes/`, {
           headers: buildAuthHeaders(authToken),
         });
         const payload = await response.json();
         if (!response.ok || !Array.isArray(payload.data)) {
-          setEstimatesWithSchedule([]);
+          setQuotesWithSchedule([]);
           return;
         }
-        const withSchedule = (payload.data as EstimateWithSchedule[]).filter(
+        const withSchedule = (payload.data as QuoteWithSchedule[]).filter(
           (e) => e.billing_periods && e.billing_periods.length > 0,
         );
-        setEstimatesWithSchedule(withSchedule);
+        setQuotesWithSchedule(withSchedule);
       } catch {
-        setEstimatesWithSchedule([]);
+        setQuotesWithSchedule([]);
       }
     },
     [authToken],
   );
 
-  /** Fetch contract breakdown (estimate + COs) for a project. */
+  /** Fetch contract breakdown (quote + COs) for a project. */
   const loadContractBreakdown = useCallback(
     async (projectId: number) => {
       if (!authToken || !projectId) {
@@ -381,9 +381,9 @@ export function useInvoiceData({
       onInitialLoad(rows);
     })();
     void loadContractBreakdown(scopedProjectId);
-    void loadEstimatesWithSchedule(scopedProjectId);
+    void loadQuotesWithSchedule(scopedProjectId);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- onInitialLoad is an untracked callback; adding it would re-fire on every render
-  }, [loadEstimatesWithSchedule, loadContractBreakdown, loadInvoices, scopedProjectId, authToken]);
+  }, [loadQuotesWithSchedule, loadContractBreakdown, loadInvoices, scopedProjectId, authToken]);
 
   // --- Derived: available schedule period options ---
 
@@ -397,7 +397,7 @@ export function useInvoiceData({
     }
 
     const options: SchedulePeriodOption[] = [];
-    for (const est of estimatesWithSchedule) {
+    for (const est of quotesWithSchedule) {
       const total = parseAmount(est.grand_total);
       for (const period of est.billing_periods ?? []) {
         if (invoicedPeriodIds.has(period.id)) continue;
@@ -415,9 +415,9 @@ export function useInvoiceData({
           };
         });
         options.push({
-          estimateId: est.id,
-          estimateTitle: est.title || `Estimate #${est.id}`,
-          estimateTotal: est.grand_total,
+          quoteId: est.id,
+          quoteTitle: est.title || `Quote #${est.id}`,
+          quoteTotal: est.grand_total,
           billingPeriodId: period.id,
           description: period.description,
           percent: period.percent,
@@ -428,7 +428,7 @@ export function useInvoiceData({
       }
     }
     return options;
-  }, [estimatesWithSchedule, invoices]);
+  }, [quotesWithSchedule, invoices]);
 
   // --- Return bag ---
 
@@ -455,7 +455,7 @@ export function useInvoiceData({
     loadDependencies,
     loadInvoices,
     loadContractBreakdown,
-    loadEstimatesWithSchedule,
+    loadQuotesWithSchedule,
     loadInvoiceStatusEvents,
   };
 }

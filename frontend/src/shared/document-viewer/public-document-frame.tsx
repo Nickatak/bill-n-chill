@@ -1,5 +1,5 @@
 /**
- * Structural frame for public-facing document pages (invoices, estimates, change orders).
+ * Structural frame for public-facing document pages (invoices, quotes, change orders).
  *
  * Provides the card layout shared by all public document types: a two-column
  * header (sender/recipient on the left, document identity on the right),
@@ -78,7 +78,7 @@ type PublicDocumentFrameProps = {
  * Build a complete `PublicDocumentViewerClassNames` map by merging the
  * frame's base CSS module classes with optional per-document overrides.
  *
- * This lets each document type (invoice, estimate, change order) layer
+ * This lets each document type (invoice, quote, change order) layer
  * additional styling without duplicating the base class structure.
  */
 export function publicDocumentViewerClassNames(

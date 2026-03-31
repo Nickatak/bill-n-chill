@@ -279,7 +279,7 @@ Public routes (login, register, public document previews) bypass the gate entire
 
 ```json
 {
-  "estimates": ["view", "create", "edit", "approve", "send"],
+  "quotes": ["view", "create", "edit", "approve", "send"],
   "invoices": ["view", "create", "edit"],
   "users": ["view", "invite"],
   ...
@@ -304,7 +304,7 @@ Keys are resource names, values are arrays of allowed actions. Stored as a JSONF
 Every write endpoint calls `_capability_gate` before performing mutations:
 
 ```python
-error, capabilities = _capability_gate(request.user, "estimates", "send")
+error, capabilities = _capability_gate(request.user, "quotes", "send")
 if error:
     return Response(error, status=403)
 ```
@@ -318,8 +318,8 @@ Read endpoints are generally ungated — all roles have `view` on all resources.
 UI gating uses the capabilities dict stored in the [session](#storage):
 
 ```typescript
-const canSend = canDo(capabilities, "estimates", "send");
-const canApprove = canDo(capabilities, "estimates", "approve");
+const canSend = canDo(capabilities, "quotes", "send");
+const canApprove = canDo(capabilities, "quotes", "approve");
 ```
 
 **Two gating strategies are used:**
@@ -337,7 +337,7 @@ Five system roles with preset capability matrices, seeded in migration [`0001_in
 
 | Resource | Owner | PM | Worker | Bookkeeping | Viewer |
 |---|---|---|---|---|---|
-| estimates | view, create, edit, approve, send | view, create, edit, approve, send | view, create, edit, send | view | view |
+| quotes | view, create, edit, approve, send | view, create, edit, approve, send | view, create, edit, send | view | view |
 | change_orders | view, create, edit, approve, send | view, create, edit, approve, send | view, create, edit, send | view | view |
 | invoices | view, create, edit, approve, send | view, create, edit, approve, send | view, create, edit, send | view, create, edit | view |
 | vendor_bills | view, create, edit, approve, pay | view, create, edit, approve, pay | view, create, edit | view, create, edit, approve, pay | view |
@@ -356,13 +356,13 @@ Five system roles with preset capability matrices, seeded in migration [`0001_in
 - **Owner:** Full access. Only role with `org_identity.edit`.
 - **PM:** Everything except `org_identity.edit`. Full user management.
 - **Worker:** Day-to-day document work (create/edit/send). No approve, no pay, no disable, no org settings edit, no user management.
-- **Bookkeeping:** Financial record-keeper. Full vendor_bills lifecycle (approve/pay). Can create/edit invoices but not send. Manages cost codes and vendors. Read-only on estimates, COs, projects, customers, org settings.
+- **Bookkeeping:** Financial record-keeper. Full vendor_bills lifecycle (approve/pay). Can create/edit invoices but not send. Manages cost codes and vendors. Read-only on quotes, COs, projects, customers, org settings.
 - **Viewer:** Read-only across all resources. No user management.
 
 ### Capability Surface
 
 ```
-estimates:        view, create, edit, approve, send
+quotes:        view, create, edit, approve, send
 change_orders:    view, create, edit, approve, send
 invoices:         view, create, edit, approve, send
 vendor_bills:     view, create, edit, approve, pay

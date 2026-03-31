@@ -10,7 +10,7 @@ SYSTEM_ROLES = {
         "name": "Owner",
         "description": "Full access to everything.",
         "capability_flags_json": {
-            "estimates": ["view", "create", "edit", "approve", "send"],
+            "quotes": ["view", "create", "edit", "approve", "send"],
             "change_orders": ["view", "create", "edit", "approve", "send"],
             "invoices": ["view", "create", "edit", "approve", "send"],
             "vendor_bills": ["view", "create", "edit", "approve", "pay"],
@@ -29,7 +29,7 @@ SYSTEM_ROLES = {
         "name": "Project Manager",
         "description": "Full access except org identity editing.",
         "capability_flags_json": {
-            "estimates": ["view", "create", "edit", "approve", "send"],
+            "quotes": ["view", "create", "edit", "approve", "send"],
             "change_orders": ["view", "create", "edit", "approve", "send"],
             "invoices": ["view", "create", "edit", "approve", "send"],
             "vendor_bills": ["view", "create", "edit", "approve", "pay"],
@@ -48,7 +48,7 @@ SYSTEM_ROLES = {
         "name": "Worker",
         "description": "Day-to-day document work. No approve, pay, disable, or user management.",
         "capability_flags_json": {
-            "estimates": ["view", "create", "edit", "send"],
+            "quotes": ["view", "create", "edit", "send"],
             "change_orders": ["view", "create", "edit", "send"],
             "invoices": ["view", "create", "edit", "send"],
             "vendor_bills": ["view", "create", "edit"],
@@ -67,7 +67,7 @@ SYSTEM_ROLES = {
         "name": "Bookkeeping",
         "description": "Financial record-keeper. Full vendor bills, invoices without send.",
         "capability_flags_json": {
-            "estimates": ["view"],
+            "quotes": ["view"],
             "change_orders": ["view"],
             "invoices": ["view", "create", "edit"],
             "vendor_bills": ["view", "create", "edit", "approve", "pay"],
@@ -86,7 +86,7 @@ SYSTEM_ROLES = {
         "name": "Viewer",
         "description": "Read-only access across all resources.",
         "capability_flags_json": {
-            "estimates": ["view"],
+            "quotes": ["view"],
             "change_orders": ["view"],
             "invoices": ["view"],
             "vendor_bills": ["view"],

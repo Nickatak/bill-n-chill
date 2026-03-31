@@ -35,12 +35,12 @@ type ChangeOrderPublicPreviewProps = {
   publicToken: string;
 };
 
-/** Build the public-facing estimate URL for a cross-reference link. */
-function publicEstimateHref(publicRef?: string): string {
+/** Build the public-facing quote URL for a cross-reference link. */
+function publicQuoteHref(publicRef?: string): string {
   if (!publicRef) {
     return "";
   }
-  return `/estimate/${publicRef}`;
+  return `/quote/${publicRef}`;
 }
 
 /** Renders the public change-order preview and customer decision form. */
@@ -225,19 +225,19 @@ export function ChangeOrderPublicPreview({ publicToken }: ChangeOrderPublicPrevi
                   </p>
                 </div>
                 <div className={frameStyles.identityMetaRow}>
-                  {changeOrder.origin_estimate_context ? (
+                  {changeOrder.origin_quote_context ? (
                     <>
-                      {changeOrder.origin_estimate_context.public_ref ? (
+                      {changeOrder.origin_quote_context.public_ref ? (
                         <a
                           className={`${frameStyles.metaLink} ${creatorStyles.screenOnly}`}
-                          href={publicEstimateHref(changeOrder.origin_estimate_context.public_ref)}
+                          href={publicQuoteHref(changeOrder.origin_quote_context.public_ref)}
                         >
-                          View Estimate
+                          View Quote
                         </a>
                       ) : null}
                       <span className={creatorStyles.printOnly}>
-                        Estimate: {changeOrder.origin_estimate_context.title || `#${changeOrder.origin_estimate_context.id}`}
-                        {changeOrder.origin_estimate_context.version ? ` v${changeOrder.origin_estimate_context.version}` : ""}
+                        Quote: {changeOrder.origin_quote_context.title || `#${changeOrder.origin_quote_context.id}`}
+                        {changeOrder.origin_quote_context.version ? ` v${changeOrder.origin_quote_context.version}` : ""}
                       </span>
                     </>
                   ) : null}

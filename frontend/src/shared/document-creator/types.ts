@@ -1,6 +1,6 @@
 import type { FormEvent, ReactNode } from "react";
 
-export type DocumentKind = "estimate" | "change_order" | "invoice";
+export type DocumentKind = "quote" | "change_order" | "invoice";
 
 export type CreatorStatusPolicy = {
   statuses: string[];

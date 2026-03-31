@@ -24,7 +24,7 @@ Next.js App  <----HTTP/JSON---->  Django/DRF API  <---->  Database
 ## Backend Domain Layout
 
 - `backend/core/models/shared_operations`: project/org/role/cost-code/vendor/accounting-sync/customer shared operational models
-- `backend/core/models/estimating`: estimate authoring + estimate lines
+- `backend/core/models/quoting`: quote authoring + quote lines
 - `backend/core/models/change_orders`: change-order workflow models
 - `backend/core/models/accounts_receivable`: invoice + invoice lines
 - `backend/core/models/accounts_payable`: vendor bill + allocations
@@ -34,7 +34,7 @@ Next.js App  <----HTTP/JSON---->  Django/DRF API  <---->  Database
 ## Backend View Layout
 
 - `backend/core/views/shared_operations`: auth-adjacent/project-wide operational endpoints (`accounting`, `intake`, `projects`, `cost_codes`, `vendors`)
-- `backend/core/views/estimating`: estimate + budget endpoints
+- `backend/core/views/quoting`: quote + budget endpoints
 - `backend/core/views/change_orders`: change-order endpoints
 - `backend/core/views/accounts_receivable`: invoice endpoints
 - `backend/core/views/accounts_payable`: vendor-bill endpoints

@@ -1,4 +1,4 @@
-# Decision Record: Direct Invoicing (Invoices Without Estimates)
+# Decision Record: Direct Invoicing (Invoices Without Quotes)
 
 Date: 2026-03-05
 Status: Accepted
@@ -8,7 +8,7 @@ Status: Accepted
 The current invoice workflow enforces a strict pipeline:
 
 ```
-Estimate -> Approval -> Invoice (against approved scope) -> Payment
+Quote -> Approval -> Invoice (against approved scope) -> Payment
 ```
 
 This pipeline provides excellent financial controls for GCs running structured projects
@@ -16,9 +16,9 @@ with detailed scope breakdowns. But it's a poor fit for:
 
 - **Solo operators** (drywallers, painters, electricians) who give verbal quotes and
   just need to send a bill
-- **Small service providers** doing T&M work where formal estimates aren't part of the
+- **Small service providers** doing T&M work where formal quotes aren't part of the
   workflow
-- **Quick jobs** where the overhead of estimate -> approve -> invoice exceeds the value
+- **Quick jobs** where the overhead of quote -> approve -> invoice exceeds the value
   of the financial controls
 
 Our ICP is 1-10 person GCs. The 1-person end of that spectrum — especially
@@ -29,24 +29,24 @@ non-full-remodeler service providers — needs a direct path from project to inv
 The model layer is already flexible. Invoice lines don't require rigid upstream linkage.
 
 This matches the existing decision record (DECISION_RECORD_INVOICE_LINEAGE_AND_ADJUSTMENTS):
-*"Do not require invoice lines to reference EstimateLineItem."*
+*"Do not require invoice lines to reference QuoteLineItem."*
 
 But the helper layer adds enforcement the model doesn't require:
 
 1. **`_apply_invoice_lines_and_totals()`** — Previously rejected SCOPE lines without
-   upstream linkage. Without an approved estimate, the only way to create an invoice was
+   upstream linkage. Without an approved quote, the only way to create an invoice was
    with ADJUSTMENT lines, which semantically mean discounts/fees/credits — not "work performed."
 
 2. **`_enforce_invoice_scope_guard()`** *(not yet implemented)* — Compares invoice total
-   against `project.contract_value_current`. Without an approved estimate this value is
+   against `project.contract_value_current`. Without an approved quote this value is
    0.00, so *any* invoice for *any* amount is blocked from being sent.
 
 3. **Frontend invoice console** — The line editor requires cost code selection for SCOPE
-   lines. Without an approved estimate, the invoice workflow was effectively blocked.
+   lines. Without an approved quote, the invoice workflow was effectively blocked.
 
 ## Decision
 
-Allow creating and sending invoices on projects that have no approved estimate.
+Allow creating and sending invoices on projects that have no approved quote.
 
 ### New Line Type: `DIRECT`
 
@@ -63,26 +63,26 @@ required. They represent "I did this work and I'm billing for it" without the fi
 control chain.
 
 **Why a new type instead of relaxing SCOPE:** SCOPE lines carry a semantic guarantee —
-they can be traced back through the approved estimate scope. Relaxing that guarantee
+they can be traced back through the approved quote scope. Relaxing that guarantee
 would degrade the traceability of all scope lines. A distinct type keeps the contract
 clean: if `line_type == "scope"`, the scope linkage is trustworthy.
 
 **Why this matters legally:** In a billing dispute between the user and their client,
 the line type is the first thing legal counsel will look at. `scope` means "there is an
-approved estimate behind this charge." `direct` means "there is not." These
+approved quote behind this charge." `direct` means "there is not." These
 are two fundamentally different evidentiary positions. Collapsing them into one type
 would make it impossible to distinguish the two cases after the fact.
 
 ### Scope Guard Behavior
 
-When sending an invoice on a project with **no approved estimate**:
+When sending an invoice on a project with **no approved quote**:
 
 - The scope guard is bypassed entirely. There is no approved scope ceiling to enforce
   against.
 - The user is operating without financial controls and accepts that tradeoff.
 - The invoice, its status events, and payment allocations still work normally.
 
-When sending an invoice on a project **with** an approved estimate:
+When sending an invoice on a project **with** an approved quote:
 
 - Existing scope guard behavior is unchanged.
 - DIRECT lines still count toward the invoice total (and thus the scope guard ceiling).
@@ -91,11 +91,11 @@ When sending an invoice on a project **with** an approved estimate:
 
 ### Financial Summary Behavior
 
-Projects without approved estimates still produce valid financial summaries:
+Projects without approved quotes still produce valid financial summaries:
 
-- `accepted_contract_total`: already returns 0 when no approved estimate exists
+- `accepted_contract_total`: already returns 0 when no approved quote exists
 - AR fields (`invoiced_to_date`, `paid_to_date`, `ar_outstanding`): work regardless of
-  estimate existence — they read from invoices and payments directly
+  quote existence — they read from invoices and payments directly
 
 ## What Changes
 
@@ -106,24 +106,24 @@ Projects without approved estimates still produce valid financial summaries:
    DIRECT lines require only description + amount (same as today's ADJUSTMENT minus the
    `adjustment_reason` requirement).
 3. **`_enforce_invoice_scope_guard()`** *(not yet implemented)* — Skip when no approved
-   estimate exists on the project.
+   quote exists on the project.
 4. **Invoice serializer** — No changes needed. `line_type` is already a string field.
 
 ### Frontend
 
-5. **Invoice console line editor** — When no approved estimate exists on the selected
+5. **Invoice console line editor** — When no approved quote exists on the selected
    project, the line type defaults to `direct`. The editor shows description + quantity +
    unit + unit_price.
-6. **When an approved estimate exists** — The line type dropdown gains a third option
+6. **When an approved quote exists** — The line type dropdown gains a third option
    (`Direct`). Selecting it allows free-form billing without cost code linkage.
 
-### Estimates
+### Quotes
 
-This decision does **not** change estimates. Estimates remain structured documents with
+This decision does **not** change quotes. Quotes remain structured documents with
 cost code line items. The relaxation is specifically: a project doesn't need an approved
-estimate to be invoiceable.
+quote to be invoiceable.
 
-A separate future consideration: whether estimates themselves should support a "simple
+A separate future consideration: whether quotes themselves should support a "simple
 mode" without cost codes for small operators. That's a different question with different
 tradeoffs and is not in scope here.
 
@@ -151,19 +151,19 @@ clear.
 **Scope-backed invoice (full pipeline):**
 
 ```
-1. Estimate #EST-0001 created by {user} on {date}
+1. Quote #EST-0001 created by {user} on {date}
    └─ Line items with cost codes, quantities, unit prices
-2. Estimate sent to customer on {date}
-3. Customer approved estimate on {date} (public decision, IP + timestamp recorded)
+2. Quote sent to customer on {date}
+3. Customer approved quote on {date} (public decision, IP + timestamp recorded)
 4. Invoice #INV-0001 created by {user} on {date}
-   └─ Each SCOPE line references cost code from approved estimate scope
+   └─ Each SCOPE line references cost code from approved quote scope
    └─ Scope guard passed: invoice total ${X} within approved ceiling ${Y}
 5. Invoice sent to customer on {date}
 6. Payment received on {date}, allocated to invoice
 ```
 
 Every link in this chain is immutable and timestamped. Legal counsel can trace any
-charge back to the customer-approved estimate scope.
+charge back to the customer-approved quote scope.
 
 **Direct invoice (no pipeline):**
 
@@ -177,7 +177,7 @@ charge back to the customer-approved estimate scope.
 
 The audit trail is shorter because there is less to trace. This is not a deficiency —
 it is an accurate representation of what happened. The user billed without a formal
-estimate, and the system records exactly that.
+quote, and the system records exactly that.
 
 ### What the `line_type` Field Guarantees
 
@@ -186,7 +186,7 @@ evidentiary basis for that charge:
 
 | `line_type` | Evidentiary basis | What counsel can request |
 |-------------|-------------------|------------------------|
-| `scope` | Cost code from customer-approved estimate scope | Full chain: estimate, approval decision, cost code |
+| `scope` | Cost code from customer-approved quote scope | Full chain: quote, approval decision, cost code |
 | `direct` | User's description of work performed | Invoice only: creation timestamp, creator, status history, payment records |
 | `adjustment` | Explicit fee/credit/discount with stated reason | Invoice + adjustment_reason field |
 
@@ -207,16 +207,16 @@ creation:
 
 ### What Direct Invoicing Explicitly Lacks
 
-When a user creates direct invoices without estimates, the following are absent from the
+When a user creates direct invoices without quotes, the following are absent from the
 audit trail — not because the system failed to capture them, but because they never
 existed:
 
-- No estimate document (no scope breakdown agreed upon in writing)
+- No quote document (no scope breakdown agreed upon in writing)
 - No customer approval decision (no public decision record with IP/timestamp)
 - No contract value ceiling protection
 
 **This is the user's choice, and the system makes it visible.** If counsel asks "was
-there an approved estimate behind this invoice?", the answer is unambiguously "no" —
+there an approved quote behind this invoice?", the answer is unambiguously "no" —
 the DIRECT line type says so in the data. The system does not attempt to obscure or
 soften this distinction.
 
@@ -225,9 +225,9 @@ soften this distinction.
 | Scenario | Behavior |
 |----------|----------|
 | Mix SCOPE + DIRECT lines on budgeted project | Allowed. Scope guard applies to full invoice total. |
-| Approve estimate on previously unscoped project | Existing DIRECT-line invoices remain valid. New invoices can use SCOPE lines. |
+| Approve quote on previously unscoped project | Existing DIRECT-line invoices remain valid. New invoices can use SCOPE lines. |
 | DIRECT line with cost_code | Allowed but optional. Provides categorization without requiring scope linkage. |
-| "Bill All" button with no approved estimate | Creates one empty DIRECT line (or is hidden — TBD in frontend pass). |
+| "Bill All" button with no approved quote | Creates one empty DIRECT line (or is hidden — TBD in frontend pass). |
 
 ## Implementation Constraint: Line Type Immutability
 
@@ -237,7 +237,7 @@ the helper layer: `_apply_invoice_lines_and_totals()` replaces all lines on ever
 and the API does not accept type changes on existing lines.
 
 If a user wants to change a DIRECT line to a SCOPE line (e.g., they later created an
-estimate and want to link up), they delete the line and add a new SCOPE line. This
+quote and want to link up), they delete the line and add a new SCOPE line. This
 preserves the audit trail — the original DIRECT line existed and was removed, the new
 SCOPE line was added.
 
@@ -249,7 +249,7 @@ model in the financial auditing layer, not by constraining line edits on draft i
 
 This is consistent with DECISION_RECORD_INVOICE_LINEAGE_AND_ADJUSTMENTS, which states:
 
-> *"Do not require invoice lines to reference EstimateLineItem."*
+> *"Do not require invoice lines to reference QuoteLineItem."*
 
 The model was designed for this flexibility. This decision catches the enforcement layer
 up to the stated architectural intent.

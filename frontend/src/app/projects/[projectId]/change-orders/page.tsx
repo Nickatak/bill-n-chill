@@ -6,7 +6,7 @@ import { isNumericRouteId, resolveProjectParamTitle } from "@/shared/shell/route
 
 type ProjectChangeOrdersPageProps = {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ origin_estimate?: string }>;
+  searchParams: Promise<{ origin_quote?: string }>;
 };
 
 export async function generateMetadata({ params }: ProjectChangeOrdersPageProps): Promise<Metadata> {
@@ -19,19 +19,19 @@ export default async function ProjectChangeOrdersPage({
   searchParams,
 }: ProjectChangeOrdersPageProps) {
   const { projectId } = await params;
-  const { origin_estimate: originEstimate } = await searchParams;
+  const { origin_quote: originQuote } = await searchParams;
   if (!isNumericRouteId(projectId)) {
     redirect("/projects");
   }
-  const initialOriginEstimateId =
-    isNumericRouteId(originEstimate) ? Number(originEstimate) : null;
+  const initialOriginQuoteId =
+    isNumericRouteId(originQuote) ? Number(originQuote) : null;
 
   return (
     <PageShell>
       <PageCard>
         <ChangeOrdersConsole
           scopedProjectId={Number(projectId)}
-          initialOriginEstimateId={initialOriginEstimateId}
+          initialOriginQuoteId={initialOriginQuoteId}
         />
       </PageCard>
     </PageShell>

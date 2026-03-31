@@ -28,7 +28,7 @@ def get_change_order_policy_contract() -> dict:
     editing_rules = {
         "edit_requires_draft_status": True,
     }
-    origin_estimate_rules = {
+    origin_quote_rules = {
         "required_on_create": True,
         "must_be_approved": True,
         "must_match_change_order_project": True,
@@ -40,10 +40,10 @@ def get_change_order_policy_contract() -> dict:
     }
     error_rules = {
         "co_create_missing_required_fields": "Create requires title and amount_delta.",
-        "co_create_origin_estimate_required": "Create requires origin_estimate.",
-        "co_origin_estimate_project_scope": "origin_estimate must belong to the same project.",
-        "co_origin_estimate_approved_required": "origin_estimate must be approved.",
-        "co_origin_estimate_immutable_once_set": "origin_estimate cannot change/clear once set.",
+        "co_create_origin_quote_required": "Create requires origin_quote.",
+        "co_origin_quote_project_scope": "origin_quote must belong to the same project.",
+        "co_origin_quote_approved_required": "origin_quote must be approved.",
+        "co_origin_quote_immutable_once_set": "origin_quote cannot change/clear once set.",
         "co_line_total_must_match_amount_delta": "Sum of line_items amount_delta must match change-order amount_delta.",
         "co_line_cost_code_invalid": "Each cost_code must exist and belong to the organization.",
         "co_edit_requires_draft_status": "Only draft change orders can edit content fields.",
@@ -59,7 +59,7 @@ def get_change_order_policy_contract() -> dict:
         "allowed_status_transitions": allowed_status_transitions,
         "terminal_statuses": terminal_statuses,
         "editing_rules": editing_rules,
-        "origin_estimate_rules": origin_estimate_rules,
+        "origin_quote_rules": origin_quote_rules,
         "approval_metadata_rules": approval_metadata_rules,
         "error_rules": error_rules,
     }

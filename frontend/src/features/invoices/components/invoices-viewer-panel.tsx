@@ -354,7 +354,7 @@ function InvoiceActionPanel({
 // Contract breakdown types (local — mirrors parent's inline types)
 // ---------------------------------------------------------------------------
 
-type ContractBreakdownEstimateLine = {
+type ContractBreakdownQuoteLine = {
   id: number;
   cost_code?: number | null;
   cost_code_code?: string;
@@ -366,12 +366,12 @@ type ContractBreakdownEstimateLine = {
   line_total: string;
 };
 
-type ContractBreakdownEstimate = {
+type ContractBreakdownQuote = {
   id: number;
   title: string;
   version: number;
   grand_total: string;
-  line_items: ContractBreakdownEstimateLine[];
+  line_items: ContractBreakdownQuoteLine[];
 };
 
 type ContractBreakdownCO = {
@@ -391,7 +391,7 @@ type ContractBreakdownCO = {
 };
 
 type ContractBreakdown = {
-  active_estimate: ContractBreakdownEstimate | null;
+  active_quote: ContractBreakdownQuote | null;
   approved_change_orders: ContractBreakdownCO[];
 };
 
@@ -518,16 +518,16 @@ export function InvoicesViewerPanel({
   }
 
   function renderContractBreakdown() {
-    if (!contractBreakdown?.active_estimate) return null;
-    const estimate = contractBreakdown.active_estimate;
+    if (!contractBreakdown?.active_quote) return null;
+    const quote = contractBreakdown.active_quote;
     const approvedCOs = contractBreakdown.approved_change_orders;
-    const hasEstimateLines = estimate.line_items.length > 0;
+    const hasQuoteLines = quote.line_items.length > 0;
     const hasApprovedCOs = approvedCOs.length > 0;
-    if (!hasEstimateLines && !hasApprovedCOs) return null;
+    if (!hasQuoteLines && !hasApprovedCOs) return null;
     const canDuplicate = !workspaceIsLocked;
 
-    const estimateColumns = ["Cost code", "Description", "Qty", "Unit", "Unit cost", "Markup %", "Line total"];
-    const estimateMobileLayout: { order: number; span: "full" | "half"; align?: "left" | "right"; hidden?: boolean }[] = [
+    const quoteColumns = ["Cost code", "Description", "Qty", "Unit", "Unit cost", "Markup %", "Line total"];
+    const quoteMobileLayout: { order: number; span: "full" | "half"; align?: "left" | "right"; hidden?: boolean }[] = [
       { order: 0, span: "full" },
       { order: 1, span: "full" },
       { order: 2, span: "half", hidden: true },
@@ -546,9 +546,9 @@ export function InvoicesViewerPanel({
     ];
 
     if (canDuplicate) {
-      estimateColumns.push("");
-      estimateMobileLayout[6] = { order: 7, span: "half", align: "right" };
-      estimateMobileLayout.push({ order: 6, span: "half" });
+      quoteColumns.push("");
+      quoteMobileLayout[6] = { order: 7, span: "half", align: "right" };
+      quoteMobileLayout.push({ order: 6, span: "half" });
       coColumns.push("");
       coMobileLayout[4] = { order: 5, span: "half", align: "right" };
       coMobileLayout.push({ order: 4, span: "half" });
@@ -566,11 +566,11 @@ export function InvoicesViewerPanel({
           <span className={styles.contractBreakdownArrow}>▼</span>
         </button>
 
-        {isContractBreakdownOpen && hasEstimateLines ? (
+        {isContractBreakdownOpen && hasQuoteLines ? (
           <ReadOnlyLineTable
-            caption={`Approved Estimate: ${estimate.title} v${estimate.version}`}
-            columns={estimateColumns}
-            rows={estimate.line_items.map((line) => {
+            caption={`Approved Quote: ${quote.title} v${quote.version}`}
+            columns={quoteColumns}
+            rows={quote.line_items.map((line) => {
               const qty = parseAmount(line.quantity);
               const markedUpUnitPrice = qty !== 0
                 ? formatDecimal(parseAmount(line.line_total) / qty)
@@ -605,11 +605,11 @@ export function InvoicesViewerPanel({
               }
               return { key: line.id, cells };
             })}
-            mobileColumnLayout={estimateMobileLayout}
+            mobileColumnLayout={quoteMobileLayout}
             afterTable={
               <div className={styles.invoiceViewerMetaRow}>
-                <span className={styles.invoiceViewerMetaLabel}>Estimate grand total</span>
-                <strong>${estimate.grand_total}</strong>
+                <span className={styles.invoiceViewerMetaLabel}>Quote grand total</span>
+                <strong>${quote.grand_total}</strong>
               </div>
             }
           />
@@ -649,7 +649,7 @@ export function InvoicesViewerPanel({
                 <span className={styles.invoiceViewerMetaLabel}>Net contract total</span>
                 <strong>
                   ${formatDecimal(
-                    parseAmount(estimate.grand_total) +
+                    parseAmount(quote.grand_total) +
                       approvedCOs.reduce((sum, co) => sum + parseAmount(co.amount_delta), 0),
                   )}
                 </strong>

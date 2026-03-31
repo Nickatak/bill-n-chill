@@ -6,8 +6,8 @@ import { isPublicAuthRoute, isPublicDocumentRoute } from "../public-routes";
 // ---------------------------------------------------------------------------
 
 describe("isPublicDocumentRoute", () => {
-  it("matches /estimate/:ref", () => {
-    expect(isPublicDocumentRoute("/estimate/slug--aBcDeFgH")).toBe(true);
+  it("matches /quote/:ref", () => {
+    expect(isPublicDocumentRoute("/quote/slug--aBcDeFgH")).toBe(true);
   });
 
   it("matches /invoice/:ref", () => {
@@ -19,15 +19,15 @@ describe("isPublicDocumentRoute", () => {
   });
 
   it("matches with trailing slash", () => {
-    expect(isPublicDocumentRoute("/estimate/slug--aBcDeFgH/")).toBe(true);
+    expect(isPublicDocumentRoute("/quote/slug--aBcDeFgH/")).toBe(true);
   });
 
   it("rejects nested paths beyond the ref segment", () => {
-    expect(isPublicDocumentRoute("/estimate/slug--aBcDeFgH/extra")).toBe(false);
+    expect(isPublicDocumentRoute("/quote/slug--aBcDeFgH/extra")).toBe(false);
   });
 
-  it("rejects bare /estimate with no ref", () => {
-    expect(isPublicDocumentRoute("/estimate")).toBe(false);
+  it("rejects bare /quote with no ref", () => {
+    expect(isPublicDocumentRoute("/quote")).toBe(false);
   });
 
   it("rejects unrelated paths", () => {
@@ -73,7 +73,7 @@ describe("isPublicAuthRoute", () => {
   });
 
   it("returns true for public document routes", () => {
-    expect(isPublicAuthRoute("/estimate/slug--aBcDeFgH")).toBe(true);
+    expect(isPublicAuthRoute("/quote/slug--aBcDeFgH")).toBe(true);
   });
 
   it("returns false for authenticated routes", () => {

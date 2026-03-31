@@ -40,7 +40,7 @@ describe("loadClientSession", () => {
       email: "nick@test.com",
       role: "owner",
       organization: { id: 1, displayName: "Acme", onboardingCompleted: true },
-      capabilities: { estimates: ["view", "create"] },
+      capabilities: { quotes: ["view", "create"] },
     };
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
     expect(loadClientSession()).toEqual(session);
@@ -68,7 +68,7 @@ describe("loadClientSession", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
     localStorage.setItem(
       SESSION_STORAGE_KEY,
-      JSON.stringify({ token: "abc", capabilities: { estimates: [1, 2] } }),
+      JSON.stringify({ token: "abc", capabilities: { quotes: [1, 2] } }),
     );
     expect(loadClientSession()?.capabilities).toBeUndefined();
     spy.mockRestore();

@@ -13,7 +13,7 @@ Last updated: 2026-02-28
 - Practical outcome: auditability without freezing normal operations.
 
 ## 3) Public Approval Without Customer Accounts
-- Tokenized public routes for estimates/change orders/invoices.
+- Tokenized public routes for quotes/change orders/invoices.
 - Decisions are state-gated and recorded with decision metadata.
 - Tradeoff intentionally accepted: fast customer response now; stronger signer assurance (e-sign + PSK/TTL/revocation) deferred post-MVP.
 

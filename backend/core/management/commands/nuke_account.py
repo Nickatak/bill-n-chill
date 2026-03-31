@@ -48,7 +48,7 @@ class Command(BaseCommand):
 
         # Subquery fragments for scoping.
         project_ids_sub = f"(SELECT id FROM core_project WHERE organization_id = {org_id})"
-        estimate_ids_sub = f"(SELECT id FROM core_estimate WHERE project_id IN {project_ids_sub})"
+        quote_ids_sub = f"(SELECT id FROM core_quote WHERE project_id IN {project_ids_sub})"
         invoice_ids_sub = f"(SELECT id FROM core_invoice WHERE project_id IN {project_ids_sub})"
         vendor_bill_ids_sub = f"(SELECT id FROM core_vendorbill WHERE project_id IN {project_ids_sub})"
         payment_ids_sub = f"(SELECT id FROM core_payment WHERE project_id IN {project_ids_sub})"
@@ -63,7 +63,7 @@ class Command(BaseCommand):
                 f"""DELETE FROM core_signingceremonyrecord
                     WHERE access_session_id IN (
                         SELECT id FROM core_documentaccesssession
-                        WHERE (document_type = 'estimate' AND document_id IN {estimate_ids_sub})
+                        WHERE (document_type = 'quote' AND document_id IN {quote_ids_sub})
                            OR (document_type = 'change_order' AND document_id IN {change_order_ids_sub})
                            OR (document_type = 'invoice' AND document_id IN {invoice_ids_sub})
                     )""",
@@ -71,7 +71,7 @@ class Command(BaseCommand):
             (
                 "document access sessions",
                 f"""DELETE FROM core_documentaccesssession
-                    WHERE (document_type = 'estimate' AND document_id IN {estimate_ids_sub})
+                    WHERE (document_type = 'quote' AND document_id IN {quote_ids_sub})
                        OR (document_type = 'change_order' AND document_id IN {change_order_ids_sub})
                        OR (document_type = 'invoice' AND document_id IN {invoice_ids_sub})""",
             ),
@@ -81,7 +81,7 @@ class Command(BaseCommand):
             ("payment records", f"DELETE FROM core_paymentrecord WHERE payment_id IN {payment_ids_sub}"),
             ("vendor bill snapshots", f"DELETE FROM core_vendorbillsnapshot WHERE vendor_bill_id IN {vendor_bill_ids_sub}"),
             ("change order snapshots", f"DELETE FROM core_changeordersnapshot WHERE change_order_id IN {change_order_ids_sub}"),
-            ("estimate status events", f"DELETE FROM core_estimatestatusevent WHERE estimate_id IN {estimate_ids_sub}"),
+            ("quote status events", f"DELETE FROM core_quotestatusevent WHERE quote_id IN {quote_ids_sub}"),
             ("invoice status events", f"DELETE FROM core_invoicestatusevent WHERE invoice_id IN {invoice_ids_sub}"),
             ("customer records", f"DELETE FROM core_customerrecord WHERE customer_id IN (SELECT id FROM core_customer WHERE organization_id = {org_id})"),
             ("organization records", f"DELETE FROM core_organizationrecord WHERE organization_id = {org_id}"),
@@ -92,14 +92,14 @@ class Command(BaseCommand):
             ("payment allocations", f"DELETE FROM core_paymentallocation WHERE payment_id IN {payment_ids_sub}"),
             ("invoice lines", f"DELETE FROM core_invoiceline WHERE invoice_id IN {invoice_ids_sub}"),
             ("change order lines", f"DELETE FROM core_changeorderline WHERE change_order_id IN {change_order_ids_sub}"),
-            ("estimate line items", f"DELETE FROM core_estimatelineitem WHERE estimate_id IN {estimate_ids_sub}"),
+            ("quote line items", f"DELETE FROM core_quotelineitem WHERE quote_id IN {quote_ids_sub}"),
             # --- Entity-level (project-scoped) ---
             ("accounting sync events", f"DELETE FROM core_accountingsyncevent WHERE project_id IN {project_ids_sub}"),
             ("change orders", f"DELETE FROM core_changeorder WHERE project_id IN {project_ids_sub}"),
             ("invoices", f"DELETE FROM core_invoice WHERE project_id IN {project_ids_sub}"),
             ("payments", f"DELETE FROM core_payment WHERE project_id IN {project_ids_sub}"),
             ("vendor bills", f"DELETE FROM core_vendorbill WHERE project_id IN {project_ids_sub}"),
-            ("estimates", f"DELETE FROM core_estimate WHERE project_id IN {project_ids_sub}"),
+            ("quotes", f"DELETE FROM core_quote WHERE project_id IN {project_ids_sub}"),
             # --- Org-level entities ---
             ("projects", f"DELETE FROM core_project WHERE organization_id = {org_id}"),
             ("customers", f"DELETE FROM core_customer WHERE organization_id = {org_id}"),

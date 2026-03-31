@@ -11,7 +11,7 @@ import type {
   AuditEventRecord,
   ChangeOrderLineInput,
   ChangeOrderRecord,
-  OriginEstimateRecord,
+  OriginQuoteRecord,
 } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -216,29 +216,29 @@ export function statusEventActionLabel(
 }
 
 // ---------------------------------------------------------------------------
-// Estimate / CO financial helpers
+// Quote / CO financial helpers
 // ---------------------------------------------------------------------------
 
-/** Build a human-readable approval summary string for an origin estimate (e.g. "approved on Mar 15, 2026 by user@example.com"). */
-export function approvalMeta(estimate: OriginEstimateRecord): string {
-  const dateLabel = formatApprovedDate(estimate.approved_at);
-  if (estimate.approved_by_email) {
-    return `approved on ${dateLabel} by ${estimate.approved_by_email}`;
+/** Build a human-readable approval summary string for an origin quote (e.g. "approved on Mar 15, 2026 by user@example.com"). */
+export function approvalMeta(quote: OriginQuoteRecord): string {
+  const dateLabel = formatApprovedDate(quote.approved_at);
+  if (quote.approved_by_email) {
+    return `approved on ${dateLabel} by ${quote.approved_by_email}`;
   }
   return `approved on ${dateLabel}`;
 }
 
 /**
- * Sum approved change order deltas for a given origin estimate.
+ * Sum approved change order deltas for a given origin quote.
  * Returns a formatted decimal string (e.g. "1500.00").
  */
-export function approvedRollingDeltaForEstimate(
-  estimateId: number,
+export function approvedRollingDeltaForQuote(
+  quoteId: number,
   changeOrders: ChangeOrderRecord[],
 ): string {
   const total = changeOrders.reduce((sum, changeOrder) => {
     if (
-      changeOrder.origin_estimate !== estimateId ||
+      changeOrder.origin_quote !== quoteId ||
       changeOrder.status !== "approved"
     ) {
       return sum;
@@ -248,23 +248,23 @@ export function approvedRollingDeltaForEstimate(
   return formatDecimal(total);
 }
 
-/** Look up the original budget total for a given estimate from the precomputed totals map. */
-export function originalBudgetTotalForEstimate(
-  estimateId: number,
-  originEstimateOriginalTotals: Record<number, number>,
+/** Look up the original budget total for a given quote from the precomputed totals map. */
+export function originalBudgetTotalForQuote(
+  quoteId: number,
+  originQuoteOriginalTotals: Record<number, number>,
 ): string {
-  return formatDecimal(originEstimateOriginalTotals[estimateId] ?? 0);
+  return formatDecimal(originQuoteOriginalTotals[quoteId] ?? 0);
 }
 
-/** Compute the current approved budget total (original estimate + approved CO deltas) for a given estimate. */
-export function currentApprovedBudgetTotalForEstimate(
-  estimateId: number,
+/** Compute the current approved budget total (original quote + approved CO deltas) for a given quote. */
+export function currentApprovedBudgetTotalForQuote(
+  quoteId: number,
   changeOrders: ChangeOrderRecord[],
-  originEstimateOriginalTotals: Record<number, number>,
+  originQuoteOriginalTotals: Record<number, number>,
 ): string {
   return formatDecimal(
-    parseAmount(originalBudgetTotalForEstimate(estimateId, originEstimateOriginalTotals)) +
-    parseAmount(approvedRollingDeltaForEstimate(estimateId, changeOrders)),
+    parseAmount(originalBudgetTotalForQuote(quoteId, originQuoteOriginalTotals)) +
+    parseAmount(approvedRollingDeltaForQuote(quoteId, changeOrders)),
   );
 }
 

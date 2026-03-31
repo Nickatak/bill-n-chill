@@ -449,23 +449,23 @@ class ProjectTimelineEventsTests(ReportingTestBase):
         self.assertEqual(data["item_count"], 0)
         self.assertEqual(data["project_name"], "Alpha Project")
 
-    def test_returns_estimate_status_events(self):
-        estimate = Estimate.objects.create(
+    def test_returns_quote_status_events(self):
+        quote = Quote.objects.create(
             project=self.project,
-            title="Foundation Estimate",
+            title="Foundation Quote",
             version=1,
-            status=Estimate.Status.DRAFT,
+            status=Quote.Status.DRAFT,
             created_by=self.user,
         )
-        EstimateStatusEvent.record(
-            estimate=estimate,
+        QuoteStatusEvent.record(
+            quote=quote,
             from_status="",
             to_status="draft",
             note="Created",
             changed_by=self.user,
         )
-        EstimateStatusEvent.record(
-            estimate=estimate,
+        QuoteStatusEvent.record(
+            quote=quote,
             from_status="draft",
             to_status="sent",
             note="Sent to customer",
@@ -479,15 +479,15 @@ class ProjectTimelineEventsTests(ReportingTestBase):
         self.assertEqual(data["items"][0]["category"], "workflow")
 
     def test_workflow_category_filter(self):
-        estimate = Estimate.objects.create(
+        quote = Quote.objects.create(
             project=self.project,
-            title="Filtered Estimate",
+            title="Filtered Quote",
             version=1,
-            status=Estimate.Status.DRAFT,
+            status=Quote.Status.DRAFT,
             created_by=self.user,
         )
-        EstimateStatusEvent.record(
-            estimate=estimate,
+        QuoteStatusEvent.record(
+            quote=quote,
             from_status="",
             to_status="draft",
             note="",
@@ -502,15 +502,15 @@ class ProjectTimelineEventsTests(ReportingTestBase):
         self.assertEqual(data["item_count"], 1)
 
     def test_financial_category_filter_excludes_workflow_events(self):
-        estimate = Estimate.objects.create(
+        quote = Quote.objects.create(
             project=self.project,
-            title="Another Estimate",
+            title="Another Quote",
             version=1,
-            status=Estimate.Status.DRAFT,
+            status=Quote.Status.DRAFT,
             created_by=self.user,
         )
-        EstimateStatusEvent.record(
-            estimate=estimate,
+        QuoteStatusEvent.record(
+            quote=quote,
             from_status="",
             to_status="draft",
             note="",

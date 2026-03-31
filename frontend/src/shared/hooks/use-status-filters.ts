@@ -1,7 +1,7 @@
 /**
  * Shared hook for status filter state management.
  *
- * Extracts the common pattern used by estimates, invoices, and vendor bills:
+ * Extracts the common pattern used by quotes, invoices, and vendor bills:
  * a set of active status filters that can be toggled, reset, or shown-all,
  * plus derived status counts from a list of items.
  */
@@ -19,7 +19,7 @@ export type UseStatusFiltersConfig = {
   defaultFilters: string[];
   /**
    * When true, toggling a filter on preserves the ordering from `allStatuses`
-   * rather than appending to the end. Estimates uses this; others don't.
+   * rather than appending to the end. Quotes uses this; others don't.
    */
   preserveOrder?: boolean;
 };

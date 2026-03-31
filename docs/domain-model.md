@@ -12,7 +12,7 @@ Last reviewed: 2026-03-04
 - [Domain Glossary (Canonical)](#domain-glossary-canonical)
 - [Entity Catalog](#entity-catalog)
   - [Shared Operations and Core Anchors](#shared-operations-and-core-anchors)
-  - [Estimating and Scope](#estimating-and-scope)
+  - [Quoting and Scope](#quoting-and-scope)
   - [Audit and Snapshot Infrastructure](#audit-and-snapshot-infrastructure)
   - [Commercial and Cash Movement](#commercial-and-cash-movement)
 - [Relationship and Lifecycle Views](#relationship-and-lifecycle-views)
@@ -58,7 +58,7 @@ Define the core construction and billing entities for the initial bill-n-chill p
   - `Payment` -> `PaymentRecord`
   - `PaymentAllocation` -> `PaymentAllocationRecord`
   - `AccountingSyncEvent` -> `AccountingSyncRecord`
-  - `Estimate` -> `EstimateStatusEvent`
+  - `Quote` -> `QuoteStatusEvent`
   - `Invoice` -> `InvoiceStatusEvent`
   - `ChangeOrder` -> `ChangeOrderSnapshot`
   - `VendorBill` -> `VendorBillSnapshot`
@@ -73,15 +73,15 @@ This section is the canonical glossary for bill-n-chill. For model fields and li
 | Tenant | Isolated organization/workspace boundary in the SaaS system. | `Organization`, `OrganizationMembership` | Auth responses include organization context. | A tenant is the company boundary, not an individual user. |
 | Duplicate Resolution | Explicit operator decision when intake duplicate candidates are detected. | Intake workflows | `POST /api/v1/customers/quick-add/` (`use_existing`) | Customers support `use_existing` only. Vendors and vendor bills block duplicates outright (no override path). |
 | Customer | Client/owner entity for project relationship and billing context. | `Customer` + `CustomerRecord` | `GET/PATCH /api/v1/customers/{id}/` | One customer can have multiple projects. |
-| Project | Primary container for estimating, change orders, billing, AP, and payments. | `Project` | `GET/PATCH /api/v1/projects/{id}/`, `GET /api/v1/projects/{id}/financial-summary/` | Lifecycle status gates workflow readiness. |
+| Project | Primary container for quoting, change orders, billing, AP, and payments. | `Project` | `GET/PATCH /api/v1/projects/{id}/`, `GET /api/v1/projects/{id}/financial-summary/` | Lifecycle status gates workflow readiness. |
 | Project Profile | Editable baseline project fields used after shell creation. | `Project` | `GET /api/v1/projects/`, `GET/PATCH /api/v1/projects/{id}/` | Includes status and planned dates. |
-| Estimate | Customer-facing scope/price proposal for project contract value. | `Estimate`, `EstimateLineItem` | `GET/POST /api/v1/projects/{project_id}/estimates/`, `GET/PATCH /api/v1/estimates/{id}/` | Lifecycle: `draft`, `sent`, `approved`, `rejected`, `void`, `archived`. |
-| Approved Estimate | Estimate version approved; sets project contract value. | `Estimate(status=approved)` | `PATCH /api/v1/estimates/{id}/` | Approval updates project contract value. |
-| Estimate Version | Revision snapshot of an estimate for one project. | `Estimate(version)` | `POST /api/v1/estimates/{id}/clone-version/` | Revisions preserve prior history. |
-| Estimate Status Event | Audit record for estimate status transitions. | `EstimateStatusEvent` | `GET /api/v1/estimates/{id}/status-events/` | Stores from/to status, actor, timestamp, note. |
-| Cost Code | Cost/billing classification used across estimate/invoice/AP flows. | `CostCode` | `GET/POST /api/v1/cost-codes/`, `PATCH /api/v1/cost-codes/{id}/` | Supports CSV import and org-scoped ownership. |
+| Quote | Customer-facing scope/price proposal for project contract value. | `Quote`, `QuoteLineItem` | `GET/POST /api/v1/projects/{project_id}/quotes/`, `GET/PATCH /api/v1/quotes/{id}/` | Lifecycle: `draft`, `sent`, `approved`, `rejected`, `void`, `archived`. |
+| Approved Quote | Quote version approved; sets project contract value. | `Quote(status=approved)` | `PATCH /api/v1/quotes/{id}/` | Approval updates project contract value. |
+| Quote Version | Revision snapshot of an quote for one project. | `Quote(version)` | `POST /api/v1/quotes/{id}/clone-version/` | Revisions preserve prior history. |
+| Quote Status Event | Audit record for quote status transitions. | `QuoteStatusEvent` | `GET /api/v1/quotes/{id}/status-events/` | Stores from/to status, actor, timestamp, note. |
+| Cost Code | Cost/billing classification used across quote/invoice/AP flows. | `CostCode` | `GET/POST /api/v1/cost-codes/`, `PATCH /api/v1/cost-codes/{id}/` | Supports CSV import and org-scoped ownership. |
 | Change Order (CO) | Post-contract change request for scoped delta. | `ChangeOrder`, `ChangeOrderLine`, `ChangeOrderSnapshot` | `GET/POST /api/v1/projects/{id}/change-orders/`, `GET/PATCH /api/v1/change-orders/{id}/` | Lifecycle: `draft`, `sent`, `approved`, `rejected`, `void`. |
-| Public Decision Link | Tokenized public customer decision flow for estimate/CO/invoice. | Public token/ref on document models | `/api/v1/public/.../{token}/decision/` | State-gated; writes audit/lifecycle context. |
+| Public Decision Link | Tokenized public customer decision flow for quote/CO/invoice. | Public token/ref on document models | `/api/v1/public/.../{token}/decision/` | State-gated; writes audit/lifecycle context. |
 | Vendor | Payee identity for subcontractor/supplier billing workflows. | `Vendor` | `GET/POST /api/v1/vendors/`, `GET/PATCH /api/v1/vendors/{id}/` | Duplicate warning + override flow supported. |
 | Vendor Bill | AP invoice from vendor/subcontractor. | `VendorBill`, `VendorBillSnapshot` | `GET/POST /api/v1/projects/{id}/vendor-bills/`, `GET/PATCH /api/v1/vendor-bills/{id}/` | Lifecycle: `planned`, `received`, `approved`, `scheduled`, `paid`, `void`. |
 | Invoice | AR billing document sent to customer. | `Invoice`, `InvoiceLine`, `InvoiceStatusEvent` | `GET/POST /api/v1/projects/{id}/invoices/`, `GET/PATCH /api/v1/invoices/{id}/`, `POST /api/v1/invoices/{id}/send/` | Lifecycle: `draft`, `sent`, `outstanding`, `closed`, `void`. |
@@ -111,9 +111,9 @@ Key fields:
 - `help_email`
 - `billing_address`
 - `default_invoice_due_delta`
-- `default_estimate_valid_delta`
+- `default_quote_valid_delta`
 - `invoice_terms_and_conditions`
-- `estimate_terms_and_conditions`
+- `quote_terms_and_conditions`
 - `change_order_terms_and_conditions`
 - `created_by`
 
@@ -314,9 +314,9 @@ Key fields:
 - `contract_value_original`
 - `contract_value_current`
 
-### Estimating and Scope
+### Quoting and Scope
 
-#### Estimate
+#### Quote
 
 Pre-contract pricing proposal.
 
@@ -332,13 +332,13 @@ Key fields:
 - `tax_total`
 - `grand_total`
 
-#### EstimateLineItem
+#### QuoteLineItem
 
 Line-level scope and pricing rows.
 
 Key fields:
 - `id`
-- `estimate_id`
+- `quote_id`
 - `cost_code_id`
 - `description`
 - `quantity`
@@ -347,13 +347,13 @@ Key fields:
 - `markup_percent`
 - `line_total`
 
-#### EstimateStatusEvent
+#### QuoteStatusEvent
 
-Audit trail of estimate status transitions.
+Audit trail of quote status transitions.
 
 Key fields:
 - `id`
-- `estimate_id`
+- `quote_id`
 - `from_status` (nullable)
 - `to_status`
 - `note`
@@ -361,7 +361,7 @@ Key fields:
 - `changed_at`
 
 Policy:
-- Append-only status-history record for estimate lifecycle decisions.
+- Append-only status-history record for quote lifecycle decisions.
 - Internal-facing operational audit artifact.
 
 #### CostCode
@@ -403,7 +403,7 @@ Current policy:
 - Captured for terminal decision states: `approved`, `rejected`, and `void`.
 - Not captured for non-terminal workflow states: `draft`, `sent`.
 - Append-only audit representation used for strict decision traceability.
-- Includes `origin_estimate_version` in snapshot payload for historical replay/forensics,
+- Includes `origin_quote_version` in snapshot payload for historical replay/forensics,
   not as a primary mutable operational field.
 - Includes decision context (`previous_status`, `applied_financial_delta`) to support
   replay and reversal forensics.
@@ -491,7 +491,7 @@ Key fields:
 
 Current policy:
 - One canonical invoice line set is used for both customer-facing and internal-facing views.
-- Invoice lines do not require direct FK coupling to `EstimateLineItem`.
+- Invoice lines do not require direct FK coupling to `QuoteLineItem`.
 - Non-scope billing is represented explicitly as adjustment lines with reason metadata.
 
 #### InvoiceLine
@@ -673,9 +673,9 @@ Policy:
 - `Customer` has many `CustomerRecords`.
 - `User` owns/scopes `Customers`, `Projects`, and financial workflow records via `created_by`.
 - `OrganizationMembership` has many `OrganizationMembershipRecords`.
-- `Project` has many `Estimates`, `ChangeOrders`, `Invoices`, `VendorBills`, `Payments`, and `AccountingSyncEvents`.
+- `Project` has many `Quotes`, `ChangeOrders`, `Invoices`, `VendorBills`, `Payments`, and `AccountingSyncEvents`.
 - `AccountingSyncEvent` has many `AccountingSyncRecords`.
-- `Estimate` has many `EstimateLineItems`.
+- `Quote` has many `QuoteLineItems`.
 - `Invoice` has many `InvoiceLines`.
 - `Payment` has many `PaymentAllocations`.
 - `Payment` has many `PaymentAllocationRecords`.
@@ -685,7 +685,7 @@ Policy:
 
 1. Capture customer intake (usually from field/office quick add).
 2. Create/reuse customer + optional project shell.
-3. Build estimate and mark approved (sets project contract value).
+3. Build quote and mark approved (sets project contract value).
 4. Execute work and capture change orders.
 5. Approve change orders and apply contract value deltas.
 6. Issue invoices and record customer payments.
@@ -712,7 +712,7 @@ This section is a compact index only. Canonical endpoint behavior lives in `docs
 - `GET /api/v1/customers/`
 - `PATCH /api/v1/customers/{id}/`
 - `GET /api/v1/projects/{id}/financial-summary/`
-- `PATCH /api/v1/estimates/{estimate_id}/`
+- `PATCH /api/v1/quotes/{quote_id}/`
 - `PATCH /api/v1/change-orders/{change_order_id}/`
 - `POST /api/v1/invoices/{id}/send/`
 - `POST /api/v1/projects/{project_id}/payments/`

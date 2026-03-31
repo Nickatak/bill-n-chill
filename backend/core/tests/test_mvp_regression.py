@@ -41,10 +41,10 @@ class MvpRegressionMoneyLoopTests(TestCase):
         )
 
     def test_end_to_end_mvp_money_loop_regression(self):
-        estimate_create = self.client.post(
-            f"/api/v1/projects/{self.project.id}/estimates/",
+        quote_create = self.client.post(
+            f"/api/v1/projects/{self.project.id}/quotes/",
             data={
-                "title": "Bathroom Estimate v1",
+                "title": "Bathroom Quote v1",
                 "line_items": [
                     {
                         "cost_code": self.cost_code.id,
@@ -67,25 +67,25 @@ class MvpRegressionMoneyLoopTests(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(estimate_create.status_code, 201)
-        estimate_id = estimate_create.json()["data"]["id"]
-        self.assertEqual(estimate_create.json()["data"]["grand_total"], "1000.00")
+        self.assertEqual(quote_create.status_code, 201)
+        quote_id = quote_create.json()["data"]["id"]
+        self.assertEqual(quote_create.json()["data"]["grand_total"], "1000.00")
 
-        send_estimate = self.client.patch(
-            f"/api/v1/estimates/{estimate_id}/",
+        send_quote = self.client.patch(
+            f"/api/v1/quotes/{quote_id}/",
             data={"status": "sent", "status_note": "Sent to client."},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(send_estimate.status_code, 200)
+        self.assertEqual(send_quote.status_code, 200)
 
-        approve_estimate = self.client.patch(
-            f"/api/v1/estimates/{estimate_id}/",
+        approve_quote = self.client.patch(
+            f"/api/v1/quotes/{quote_id}/",
             data={"status": "approved", "status_note": "Accepted by client."},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
-        self.assertEqual(approve_estimate.status_code, 200)
+        self.assertEqual(approve_quote.status_code, 200)
 
         create_co = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -93,7 +93,7 @@ class MvpRegressionMoneyLoopTests(TestCase):
                 "title": "Additional trim",
                 "amount_delta": "200.00",
                 "days_delta": 1,
-                "origin_estimate": estimate_id,
+                "origin_quote": quote_id,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",

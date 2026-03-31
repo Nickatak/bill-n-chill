@@ -38,7 +38,7 @@ export function resolveProjectQueryTitle(baseTitle: string, projectQuery: string
  * Build a route title from a required project route param with fallback safety.
  *
  * Example:
- * - ("17", "Estimates", "Project Estimates") => "Project #17 Estimates"
+ * - ("17", "Quotes", "Project Quotes") => "Project #17 Quotes"
  */
 export function resolveProjectParamTitle(
   projectId: string,

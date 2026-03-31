@@ -10,8 +10,8 @@
  *
  * ## Memos
  *
- * - viewerChangeOrders               — COs filtered to the selected estimate, sorted by created_at/family/revision
- * - approvedCOsForSelectedEstimate   — approved subset of viewerChangeOrders
+ * - viewerChangeOrders               — COs filtered to the selected quote, sorted by created_at/family/revision
+ * - approvedCOsForSelectedQuote   — approved subset of viewerChangeOrders
  * - selectedChangeOrderStatusEvents  — audit events for the selected CO, newest first
  * - quickStatusOptions               — available status transitions for the selected viewer CO
  * - selectedViewerWorkingTotals      — pre/post-approval budget totals
@@ -21,10 +21,10 @@
  * ## Derived
  *
  * - selectedChangeOrder              — the CO matching selectedChangeOrderId
- * - selectedViewerEstimate           — the estimate matching selectedViewerEstimateId
+ * - selectedViewerQuote           — the quote matching selectedViewerQuoteId
  * - selectedViewerChangeOrder        — the CO from viewerChangeOrders matching selection, or first
- * - currentAcceptedTotal             — current approved budget for the selected estimate
- * - originalEstimateTotal            — original budget for the selected estimate
+ * - currentAcceptedTotal             — current approved budget for the selected quote
+ * - originalQuoteTotal            — original budget for the selected quote
  * - Various workspace display values (context, badge, editable flags)
  *
  * @module
@@ -36,8 +36,8 @@ import { useClientPagination } from "@/shared/hooks/use-client-pagination";
 import { canDo } from "@/shared/session/rbac";
 import {
   CHANGE_ORDER_STATUSES_FALLBACK,
-  currentApprovedBudgetTotalForEstimate,
-  originalBudgetTotalForEstimate,
+  currentApprovedBudgetTotalForQuote,
+  originalBudgetTotalForQuote,
 } from "../components/change-orders-display";
 import {
   createChangeOrderDocumentAdapter,
@@ -46,7 +46,7 @@ import {
 import type {
   AuditEventRecord,
   ChangeOrderRecord,
-  OriginEstimateRecord,
+  OriginQuoteRecord,
 } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -55,11 +55,11 @@ import type {
 
 type UseChangeOrderViewerOptions = {
   changeOrders: ChangeOrderRecord[];
-  projectEstimates: OriginEstimateRecord[];
-  originEstimateOriginalTotals: Record<number, number>;
+  projectQuotes: OriginQuoteRecord[];
+  originQuoteOriginalTotals: Record<number, number>;
   projectAuditEvents: AuditEventRecord[];
   selectedProjectId: string;
-  selectedViewerEstimateId: string;
+  selectedViewerQuoteId: string;
   selectedChangeOrderId: string;
   changeOrderStatusLabels: Record<string, string>;
   changeOrderAllowedTransitions: Record<string, string[]>;
@@ -91,29 +91,29 @@ export function sortChangeOrdersForViewer(changeOrders: ChangeOrderRecord[]): Ch
 
 /**
  * Compute pre- and post-approval working budget totals for the selected
- * viewer change order within its origin estimate's scope.
+ * viewer change order within its origin quote's scope.
  */
 export function computeWorkingTotals(
   changeOrders: ChangeOrderRecord[],
-  selectedViewerEstimateRecordId: number | null,
+  selectedViewerQuoteRecordId: number | null,
   selectedViewerChangeOrderIdValue: number | null,
   selectedViewerChangeOrderLineDelta: number,
   selectedViewerChangeOrderIsApproved: boolean,
-  originEstimateOriginalTotals: Record<number, number>,
+  originQuoteOriginalTotals: Record<number, number>,
 ): { preApproval: string; postApproval: string } {
-  if (!selectedViewerEstimateRecordId || !selectedViewerChangeOrderIdValue) {
+  if (!selectedViewerQuoteRecordId || !selectedViewerChangeOrderIdValue) {
     return { preApproval: "0.00", postApproval: "0.00" };
   }
   const approvedRollingDelta = changeOrders.reduce((sum, changeOrder) => {
     if (
-      changeOrder.origin_estimate !== selectedViewerEstimateRecordId ||
+      changeOrder.origin_quote !== selectedViewerQuoteRecordId ||
       changeOrder.status !== "approved"
     ) {
       return sum;
     }
     return sum + parseAmount(changeOrder.amount_delta);
   }, 0);
-  const originalBudgetTotal = originEstimateOriginalTotals[selectedViewerEstimateRecordId] ?? 0;
+  const originalBudgetTotal = originQuoteOriginalTotals[selectedViewerQuoteRecordId] ?? 0;
   const currentApprovedWorkingTotal = originalBudgetTotal + approvedRollingDelta;
   const preApprovalTotal = selectedViewerChangeOrderIsApproved
     ? currentApprovedWorkingTotal - selectedViewerChangeOrderLineDelta
@@ -137,11 +137,11 @@ export function computeWorkingTotals(
  */
 export function useChangeOrderViewer({
   changeOrders,
-  projectEstimates,
-  originEstimateOriginalTotals,
+  projectQuotes,
+  originQuoteOriginalTotals,
   projectAuditEvents,
   selectedProjectId,
-  selectedViewerEstimateId,
+  selectedViewerQuoteId,
   selectedChangeOrderId,
   changeOrderStatusLabels,
   changeOrderAllowedTransitions,
@@ -157,8 +157,8 @@ export function useChangeOrderViewer({
   const selectedChangeOrder =
     changeOrders.find((row) => String(row.id) === selectedChangeOrderId) ?? null;
 
-  const selectedViewerEstimate =
-    projectEstimates.find((estimate) => String(estimate.id) === selectedViewerEstimateId) ?? null;
+  const selectedViewerQuote =
+    projectQuotes.find((quote) => String(quote.id) === selectedViewerQuoteId) ?? null;
 
   // Memoized stable sort function for reuse in callbacks.
   const sortCOs = useCallback((rows: ChangeOrderRecord[]) => {
@@ -168,14 +168,14 @@ export function useChangeOrderViewer({
   // --- Memos ---
 
   const viewerChangeOrders = useMemo(() => {
-    if (!selectedViewerEstimateId) {
+    if (!selectedViewerQuoteId) {
       return [] as ChangeOrderRecord[];
     }
-    const originEstimateId = Number(selectedViewerEstimateId);
+    const originQuoteId = Number(selectedViewerQuoteId);
     return sortCOs(
-      changeOrders.filter((changeOrder) => changeOrder.origin_estimate === originEstimateId),
+      changeOrders.filter((changeOrder) => changeOrder.origin_quote === originQuoteId),
     );
-  }, [changeOrders, selectedViewerEstimateId, sortCOs]);
+  }, [changeOrders, selectedViewerQuoteId, sortCOs]);
 
   const {
     page: coPage,
@@ -190,9 +190,9 @@ export function useChangeOrderViewer({
     viewerChangeOrders[0] ??
     null;
 
-  const selectedViewerEstimateRecordId = selectedViewerEstimate?.id ?? null;
+  const selectedViewerQuoteRecordId = selectedViewerQuote?.id ?? null;
 
-  const approvedCOsForSelectedEstimate = useMemo(() => {
+  const approvedCOsForSelectedQuote = useMemo(() => {
     return viewerChangeOrders.filter((co) => co.status === "approved");
   }, [viewerChangeOrders]);
 
@@ -229,16 +229,16 @@ export function useChangeOrderViewer({
   const isCreateSubmitDisabled =
     !canMutateChangeOrders ||
     !selectedProjectId ||
-    !selectedViewerEstimateId;
+    !selectedViewerQuoteId;
 
   const isEditSubmitDisabled = !isSelectedChangeOrderEditable;
 
-  const currentAcceptedTotal = selectedViewerEstimate
-    ? currentApprovedBudgetTotalForEstimate(selectedViewerEstimate.id, changeOrders, originEstimateOriginalTotals)
+  const currentAcceptedTotal = selectedViewerQuote
+    ? currentApprovedBudgetTotalForQuote(selectedViewerQuote.id, changeOrders, originQuoteOriginalTotals)
     : null;
 
-  const originalEstimateTotal = selectedViewerEstimate
-    ? originalBudgetTotalForEstimate(selectedViewerEstimate.id, originEstimateOriginalTotals)
+  const originalQuoteTotal = selectedViewerQuote
+    ? originalBudgetTotalForQuote(selectedViewerQuote.id, originQuoteOriginalTotals)
     : null;
 
   const changeOrderCreatorStatusPolicy = useMemo(
@@ -282,19 +282,19 @@ export function useChangeOrderViewer({
   const selectedViewerWorkingTotals = useMemo(
     () => computeWorkingTotals(
       changeOrders,
-      selectedViewerEstimateRecordId,
+      selectedViewerQuoteRecordId,
       selectedViewerChangeOrderIdValue,
       selectedViewerChangeOrderLineDelta,
       selectedViewerChangeOrderIsApproved,
-      originEstimateOriginalTotals,
+      originQuoteOriginalTotals,
     ),
     [
       changeOrders,
-      selectedViewerEstimateRecordId,
+      selectedViewerQuoteRecordId,
       selectedViewerChangeOrderIdValue,
       selectedViewerChangeOrderLineDelta,
       selectedViewerChangeOrderIsApproved,
-      originEstimateOriginalTotals,
+      originQuoteOriginalTotals,
     ],
   );
 
@@ -303,11 +303,11 @@ export function useChangeOrderViewer({
   return {
     // Derived records
     selectedChangeOrder,
-    selectedViewerEstimate,
+    selectedViewerQuote,
     selectedViewerChangeOrder,
     viewerChangeOrders,
     paginatedChangeOrders,
-    approvedCOsForSelectedEstimate,
+    approvedCOsForSelectedQuote,
     selectedChangeOrderStatusEvents,
 
     // Pagination
@@ -335,7 +335,7 @@ export function useChangeOrderViewer({
 
     // Financial summaries
     currentAcceptedTotal,
-    originalEstimateTotal,
+    originalQuoteTotal,
 
     // Utilities
     sortCOs,

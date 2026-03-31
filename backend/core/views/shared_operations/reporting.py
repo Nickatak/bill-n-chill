@@ -11,8 +11,8 @@ from rest_framework.response import Response
 from core.models import (
     ChangeOrder,
     ChangeOrderSnapshot,
-    Estimate,
-    EstimateStatusEvent,
+    Quote,
+    QuoteStatusEvent,
     Invoice,
     InvoiceStatusEvent,
     Payment,
@@ -371,7 +371,7 @@ def attention_feed_view(request):
 def quick_jump_search_view(request):
     """Search key entities by text query for fast navigation jump points.
 
-    Performs a lightweight in-memory search across projects, estimates,
+    Performs a lightweight in-memory search across projects, quotes,
     change orders, invoices, vendor bills, and payments.  Requires a
     minimum 2-character query.  Results are deduped, sorted, and capped
     at ``QUICK_JUMP_RESULT_LIMIT`` items.
@@ -414,23 +414,23 @@ def quick_jump_search_view(request):
                 }
             )
 
-    estimates = Estimate.objects.filter(project__organization_id=membership.organization_id).select_related("project")
-    for estimate in estimates:
+    quotes = Quote.objects.filter(project__organization_id=membership.organization_id).select_related("project")
+    for quote in quotes:
         if (
-            query_lower in (estimate.title or "").lower()
-            or query_lower in str(estimate.id)
-            or query_lower in str(estimate.version)
+            query_lower in (quote.title or "").lower()
+            or query_lower in str(quote.id)
+            or query_lower in str(quote.version)
         ):
             items.append(
                 {
-                    "kind": "estimate",
-                    "record_id": estimate.id,
-                    "label": estimate.title or f"Estimate #{estimate.id}",
-                    "sub_label": f"Estimate #{estimate.id} v{estimate.version} ({estimate.status})",
-                    "project_id": estimate.project_id,
-                    "project_name": estimate.project.name,
-                    "ui_href": f"/projects/{estimate.project_id}/estimates?estimate={estimate.id}",
-                    "detail_endpoint": f"/api/v1/estimates/{estimate.id}/",
+                    "kind": "quote",
+                    "record_id": quote.id,
+                    "label": quote.title or f"Quote #{quote.id}",
+                    "sub_label": f"Quote #{quote.id} v{quote.version} ({quote.status})",
+                    "project_id": quote.project_id,
+                    "project_name": quote.project.name,
+                    "ui_href": f"/projects/{quote.project_id}/quotes?quote={quote.id}",
+                    "detail_endpoint": f"/api/v1/quotes/{quote.id}/",
                 }
             )
 
@@ -525,7 +525,7 @@ def project_timeline_events_view(request, project_id):
     Queries all project-scoped audit models and merges them into a
     unified timeline.  Supports category filtering: ``all`` (default),
     ``financial`` (payments, vendor bill snapshots), or ``workflow``
-    (estimate/invoice status events, change order snapshots).
+    (quote/invoice status events, change order snapshots).
 
     Flow:
         1. Look up project scoped to user's org.
@@ -573,20 +573,20 @@ def project_timeline_events_view(request, project_id):
     # --- Workflow events ---
     if category in {"all", "workflow"}:
         for event in (
-            EstimateStatusEvent.objects.filter(estimate__project=project)
-            .select_related("estimate")
+            QuoteStatusEvent.objects.filter(quote__project=project)
+            .select_related("quote")
             .order_by("-changed_at", "-id")
         ):
             items.append({
-                "timeline_id": f"estimate-event-{event.id}",
+                "timeline_id": f"quote-event-{event.id}",
                 "category": "workflow",
-                "event_type": "estimate_status",
+                "event_type": "quote_status",
                 "occurred_at": event.changed_at,
-                "label": f"Estimate {event.from_status or 'new'} → {event.to_status}",
+                "label": f"Quote {event.from_status or 'new'} → {event.to_status}",
                 "detail": event.note or "",
-                "object_type": "estimate",
-                "object_id": event.estimate_id,
-                "ui_route": f"/projects/{project.id}/estimates?estimate={event.estimate_id}",
+                "object_type": "quote",
+                "object_id": event.quote_id,
+                "ui_route": f"/projects/{project.id}/quotes?quote={event.quote_id}",
             })
 
         for event in (

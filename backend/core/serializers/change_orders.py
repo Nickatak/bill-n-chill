@@ -90,7 +90,7 @@ class ChangeOrderSerializer(serializers.ModelSerializer):
             "sender_address",
             "sender_logo_url",
             "contract_pdf_url",
-            "origin_estimate",
+            "origin_quote",
             "requested_by",
             "requested_by_email",
             "approved_by",
@@ -157,7 +157,7 @@ class ChangeOrderWriteSerializer(serializers.Serializer):
     terms_text = serializers.CharField(max_length=10000, required=False, allow_blank=True)
     line_items = ChangeOrderLineInputSerializer(many=True, required=False)
     sections = ChangeOrderSectionInputSerializer(many=True, required=False, default=[])
-    origin_estimate = serializers.IntegerField(required=False, allow_null=True)
+    origin_quote = serializers.IntegerField(required=False, allow_null=True)
 
 
 def _change_order_customer(obj: ChangeOrderStatusEvent):

@@ -87,14 +87,14 @@ class AuthEndpointTests(TestCase):
 
         self.assertEqual(organization.help_email, "defaults@example.com")
         self.assertEqual(organization.default_invoice_due_delta, 30)
-        self.assertEqual(organization.default_estimate_valid_delta, 30)
+        self.assertEqual(organization.default_quote_valid_delta, 30)
         self.assertEqual(
             organization.invoice_terms_and_conditions,
             "Payment due within 30 days of invoice date.",
         )
         self.assertEqual(
-            organization.estimate_terms_and_conditions,
-            "Estimate is valid for 30 days. Scope and pricing are based on visible conditions only; hidden conditions may require a change order.",
+            organization.quote_terms_and_conditions,
+            "Quote is valid for 30 days. Scope and pricing are based on visible conditions only; hidden conditions may require a change order.",
         )
         self.assertEqual(
             organization.change_order_terms_and_conditions,

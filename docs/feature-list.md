@@ -35,11 +35,11 @@ Track implementation-complete feature slices without duplicating full API/domain
 6. `INT-03` Convert lead to customer + project shell
 7. `PRJ-01` Project profile and contract baseline
 
-### Phase 2: Estimating
+### Phase 2: Quoting
 
 8. `EST-01` Cost code management
-9. `EST-02` Estimate authoring and versioning
-10. `EST-03` Estimate approval lifecycle
+9. `EST-02` Quote authoring and versioning
+10. `EST-03` Quote approval lifecycle
 
 ### Phase 3: Change Management and Billing
 
@@ -84,7 +84,7 @@ Track implementation-complete feature slices without duplicating full API/domain
 
 Frontend workflow is intentionally split into two stages:
 
-1. `Projects` stage: project shell + scope control (`Estimates`, `Change Orders`).
+1. `Projects` stage: project shell + scope control (`Quotes`, `Change Orders`).
 2. `Billing` stage: post-approval financial execution (`Invoices`, `Vendor Bills`, payment/accounting flows).
 
 This keeps scope decisions adjacent to projects, then moves operators into billing after scope is approved.

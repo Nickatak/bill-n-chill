@@ -38,7 +38,7 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
   - `backend/core/urls.py`: route map under `/api/v1/`.
 - Endpoint implementation:
   - `backend/core/views/shared_operations`: auth/org/customers/projects/cost-codes/vendors/report/search surfaces.
-  - `backend/core/views/estimating`: estimate workflows.
+  - `backend/core/views/quoting`: quote workflows.
   - `backend/core/views/change_orders`: change-order lifecycle and public decision flows.
   - `backend/core/views/accounts_receivable`: invoice workflows and public decision flows.
   - `backend/core/views/accounts_payable`: vendor-bill workflows.
@@ -46,7 +46,7 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
   - `backend/core/views/helpers.py`: capability-based RBAC enforcement (`_capability_gate`, `_resolve_user_capabilities`), organization scope helpers, and write-path utilities.
 - Domain models:
   - `backend/core/models/shared_operations`: org, membership, role template, customer, project, cost code, vendor, sync-event operational rows.
-  - `backend/core/models/estimating`: estimates, estimate lines, estimate status events.
+  - `backend/core/models/quoting`: quotes, quote lines, quote status events.
   - `backend/core/models/change_orders`: change orders, change-order lines.
   - `backend/core/models/accounts_receivable`: invoices, invoice lines, invoice status events.
   - `backend/core/models/accounts_payable`: vendor bills and related AP state.
@@ -63,7 +63,7 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
 - Route layer:
   - `frontend/src/app/*`: Next.js App Router pages and route-specific content.
 - Feature layer:
-  - `frontend/src/features/*`: workflow-domain UI modules (customers, estimates, change orders, invoices, bills, payments, etc.).
+  - `frontend/src/features/*`: workflow-domain UI modules (customers, quotes, change orders, invoices, bills, payments, etc.).
   - Each feature owns local components, state orchestration, and API interaction hooks/helpers.
 - Shared layer:
   - `frontend/src/shared/shell`: app shell — auth gate, toolbar, navbar, breadcrumbs, page layout wrappers, route metadata helpers. All styles are CSS modules.
@@ -77,14 +77,14 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
 
 - Auth + org bootstrap:
   - login/register -> token -> `auth/me` -> active org + membership context.
-- Estimate lifecycle:
-  - draft/sent/approved/rejected/void -> approved estimate sets project contract value.
+- Quote lifecycle:
+  - draft/sent/approved/rejected/void -> approved quote sets project contract value.
 - Change-order propagation:
   - `sent -> approved|rejected` with contract value updates on approved transitions.
 - Invoice + payment loop:
   - invoice send/status lifecycle -> inbound/outbound payment recording -> allocation updates balance/status.
 - Public customer decisions:
-  - tokenized public estimate/change-order/invoice routes with state-gated approve/reject/dispute endpoints.
+  - tokenized public quote/change-order/invoice routes with state-gated approve/reject/dispute endpoints.
 
 ### Invariant Enforcement Layers
 

@@ -2,7 +2,7 @@
 
 /**
  * "Document Settings" tab — help email, due/valid deltas, and T&Cs
- * with Invoice / Estimate / Change Order sub-tabs.
+ * with Invoice / Quote / Change Order sub-tabs.
  * Gated by `org_presets.edit` capability (owner + PM).
  *
  * Parent: OrganizationConsole
@@ -27,10 +27,10 @@ type DocumentSettingsTabProps = {
   onError: (message: string) => void;
 };
 
-type DocType = "invoice" | "estimate" | "change_order";
+type DocType = "invoice" | "quote" | "change_order";
 
 const DOC_TYPES: Array<{ value: DocType; label: string }> = [
-  { value: "estimate", label: "Estimates" },
+  { value: "quote", label: "Quotes" },
   { value: "change_order", label: "Change Orders" },
   { value: "invoice", label: "Invoices" },
 ];
@@ -50,19 +50,19 @@ export function DocumentSettingsTab({
   onError,
 }: DocumentSettingsTabProps) {
   const normalizedBaseUrl = normalizeApiBaseUrl(defaultApiBaseUrl);
-  const [activeDocType, setActiveDocType] = useState<DocType>("estimate");
+  const [activeDocType, setActiveDocType] = useState<DocType>("quote");
 
   const [invoiceDueDeltaDraft, setInvoiceDueDeltaDraft] = useState(
     String(profile.default_invoice_due_delta ?? 30),
   );
-  const [estimateValidDeltaDraft, setEstimateValidDeltaDraft] = useState(
-    String(profile.default_estimate_valid_delta ?? 30),
+  const [quoteValidDeltaDraft, setQuoteValidDeltaDraft] = useState(
+    String(profile.default_quote_valid_delta ?? 30),
   );
   const [invoiceTermsDraft, setInvoiceTermsDraft] = useState(
     profile.invoice_terms_and_conditions ?? "",
   );
-  const [estimateTermsDraft, setEstimateTermsDraft] = useState(
-    profile.estimate_terms_and_conditions ?? "",
+  const [quoteTermsDraft, setQuoteTermsDraft] = useState(
+    profile.quote_terms_and_conditions ?? "",
   );
   const [changeOrderTermsDraft, setChangeOrderTermsDraft] = useState(
     profile.change_order_terms_and_conditions ?? "",
@@ -80,10 +80,10 @@ export function DocumentSettingsTab({
   const hasChanges =
     String(Number(invoiceDueDeltaDraft || "30")) !==
       String(profile.default_invoice_due_delta || 30) ||
-    String(Number(estimateValidDeltaDraft || "30")) !==
-      String(profile.default_estimate_valid_delta || 30) ||
+    String(Number(quoteValidDeltaDraft || "30")) !==
+      String(profile.default_quote_valid_delta || 30) ||
     invoiceTermsDraft.trim() !== (profile.invoice_terms_and_conditions || "") ||
-    estimateTermsDraft.trim() !== (profile.estimate_terms_and_conditions || "") ||
+    quoteTermsDraft.trim() !== (profile.quote_terms_and_conditions || "") ||
     changeOrderTermsDraft.trim() !== (profile.change_order_terms_and_conditions || "");
 
   async function handleSave(event: FormEvent) {
@@ -97,16 +97,16 @@ export function DocumentSettingsTab({
     const sanitizedDueDelta = Number.isFinite(parsedDueDelta)
       ? Math.max(1, Math.min(365, Math.round(parsedDueDelta)))
       : 30;
-    const parsedEstimateDelta = Number(estimateValidDeltaDraft);
-    const sanitizedEstimateDelta = Number.isFinite(parsedEstimateDelta)
-      ? Math.max(1, Math.min(365, Math.round(parsedEstimateDelta)))
+    const parsedQuoteDelta = Number(quoteValidDeltaDraft);
+    const sanitizedQuoteDelta = Number.isFinite(parsedQuoteDelta)
+      ? Math.max(1, Math.min(365, Math.round(parsedQuoteDelta)))
       : 30;
 
     const payload = {
       default_invoice_due_delta: sanitizedDueDelta,
-      default_estimate_valid_delta: sanitizedEstimateDelta,
+      default_quote_valid_delta: sanitizedQuoteDelta,
       invoice_terms_and_conditions: invoiceTermsDraft.trim(),
-      estimate_terms_and_conditions: estimateTermsDraft.trim(),
+      quote_terms_and_conditions: quoteTermsDraft.trim(),
       change_order_terms_and_conditions: changeOrderTermsDraft.trim(),
     };
 
@@ -128,9 +128,9 @@ export function DocumentSettingsTab({
       if (data?.organization) {
         const org = data.organization;
         setInvoiceDueDeltaDraft(String(org.default_invoice_due_delta ?? 30));
-        setEstimateValidDeltaDraft(String(org.default_estimate_valid_delta ?? 30));
+        setQuoteValidDeltaDraft(String(org.default_quote_valid_delta ?? 30));
         setInvoiceTermsDraft(org.invoice_terms_and_conditions ?? "");
-        setEstimateTermsDraft(org.estimate_terms_and_conditions ?? "");
+        setQuoteTermsDraft(org.quote_terms_and_conditions ?? "");
         setChangeOrderTermsDraft(org.change_order_terms_and_conditions ?? "");
         onProfileUpdate(org, data.role_policy ?? undefined);
         showSuccess("Saved.");
@@ -185,13 +185,13 @@ export function DocumentSettingsTab({
         </>
       ) : null}
 
-      {activeDocType === "estimate" ? (
+      {activeDocType === "quote" ? (
         <>
           <label className={styles.field}>
-            <span className={styles.fieldLabel}>Estimate Valid Days</span>
+            <span className={styles.fieldLabel}>Quote Valid Days</span>
             <input
-              value={estimateValidDeltaDraft}
-              onChange={(e) => setEstimateValidDeltaDraft(e.target.value)}
+              value={quoteValidDeltaDraft}
+              onChange={(e) => setQuoteValidDeltaDraft(e.target.value)}
               type="number"
               min={1}
               max={365}
@@ -199,12 +199,12 @@ export function DocumentSettingsTab({
             />
           </label>
           <label className={styles.field}>
-            <span className={styles.fieldLabel}>Estimate Terms &amp; Conditions</span>
+            <span className={styles.fieldLabel}>Quote Terms &amp; Conditions</span>
             <textarea
-              value={estimateTermsDraft}
-              onChange={(e) => setEstimateTermsDraft(e.target.value)}
+              value={quoteTermsDraft}
+              onChange={(e) => setQuoteTermsDraft(e.target.value)}
               rows={4}
-              placeholder="Default terms and conditions shown on estimates"
+              placeholder="Default terms and conditions shown on quotes"
               disabled={disabled}
             />
           </label>

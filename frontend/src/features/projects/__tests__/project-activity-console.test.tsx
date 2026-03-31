@@ -42,15 +42,15 @@ function makeTimeline(overrides: Record<string, unknown> = {}) {
     item_count: 2,
     items: [
       {
-        timeline_id: "estimate-event-1",
+        timeline_id: "quote-event-1",
         category: "workflow",
-        event_type: "estimate_status",
+        event_type: "quote_status",
         occurred_at: "2026-03-01T10:00:00Z",
-        label: "Estimate draft → sent",
+        label: "Quote draft → sent",
         detail: "",
-        object_type: "estimate",
+        object_type: "quote",
         object_id: 10,
-        ui_route: "/projects/1/estimates?estimate=10",
+        ui_route: "/projects/1/quotes?quote=10",
       },
       {
         timeline_id: "payment-record-1",
@@ -89,7 +89,7 @@ describe("ProjectActivityConsole", () => {
     render(<ProjectActivityConsole projectId={1} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Estimate draft → sent")).toBeInTheDocument();
+      expect(screen.getByText("Quote draft → sent")).toBeInTheDocument();
       expect(screen.getByText("Payment #5 created")).toBeInTheDocument();
     });
   });
@@ -144,11 +144,11 @@ describe("ProjectActivityConsole", () => {
     render(<ProjectActivityConsole projectId={1} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Estimate draft → sent")).toBeInTheDocument();
+      expect(screen.getByText("Quote draft → sent")).toBeInTheDocument();
     });
 
     const viewLinks = screen.getAllByText("View →");
-    expect(viewLinks[0]).toHaveAttribute("href", "/projects/1/estimates?estimate=10");
+    expect(viewLinks[0]).toHaveAttribute("href", "/projects/1/quotes?quote=10");
   });
 
   it("renders event type badges", async () => {
@@ -159,7 +159,7 @@ describe("ProjectActivityConsole", () => {
     render(<ProjectActivityConsole projectId={1} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Estimate")).toBeInTheDocument();
+      expect(screen.getByText("Quote")).toBeInTheDocument();
       expect(screen.getByText("Payment")).toBeInTheDocument();
     });
   });
@@ -184,7 +184,7 @@ describe("ProjectActivityConsole", () => {
     render(<ProjectActivityConsole projectId={1} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Estimate draft → sent")).toBeInTheDocument();
+      expect(screen.getByText("Quote draft → sent")).toBeInTheDocument();
     });
 
     // Switch to financial category

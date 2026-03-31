@@ -28,11 +28,11 @@ read instructions.
 | Set up your organization | Org dropdown | AppToolbar (top-right) |
 | Add your first customer | "Customers" | WorkflowNavbar |
 | Create a project | "Projects" | WorkflowNavbar |
-| Build an estimate | "Projects" | WorkflowNavbar |
+| Build an quote | "Projects" | WorkflowNavbar |
 | Send for customer approval | "Projects" | WorkflowNavbar |
 | Create an invoice | "Invoices" | WorkflowNavbar |
 
-Steps 3-5 all point to "Projects" — the repetition reinforces that estimates and sending
+Steps 3-5 all point to "Projects" — the repetition reinforces that quotes and sending
 happen inside the projects workflow.
 
 ### Technical Approach

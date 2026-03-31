@@ -82,7 +82,7 @@ describe("AuthGate", () => {
   });
 
   it("renders children for public document routes regardless of auth state", () => {
-    vi.mocked(usePathname).mockReturnValue("/estimate/slug--aBcDeFgH");
+    vi.mocked(usePathname).mockReturnValue("/quote/slug--aBcDeFgH");
     setAuthState({ isChecking: false, isAuthorized: false, status: "unauthorized" });
 
     render(

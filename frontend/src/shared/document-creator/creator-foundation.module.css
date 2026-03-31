@@ -759,7 +759,7 @@
 
 /* Toolbar-weight action buttons — bolder than in-form buttons.
    Used for primary/secondary actions in workspace toolbars across
-   estimates, invoices, and change order consoles. */
+   quotes, invoices, and change order consoles. */
 .toolbarPrimaryButton {
   border: 1px solid var(--accent-hover);
   border-radius: 10px;

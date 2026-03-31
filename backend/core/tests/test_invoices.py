@@ -831,30 +831,30 @@ class InvoiceTests(TestCase):
         self.assertEqual(project.status, Project.Status.ACTIVE)
 
     # ------------------------------------------------------------------
-    # related_estimate + initial_status tests
+    # related_quote + initial_status tests
     # ------------------------------------------------------------------
 
-    def _create_approved_estimate(self, project=None):
-        """Create an approved estimate on the given (or default) project."""
+    def _create_approved_quote(self, project=None):
+        """Create an approved quote on the given (or default) project."""
         proj = project or self.project
-        estimate = Estimate.objects.create(
+        quote = Quote.objects.create(
             project=proj,
             version=1,
-            status=Estimate.Status.APPROVED,
+            status=Quote.Status.APPROVED,
             title="Kitchen Remodel",
             subtotal="10000.00",
             grand_total="10000.00",
             created_by=self.user,
         )
-        return estimate
+        return quote
 
-    def test_create_invoice_with_related_estimate(self):
-        """POST with related_estimate links the invoice to the estimate."""
-        estimate = self._create_approved_estimate()
+    def test_create_invoice_with_related_quote(self):
+        """POST with related_quote links the invoice to the quote."""
+        quote = self._create_approved_quote()
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/invoices/",
             data={
-                "related_estimate": estimate.id,
+                "related_quote": quote.id,
                 "line_items": [
                     {"description": "Deposit", "quantity": "1", "unit_price": "1000.00"},
                 ],
@@ -864,16 +864,16 @@ class InvoiceTests(TestCase):
         )
         self.assertEqual(response.status_code, 201)
         payload = response.json()["data"]
-        self.assertEqual(payload["related_estimate"], estimate.id)
+        self.assertEqual(payload["related_quote"], quote.id)
         self.assertEqual(payload["status"], "draft")
 
     def test_create_invoice_with_initial_status_sent(self):
         """POST with initial_status=sent creates invoice and transitions to sent atomically."""
-        estimate = self._create_approved_estimate()
+        quote = self._create_approved_quote()
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/invoices/",
             data={
-                "related_estimate": estimate.id,
+                "related_quote": quote.id,
                 "initial_status": "sent",
                 "line_items": [
                     {"description": "Deposit", "quantity": "1", "unit_price": "1000.00"},
@@ -900,12 +900,12 @@ class InvoiceTests(TestCase):
         """initial_status=sent should freeze org identity fields on the invoice."""
         self.org.display_name = "Acme Construction"
         self.org.save(update_fields=["display_name"])
-        estimate = self._create_approved_estimate()
+        quote = self._create_approved_quote()
 
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/invoices/",
             data={
-                "related_estimate": estimate.id,
+                "related_quote": quote.id,
                 "initial_status": "sent",
                 "line_items": [
                     {"description": "Deposit", "quantity": "1", "unit_price": "1000.00"},
@@ -918,13 +918,13 @@ class InvoiceTests(TestCase):
         payload = response.json()["data"]
         self.assertEqual(payload["sender_name"], "Acme Construction")
 
-    def test_related_estimate_must_belong_to_same_project(self):
-        """related_estimate from a different project is rejected."""
-        other_estimate = self._create_approved_estimate(project=self.other_project)
+    def test_related_quote_must_belong_to_same_project(self):
+        """related_quote from a different project is rejected."""
+        other_quote = self._create_approved_quote(project=self.other_project)
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/invoices/",
             data={
-                "related_estimate": other_estimate.id,
+                "related_quote": other_quote.id,
                 "line_items": [
                     {"description": "Deposit", "quantity": "1", "unit_price": "1000.00"},
                 ],
@@ -935,13 +935,13 @@ class InvoiceTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("not found", response.json()["error"]["message"].lower())
 
-    def test_related_estimate_any_status_accepted(self):
-        """related_estimate links regardless of estimate status (no approval gate)."""
-        estimate = Estimate.objects.create(
+    def test_related_quote_any_status_accepted(self):
+        """related_quote links regardless of quote status (no approval gate)."""
+        quote = Quote.objects.create(
             project=self.project,
             version=1,
-            status=Estimate.Status.DRAFT,
-            title="Draft Estimate",
+            status=Quote.Status.DRAFT,
+            title="Draft Quote",
             subtotal="5000.00",
             grand_total="5000.00",
             created_by=self.user,
@@ -949,7 +949,7 @@ class InvoiceTests(TestCase):
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/invoices/",
             data={
-                "related_estimate": estimate.id,
+                "related_quote": quote.id,
                 "line_items": [
                     {"description": "Deposit", "quantity": "1", "unit_price": "1000.00"},
                 ],
@@ -958,16 +958,16 @@ class InvoiceTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["data"]["related_estimate"], estimate.id)
+        self.assertEqual(response.json()["data"]["related_quote"], quote.id)
 
-    def test_duplicate_related_estimate_blocked(self):
-        """Second invoice with same related_estimate is rejected (409)."""
-        estimate = self._create_approved_estimate()
+    def test_duplicate_related_quote_blocked(self):
+        """Second invoice with same related_quote is rejected (409)."""
+        quote = self._create_approved_quote()
         # First invoice succeeds.
         r1 = self.client.post(
             f"/api/v1/projects/{self.project.id}/invoices/",
             data={
-                "related_estimate": estimate.id,
+                "related_quote": quote.id,
                 "line_items": [
                     {"description": "Deposit", "quantity": "1", "unit_price": "1000.00"},
                 ],
@@ -977,11 +977,11 @@ class InvoiceTests(TestCase):
         )
         self.assertEqual(r1.status_code, 201)
 
-        # Second invoice with same estimate fails.
+        # Second invoice with same quote fails.
         r2 = self.client.post(
             f"/api/v1/projects/{self.project.id}/invoices/",
             data={
-                "related_estimate": estimate.id,
+                "related_quote": quote.id,
                 "line_items": [
                     {"description": "Second deposit", "quantity": "1", "unit_price": "500.00"},
                 ],
@@ -991,13 +991,13 @@ class InvoiceTests(TestCase):
         )
         self.assertEqual(r2.status_code, 409)
 
-    def test_duplicate_related_estimate_allowed_after_void(self):
-        """Voiding the linked invoice allows re-creating with the same estimate."""
-        estimate = self._create_approved_estimate()
+    def test_duplicate_related_quote_allowed_after_void(self):
+        """Voiding the linked invoice allows re-creating with the same quote."""
+        quote = self._create_approved_quote()
         r1 = self.client.post(
             f"/api/v1/projects/{self.project.id}/invoices/",
             data={
-                "related_estimate": estimate.id,
+                "related_quote": quote.id,
                 "line_items": [
                     {"description": "Deposit", "quantity": "1", "unit_price": "1000.00"},
                 ],
@@ -1016,11 +1016,11 @@ class InvoiceTests(TestCase):
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
 
-        # Second invoice with same estimate now succeeds.
+        # Second invoice with same quote now succeeds.
         r2 = self.client.post(
             f"/api/v1/projects/{self.project.id}/invoices/",
             data={
-                "related_estimate": estimate.id,
+                "related_quote": quote.id,
                 "line_items": [
                     {"description": "Deposit retry", "quantity": "1", "unit_price": "1000.00"},
                 ],
@@ -1030,13 +1030,13 @@ class InvoiceTests(TestCase):
         )
         self.assertEqual(r2.status_code, 201)
 
-    def test_invoice_list_includes_related_estimate_field(self):
-        """GET invoice list includes the related_estimate field."""
-        estimate = self._create_approved_estimate()
+    def test_invoice_list_includes_related_quote_field(self):
+        """GET invoice list includes the related_quote field."""
+        quote = self._create_approved_quote()
         self.client.post(
             f"/api/v1/projects/{self.project.id}/invoices/",
             data={
-                "related_estimate": estimate.id,
+                "related_quote": quote.id,
                 "line_items": [
                     {"description": "Deposit", "quantity": "1", "unit_price": "1000.00"},
                 ],
@@ -1052,4 +1052,4 @@ class InvoiceTests(TestCase):
         self.assertEqual(response.status_code, 200)
         invoices = response.json()["data"]
         self.assertEqual(len(invoices), 1)
-        self.assertEqual(invoices[0]["related_estimate"], estimate.id)
+        self.assertEqual(invoices[0]["related_quote"], quote.id)

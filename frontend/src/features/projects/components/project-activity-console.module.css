@@ -139,7 +139,7 @@
   white-space: nowrap;
 }
 
-.badgeEstimate {
+.badgeQuote {
   background: var(--status-draft-bg, #e8f0fe);
   color: var(--status-draft-text, #1a56db);
 }

@@ -2,7 +2,7 @@
 
 /**
  * Change orders console -- the primary internal workspace for managing change
- * orders within a project. Orchestrates hook-provided state for estimate-linked
+ * orders within a project. Orchestrates hook-provided state for quote-linked
  * revision browsing, draft creation/editing, status transitions with
  * quick-status pills, audit event history, and cost-code-based line-item creators.
  *
@@ -15,7 +15,7 @@
  * │ read-only role hint (when !canMutateChangeOrders)    │
  * ├──────────────────────────────────────────────────────┤
  * │ ChangeOrdersViewerPanel                              │
- * │  (estimate rail, CO list, status pills, audit log)   │
+ * │  (quote rail, CO list, status pills, audit log)   │
  * ├──────────────────────────────────────────────────────┤
  * │ ChangeOrdersWorkspacePanel                           │
  * │  (create form + edit form, line items, branding)     │
@@ -37,7 +37,7 @@
  * - handleDuplicateAsNew              — pre-fill create form from selected CO
  * - handleQuickUpdateStatus           — PATCH status transition or resend
  * - handleAddChangeOrderStatusNote    — PATCH status note (no status change)
- * - handleSelectViewerEstimate        — estimate rail click handler
+ * - handleSelectViewerQuote        — quote rail click handler
  *
  * ## Effects
  *
@@ -100,7 +100,7 @@ import { useChangeOrderViewer } from "../hooks/use-change-order-viewer";
 
 type ChangeOrdersConsoleProps = {
   scopedProjectId?: number | null;
-  initialOriginEstimateId?: number | null;
+  initialOriginQuoteId?: number | null;
 };
 
 
@@ -108,15 +108,15 @@ type ChangeOrdersConsoleProps = {
 // Component
 // ---------------------------------------------------------------------------
 
-/** Internal change-orders workspace: estimate-linked viewer, dual creators (create + edit), and status lifecycle. */
+/** Internal change-orders workspace: quote-linked viewer, dual creators (create + edit), and status lifecycle. */
 export function ChangeOrdersConsole({
   scopedProjectId: scopedProjectIdProp = null,
-  initialOriginEstimateId: initialOriginEstimateIdProp = null,
+  initialOriginQuoteId: initialOriginQuoteIdProp = null,
 }: ChangeOrdersConsoleProps) {
   const isMobile = useMediaQuery("(max-width: 850px)");
   const { token: authToken, role, capabilities } = useSharedSessionAuth();
   const scopedProjectId = scopedProjectIdProp;
-  const initialOriginEstimateId = initialOriginEstimateIdProp;
+  const initialOriginQuoteId = initialOriginQuoteIdProp;
 
   // -------------------------------------------------------------------------
   // Hooks
@@ -125,7 +125,7 @@ export function ChangeOrdersConsole({
   const projectData = useChangeOrderProjectData({
     authToken,
     scopedProjectId,
-    initialOriginEstimateId,
+    initialOriginQuoteId,
   });
 
   const form = useChangeOrderForm();
@@ -142,11 +142,11 @@ export function ChangeOrdersConsole({
 
   const viewer = useChangeOrderViewer({
     changeOrders: projectData.changeOrders,
-    projectEstimates: projectData.projectEstimates,
-    originEstimateOriginalTotals: projectData.originEstimateOriginalTotals,
+    projectQuotes: projectData.projectQuotes,
+    originQuoteOriginalTotals: projectData.originQuoteOriginalTotals,
     projectAuditEvents: projectData.projectAuditEvents,
     selectedProjectId: projectData.selectedProjectId,
-    selectedViewerEstimateId: projectData.selectedViewerEstimateId,
+    selectedViewerQuoteId: projectData.selectedViewerQuoteId,
     selectedChangeOrderId: form.selectedChangeOrderId,
     changeOrderStatusLabels,
     changeOrderAllowedTransitions,
@@ -216,7 +216,7 @@ export function ChangeOrdersConsole({
       void projectData.loadProjects({
         onChangeOrdersLoaded: (changeOrderRows, initEstId) => {
           const initialCO = initEstId
-            ? changeOrderRows.find((co) => co.origin_estimate === initEstId)
+            ? changeOrderRows.find((co) => co.origin_quote === initEstId)
             : changeOrderRows[0];
           form.hydrateEditForm(initialCO ?? changeOrderRows[0]);
         },
@@ -380,7 +380,7 @@ export function ChangeOrdersConsole({
             terms_text: form.newTermsText,
             amount_delta: formatDecimal(form.newLineDeltaTotal),
             days_delta: form.newLineDaysTotal,
-            origin_estimate: projectData.selectedViewerEstimateId ? Number(projectData.selectedViewerEstimateId) : null,
+            origin_quote: projectData.selectedViewerQuoteId ? Number(projectData.selectedViewerQuoteId) : null,
             ...buildOrderedPayload(form.newLineItems, createSheetRef),
           }),
         },
@@ -629,20 +629,20 @@ export function ChangeOrdersConsole({
   const handleSelectChangeOrder = useCallback((changeOrder: ChangeOrderRecord | undefined) => {
     if (changeOrder) {
       projectData.setFeedback("");
-      if (changeOrder.origin_estimate) {
-        projectData.setSelectedViewerEstimateId(String(changeOrder.origin_estimate));
+      if (changeOrder.origin_quote) {
+        projectData.setSelectedViewerQuoteId(String(changeOrder.origin_quote));
       }
     }
     form.hydrateEditForm(changeOrder);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.hydrateEditForm, projectData.setFeedback, projectData.setSelectedViewerEstimateId]);
+  }, [form.hydrateEditForm, projectData.setFeedback, projectData.setSelectedViewerQuoteId]);
 
-  /** Handle estimate rail selection: update viewer estimate and sync the edit form. */
-  const handleSelectViewerEstimate = useCallback((nextEstimateId: string) => {
-    projectData.setSelectedViewerEstimateId(nextEstimateId);
+  /** Handle quote rail selection: update viewer quote and sync the edit form. */
+  const handleSelectViewerQuote = useCallback((nextQuoteId: string) => {
+    projectData.setSelectedViewerQuoteId(nextQuoteId);
     const related = viewer.sortCOs(
       projectData.changeOrders.filter(
-        (changeOrder) => String(changeOrder.origin_estimate) === nextEstimateId,
+        (changeOrder) => String(changeOrder.origin_quote) === nextQuoteId,
       ),
     );
     if (!related.length) {
@@ -689,12 +689,12 @@ export function ChangeOrdersConsole({
         selectedProjectName={projectData.selectedProjectName}
         selectedProjectCustomerEmail={projectData.selectedProjectCustomerEmail}
         selectedProjectCustomerId={projectData.selectedProjectCustomerId}
-        projectEstimates={projectData.projectEstimates}
-        selectedViewerEstimateId={projectData.selectedViewerEstimateId}
+        projectQuotes={projectData.projectQuotes}
+        selectedViewerQuoteId={projectData.selectedViewerQuoteId}
         changeOrders={projectData.changeOrders}
-        originEstimateOriginalTotals={projectData.originEstimateOriginalTotals}
-        onSelectEstimate={handleSelectViewerEstimate}
-        selectedViewerEstimate={viewer.selectedViewerEstimate}
+        originQuoteOriginalTotals={projectData.originQuoteOriginalTotals}
+        onSelectQuote={handleSelectViewerQuote}
+        selectedViewerQuote={viewer.selectedViewerQuote}
         viewerChangeOrders={viewer.viewerChangeOrders}
         paginatedChangeOrders={viewer.paginatedChangeOrders}
         selectedChangeOrderId={form.selectedChangeOrderId}
@@ -730,9 +730,9 @@ export function ChangeOrdersConsole({
       />
 
 
-      {projectData.projectEstimates.length === 0 && !viewer.selectedChangeOrder ? (
+      {projectData.projectQuotes.length === 0 && !viewer.selectedChangeOrder ? (
         <p className={styles.viewerHint}>
-          Approve an estimate on this project first to start creating change orders.
+          Approve an quote on this project first to start creating change orders.
         </p>
       ) : (
       <>
@@ -740,9 +740,9 @@ export function ChangeOrdersConsole({
         createSheetRef={createSheetRef}
         editSheetRef={editSheetRef}
         selectedProjectId={projectData.selectedProjectId}
-        selectedViewerEstimateId={projectData.selectedViewerEstimateId}
-        selectedViewerEstimate={viewer.selectedViewerEstimate}
-        projectEstimates={projectData.projectEstimates}
+        selectedViewerQuoteId={projectData.selectedViewerQuoteId}
+        selectedViewerQuote={viewer.selectedViewerQuote}
+        projectQuotes={projectData.projectQuotes}
         selectedChangeOrder={viewer.selectedChangeOrder}
         selectedViewerChangeOrder={viewer.selectedViewerChangeOrder}
         isSelectedChangeOrderEditable={viewer.isSelectedChangeOrderEditable}
@@ -794,11 +794,11 @@ export function ChangeOrdersConsole({
         onAddEditLine={addEditLine}
         onRemoveEditLine={removeEditLine}
         onUpdateEditLine={form.updateEditLine}
-        approvedCOsForSelectedEstimate={viewer.approvedCOsForSelectedEstimate}
+        approvedCOsForSelectedQuote={viewer.approvedCOsForSelectedQuote}
         isOriginLineItemsSectionOpen={isOriginLineItemsSectionOpen}
         setIsOriginLineItemsSectionOpen={setIsOriginLineItemsSectionOpen}
         currentAcceptedTotal={viewer.currentAcceptedTotal}
-        originalEstimateTotal={viewer.originalEstimateTotal}
+        originalQuoteTotal={viewer.originalQuoteTotal}
       />
       </>
       )}

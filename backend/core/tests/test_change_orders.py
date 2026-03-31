@@ -90,7 +90,7 @@ class ChangeOrderTests(TestCase):
                 "created_by": self.other_user,
             },
         )
-        self.last_approved_estimate_by_project = {}
+        self.last_approved_quote_by_project = {}
 
     def _bootstrap_primary_membership(self):
         response = self.client.post(
@@ -101,9 +101,9 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(response.status_code, 200)
         return OrganizationMembership.objects.select_related("organization").get(user=self.user)
 
-    def _create_estimate(self, *, project_id: int, cost_code_id: int, token: str, title: str = "Budget Seed Estimate"):
+    def _create_quote(self, *, project_id: int, cost_code_id: int, token: str, title: str = "Budget Seed Quote"):
         response = self.client.post(
-            f"/api/v1/projects/{project_id}/estimates/",
+            f"/api/v1/projects/{project_id}/quotes/",
             data={
                 "title": title,
                 "line_items": [
@@ -123,49 +123,49 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(response.status_code, 201)
         return response.json()["data"]["id"]
 
-    def _create_estimate_family(self, *, title: str = "Budget Seed Estimate"):
-        estimate_id = self._create_estimate(
+    def _create_quote_family(self, *, title: str = "Budget Seed Quote"):
+        quote_id = self._create_quote(
             project_id=self.project.id,
             cost_code_id=self.cost_code.id,
             token=self.token.key,
             title=title,
         )
-        self._approve_estimate(estimate_id=estimate_id, token=self.token.key)
-        self.last_approved_estimate_by_project[self.project.id] = estimate_id
-        return Estimate.objects.get(id=estimate_id)
+        self._approve_quote(quote_id=quote_id, token=self.token.key)
+        self.last_approved_quote_by_project[self.project.id] = quote_id
+        return Quote.objects.get(id=quote_id)
 
-    def _approve_estimate(self, *, estimate_id: int, token: str):
+    def _approve_quote(self, *, quote_id: int, token: str):
         sent_response = self.client.patch(
-            f"/api/v1/estimates/{estimate_id}/",
+            f"/api/v1/quotes/{quote_id}/",
             data={"status": "sent"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {token}",
         )
         self.assertEqual(sent_response.status_code, 200)
         response = self.client.patch(
-            f"/api/v1/estimates/{estimate_id}/",
+            f"/api/v1/quotes/{quote_id}/",
             data={"status": "approved"},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {token}",
         )
         self.assertEqual(response.status_code, 200)
 
-    def _create_other_estimate_family(self):
-        """Create an approved estimate on other_project for cross-project tests."""
-        estimate_id = self._create_estimate(
+    def _create_other_quote_family(self):
+        """Create an approved quote on other_project for cross-project tests."""
+        quote_id = self._create_quote(
             project_id=self.other_project.id,
             cost_code_id=self.other_cost_code.id,
             token=self.other_token.key,
-            title="Other Budget Seed Estimate",
+            title="Other Budget Seed Quote",
         )
-        self._approve_estimate(estimate_id=estimate_id, token=self.other_token.key)
-        self.last_approved_estimate_by_project[self.other_project.id] = estimate_id
-        return Estimate.objects.get(id=estimate_id)
+        self._approve_quote(quote_id=quote_id, token=self.other_token.key)
+        self.last_approved_quote_by_project[self.other_project.id] = quote_id
+        return Quote.objects.get(id=quote_id)
 
     def _create_change_order(self, *, title="Owner requested upgraded finish", amount_delta="1500.00"):
-        origin_estimate_id = self.last_approved_estimate_by_project.get(self.project.id)
-        if not origin_estimate_id:
-            origin_estimate_id = self._create_estimate_family().id
+        origin_quote_id = self.last_approved_quote_by_project.get(self.project.id)
+        if not origin_quote_id:
+            origin_quote_id = self._create_quote_family().id
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
             data={
@@ -173,7 +173,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": amount_delta,
                 "days_delta": 2,
                 "reason": "Scope upgrade",
-                "origin_estimate": origin_estimate_id,
+                "origin_quote": origin_quote_id,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -311,7 +311,7 @@ class ChangeOrderTests(TestCase):
             },
         )
         self.assertEqual(
-            payload["origin_estimate_rules"],
+            payload["origin_quote_rules"],
             {
                 "required_on_create": True,
                 "must_be_approved": True,
@@ -330,10 +330,10 @@ class ChangeOrderTests(TestCase):
             payload["error_rules"],
             {
                 "co_create_missing_required_fields": "Create requires title and amount_delta.",
-                "co_create_origin_estimate_required": "Create requires origin_estimate.",
-                "co_origin_estimate_project_scope": "origin_estimate must belong to the same project.",
-                "co_origin_estimate_approved_required": "origin_estimate must be approved.",
-                "co_origin_estimate_immutable_once_set": "origin_estimate cannot change/clear once set.",
+                "co_create_origin_quote_required": "Create requires origin_quote.",
+                "co_origin_quote_project_scope": "origin_quote must belong to the same project.",
+                "co_origin_quote_approved_required": "origin_quote must be approved.",
+                "co_origin_quote_immutable_once_set": "origin_quote cannot change/clear once set.",
                 "co_line_total_must_match_amount_delta": "Sum of line_items amount_delta must match change-order amount_delta.",
                 "co_line_cost_code_invalid": "Each cost_code must exist and belong to the organization.",
                 "co_edit_requires_draft_status": "Only draft change orders can edit content fields.",
@@ -344,7 +344,7 @@ class ChangeOrderTests(TestCase):
         self.assertTrue(str(payload["policy_version"]).startswith("2026-02-24.change_orders."))
 
     def test_change_order_create_and_numbering(self):
-        self._create_estimate_family()
+        self._create_quote_family()
 
         first = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -353,7 +353,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "2500.00",
                 "days_delta": 3,
                 "reason": "Owner requested larger deck",
-                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "origin_quote": self.last_approved_quote_by_project[self.project.id],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -365,7 +365,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "800.00",
                 "days_delta": 1,
                 "reason": "Add recessed lighting",
-                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "origin_quote": self.last_approved_quote_by_project[self.project.id],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -379,7 +379,7 @@ class ChangeOrderTests(TestCase):
 
     def test_change_order_create_defaults_reason_to_empty_when_omitted(self):
         self._bootstrap_primary_membership()
-        self._create_estimate_family()
+        self._create_quote_family()
 
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -387,7 +387,7 @@ class ChangeOrderTests(TestCase):
                 "title": "Missing reason payload",
                 "amount_delta": "500.00",
                 "days_delta": 1,
-                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "origin_quote": self.last_approved_quote_by_project[self.project.id],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -397,7 +397,7 @@ class ChangeOrderTests(TestCase):
 
     def test_change_order_create_allows_per_change_order_reason_override(self):
         self._bootstrap_primary_membership()
-        self._create_estimate_family()
+        self._create_quote_family()
 
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -406,7 +406,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "500.00",
                 "days_delta": 1,
                 "reason": "User-provided reason should be honored",
-                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "origin_quote": self.last_approved_quote_by_project[self.project.id],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
@@ -416,7 +416,7 @@ class ChangeOrderTests(TestCase):
 
     def test_change_order_patch_allows_reason_updates(self):
         self._bootstrap_primary_membership()
-        self._create_estimate_family()
+        self._create_quote_family()
         co_id = self._create_change_order(title="Patch reason update")
 
         response = self.client.patch(
@@ -429,7 +429,7 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(response.json()["data"]["reason"], "Patch override accepted")
 
     def test_change_order_create_with_line_items_scaffold(self):
-        self._create_estimate_family()
+        self._create_quote_family()
 
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -438,7 +438,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "2500.00",
                 "days_delta": 3,
                 "reason": "Line-level coupling scaffold",
-                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "origin_quote": self.last_approved_quote_by_project[self.project.id],
                 "line_items": [
                     {
                         "cost_code": self.cost_code.id,
@@ -456,8 +456,8 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(payload["line_total_delta"], "2500.00")
         self.assertEqual(len(payload["line_items"]), 1)
 
-    def test_change_order_create_with_origin_estimate_link(self):
-        estimate = self._create_estimate_family(title="CO Origin Estimate")
+    def test_change_order_create_with_origin_quote_link(self):
+        quote = self._create_quote_family(title="CO Origin Quote")
 
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -465,38 +465,38 @@ class ChangeOrderTests(TestCase):
                 "title": "Linked CO",
                 "amount_delta": "2500.00",
                 "days_delta": 3,
-                "reason": "Linked to approved estimate",
-                "origin_estimate": estimate.id,
+                "reason": "Linked to approved quote",
+                "origin_quote": quote.id,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self.assertEqual(response.status_code, 201)
         payload = response.json()["data"]
-        self.assertEqual(payload["origin_estimate"], estimate.id)
-        self.assertNotIn("origin_estimate_version", payload)
+        self.assertEqual(payload["origin_quote"], quote.id)
+        self.assertNotIn("origin_quote_version", payload)
 
-    def test_change_order_create_requires_origin_estimate(self):
+    def test_change_order_create_requires_origin_quote(self):
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
             data={
                 "title": "Missing Origin CO",
                 "amount_delta": "500.00",
                 "days_delta": 1,
-                "reason": "Missing origin estimate linkage",
+                "reason": "Missing origin quote linkage",
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self._assert_validation_error(response)
-        self.assertIn("origin_estimate", response.json()["error"]["fields"])
+        self.assertIn("origin_quote", response.json()["error"]["fields"])
 
-    def test_change_order_create_rejects_non_approved_origin_estimate(self):
-        draft_estimate_id = self._create_estimate(
+    def test_change_order_create_rejects_non_approved_origin_quote(self):
+        draft_quote_id = self._create_quote(
             project_id=self.project.id,
             cost_code_id=self.cost_code.id,
             token=self.token.key,
-            title="Draft Only Estimate",
+            title="Draft Only Quote",
         )
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -505,16 +505,16 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "500.00",
                 "days_delta": 1,
                 "reason": "Invalid origin status",
-                "origin_estimate": draft_estimate_id,
+                "origin_quote": draft_quote_id,
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self._assert_validation_error(response)
-        self.assertIn("origin_estimate", response.json()["error"]["fields"])
+        self.assertIn("origin_quote", response.json()["error"]["fields"])
 
     def test_change_order_create_rejects_line_total_mismatch(self):
-        self._create_estimate_family()
+        self._create_quote_family()
 
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -523,7 +523,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "2500.00",
                 "days_delta": 3,
                 "reason": "Line mismatch",
-                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "origin_quote": self.last_approved_quote_by_project[self.project.id],
                 "line_items": [
                     {
                         "cost_code": self.cost_code.id,
@@ -561,13 +561,13 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(payload["line_total_delta"], "1200.00")
         self.assertEqual(len(payload["line_items"]), 1)
 
-    def test_change_order_patch_rejects_origin_estimate_change_or_clear(self):
+    def test_change_order_patch_rejects_origin_quote_change_or_clear(self):
         change_order_id = self._create_change_order()
 
-        newer_estimate = self._create_estimate_family(title="Newer Origin Estimate")
+        newer_quote = self._create_quote_family(title="Newer Origin Quote")
         changed = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
-            data={"origin_estimate": newer_estimate.id},
+            data={"origin_quote": newer_quote.id},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
@@ -575,14 +575,14 @@ class ChangeOrderTests(TestCase):
 
         cleared = self.client.patch(
             f"/api/v1/change-orders/{change_order_id}/",
-            data={"origin_estimate": None},
+            data={"origin_quote": None},
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.token.key}",
         )
         self._assert_validation_error(cleared)
 
     def test_change_order_create_allows_duplicate_cost_codes(self):
-        self._create_estimate_family()
+        self._create_quote_family()
 
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -591,7 +591,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "200.00",
                 "days_delta": 1,
                 "reason": "Multiple adjustments to same cost code",
-                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "origin_quote": self.last_approved_quote_by_project[self.project.id],
                 "line_items": [
                     {
                         "cost_code": self.cost_code.id,
@@ -614,7 +614,7 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(len(response.json()["data"]["line_items"]), 2)
 
     def test_change_order_create_line_with_cost_code(self):
-        self._create_estimate_family()
+        self._create_quote_family()
 
         response = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -623,7 +623,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "500.00",
                 "days_delta": 2,
                 "reason": "Adding new scope",
-                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "origin_quote": self.last_approved_quote_by_project[self.project.id],
                 "line_items": [
                     {
                         "cost_code": self.cost_code.id,
@@ -662,21 +662,21 @@ class ChangeOrderTests(TestCase):
         with self.assertRaises(ValidationError):
             row.save()
 
-    def test_change_order_model_rejects_cross_project_origin_estimate_on_direct_save(self):
-        self._create_estimate_family()
-        self._create_other_estimate_family()
-        other_origin_estimate_id = self.last_approved_estimate_by_project[self.other_project.id]
+    def test_change_order_model_rejects_cross_project_origin_quote_on_direct_save(self):
+        self._create_quote_family()
+        self._create_other_quote_family()
+        other_origin_quote_id = self.last_approved_quote_by_project[self.other_project.id]
 
         with self.assertRaises(ValidationError):
             ChangeOrder.objects.create(
                 project=self.project,
                 family_key="100",
-                title="Invalid origin estimate scope",
+                title="Invalid origin quote scope",
                 status=ChangeOrder.Status.DRAFT,
                 amount_delta="100.00",
                 days_delta=0,
                 reason="Cross-project origin",
-                origin_estimate_id=other_origin_estimate_id,
+                origin_quote_id=other_origin_quote_id,
                 requested_by=self.user,
             )
 
@@ -847,7 +847,7 @@ class ChangeOrderTests(TestCase):
         self._assert_validation_error(void_blocked)
 
     def test_change_order_approved_status_creates_immutable_snapshot(self):
-        self._create_estimate_family()
+        self._create_quote_family()
 
         create = self.client.post(
             f"/api/v1/projects/{self.project.id}/change-orders/",
@@ -856,7 +856,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "250.00",
                 "days_delta": 1,
                 "reason": "Snapshot test",
-                "origin_estimate": self.last_approved_estimate_by_project[self.project.id],
+                "origin_quote": self.last_approved_quote_by_project[self.project.id],
                 "line_items": [
                     {
                         "cost_code": self.cost_code.id,
@@ -940,7 +940,7 @@ class ChangeOrderTests(TestCase):
         self.assertEqual(void_snapshot.snapshot_json["decision_context"]["applied_financial_delta"], "0.00")
 
     def test_change_order_list_and_detail_are_scoped_to_current_user(self):
-        self._create_other_estimate_family()
+        self._create_other_quote_family()
         own_id = self._create_change_order()
 
         other_create = self.client.post(
@@ -950,7 +950,7 @@ class ChangeOrderTests(TestCase):
                 "amount_delta": "500.00",
                 "days_delta": 1,
                 "reason": "Other change",
-                "origin_estimate": self.last_approved_estimate_by_project[self.other_project.id],
+                "origin_quote": self.last_approved_quote_by_project[self.other_project.id],
             },
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Token {self.other_token.key}",

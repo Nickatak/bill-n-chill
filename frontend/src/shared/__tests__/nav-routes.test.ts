@@ -33,7 +33,7 @@ describe("isRouteActive", () => {
       exact: ["/projects"],
       startsWith: ["/projects/"],
     };
-    expect(isRouteActive("/projects/42/estimates", route)).toBe(true);
+    expect(isRouteActive("/projects/42/quotes", route)).toBe(true);
   });
 
   it("does not match prefix when pathname does not start with it", () => {

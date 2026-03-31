@@ -44,10 +44,10 @@ def _prefetch_invoice_qs(queryset: QuerySet) -> QuerySet:
     """
     return queryset.select_related(
         "project", "customer", "project__customer", "created_by",
-        "related_estimate",
+        "related_quote",
     ).prefetch_related(
         "line_items", "line_items__cost_code", "target_payments",
-        "related_estimate__billing_periods",
+        "related_quote__billing_periods",
     )
 
 

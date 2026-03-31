@@ -13,7 +13,7 @@ End-to-end function call order for CO page initialization and the line-item loca
 
 ## Page Initialization (No Existing COs)
 
-This traces the load sequence when a project has one approved estimate and zero change orders — the exact scenario that triggered the duplicate-key race.
+This traces the load sequence when a project has one approved quote and zero change orders — the exact scenario that triggered the duplicate-key race.
 
 `FRONTEND` — [`ChangeOrdersConsole`](../../frontend/src/features/change-orders/components/change-orders-console.tsx#L56)
 
@@ -30,7 +30,7 @@ This traces the load sequence when a project has one approved estimate and zero 
     - `setNewLineItems([emptyLine(1)])`, `setNewLineNextLocalId(2)` — reset create form
     - `setSelectedProjectId(...)`, `setSelectedProjectName(...)`
     - `await Promise.all([`
-      - [`loadProjectEstimates(projectId)`](../../frontend/src/features/change-orders/components/change-orders-console.tsx#L835) — **sets `selectedViewerEstimateId`**
+      - [`loadProjectQuotes(projectId)`](../../frontend/src/features/change-orders/components/change-orders-console.tsx#L835) — **sets `selectedViewerQuoteId`**
       - `loadProjectAuditEvents(projectId)`
     - `])`
     - [`fetchProjectChangeOrders(projectId)`](../../frontend/src/features/change-orders/components/change-orders-console.tsx#L978) — returns `[]` (no COs)

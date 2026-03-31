@@ -5,7 +5,7 @@
  *
  * Three top-level steps (org → customer → project), then a project
  * subsection that reveals once a project is detected. Sub-steps cover
- * the full billing workflow: estimates, COs, invoices, bills, payments.
+ * the full billing workflow: quotes, COs, invoices, bills, payments.
  *
  * Auto-detects progress by probing list endpoints and localStorage flags.
  * Optional steps have dashed borders and are excluded from progress.
@@ -23,7 +23,7 @@
  * │ Step 2: Customer                   │
  * │ Step 3: Project                    │
  * │   ┌─ Sub-steps (revealed) ───────┐ │
- * │   │  Build an estimate (opt)     │ │
+ * │   │  Build a quote (opt)     │ │
  * │   │  Send for approval (opt)     │ │
  * │   │  Handle a change order (opt) │ │
  * │   │  Create an invoice           │ │
@@ -89,7 +89,7 @@ const TOP_LEVEL_STEPS: Step[] = [
     key: "project",
     label: "Create a project",
     description:
-      "Projects keep estimates, change orders, invoices, and payments organized per job.",
+      "Projects keep quotes, change orders, invoices, and payments organized per job.",
     href: "/projects",
     linkLabel: "Projects",
   },
@@ -98,13 +98,13 @@ const TOP_LEVEL_STEPS: Step[] = [
 /** Sub-steps nested under "Create a project" — revealed once a project exists. */
 const PROJECT_SUB_STEPS: Step[] = [
   {
-    key: "estimate",
-    label: "Build & send an estimate",
+    key: "quote",
+    label: "Build & send a quote",
     description:
       "Define scope and pricing, then share a professional link so your customer can review and approve.",
     href: "/projects",
-    dynamicHref: (pid) => `/projects/${pid}/estimates`,
-    linkLabel: "Estimates",
+    dynamicHref: (pid) => `/projects/${pid}/quotes`,
+    linkLabel: "Quotes",
     optional: true,
   },
   {

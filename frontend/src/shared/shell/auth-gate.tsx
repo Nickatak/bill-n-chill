@@ -20,7 +20,7 @@ type AuthGateProps = {
  * Prevent unauthenticated access to protected routes.
  *
  * Public routes bypass the gate entirely so tokenized customer links
- * (estimates, invoices, change orders) render without a session.
+ * (quotes, invoices, change orders) render without a session.
  * Protected routes show nothing until the session check resolves,
  * then either render children or redirect to /login.
  */

@@ -10,7 +10,7 @@ from rest_framework.request import Request
 
 from core.models import (
     ChangeOrder,
-    Estimate,
+    Quote,
     Invoice,
     Payment,
     Project,
@@ -71,26 +71,26 @@ def _project_accepted_contract_totals_map(
 ) -> dict[int, Decimal]:
     """Return a dict mapping project IDs to their accepted contract total.
 
-    For each project, finds the latest approved estimate's grand total and
+    For each project, finds the latest approved quote's grand total and
     sums all approved change-order deltas.  The accepted contract total is
-    ``estimate_total + co_total``.  Projects with no approved estimate
+    ``quote_total + co_total``.  Projects with no approved quote
     default to zero.
     """
     if not project_ids:
         return {}
 
-    # Find approved estimates per project (latest approved by project).
-    approved_estimates = (
-        Estimate.objects.filter(
+    # Find approved quotes per project (latest approved by project).
+    approved_quotes = (
+        Quote.objects.filter(
             project_id__in=project_ids,
-            status=Estimate.Status.APPROVED,
+            status=Quote.Status.APPROVED,
         )
         .order_by("project_id", "-created_at", "-id")
     )
-    estimate_total_by_project: dict[int, Decimal] = {}
-    for estimate in approved_estimates:
-        if estimate.project_id not in estimate_total_by_project:
-            estimate_total_by_project[estimate.project_id] = estimate.grand_total
+    quote_total_by_project: dict[int, Decimal] = {}
+    for quote in approved_quotes:
+        if quote.project_id not in quote_total_by_project:
+            quote_total_by_project[quote.project_id] = quote.grand_total
 
     # Sum approved CO deltas per project.
     approved_cos = ChangeOrder.objects.filter(
@@ -103,9 +103,9 @@ def _project_accepted_contract_totals_map(
 
     totals: dict[int, Decimal] = {}
     for project_id in project_ids:
-        estimate_total = estimate_total_by_project.get(project_id, Decimal("0"))
+        quote_total = quote_total_by_project.get(project_id, Decimal("0"))
         change_order_total = change_order_total_by_project.get(project_id, Decimal("0"))
-        totals[project_id] = estimate_total + change_order_total
+        totals[project_id] = quote_total + change_order_total
     return totals
 
 

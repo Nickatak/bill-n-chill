@@ -12,7 +12,7 @@ In scope:
 
 - [ ] account setup and sign in
 - [ ] intake -> customer -> project flow
-- [ ] estimate lifecycle + public estimate decision
+- [ ] quote lifecycle + public quote decision
 - [ ] invoice lifecycle + public invoice decision
 - [ ] change-order public review/decision path
 
@@ -28,8 +28,8 @@ Run this yourself before inviting anyone:
 
 - [x] Register a fresh account.
 - [x] Use Quick Add to create a customer and project.
-- [x] Open `/customers`, `/projects`, `/estimates`, `/invoices`, `/financials-auditing`.
-- [x] Create an estimate, send it, open public link, approve/reject once.
+- [x] Open `/customers`, `/projects`, `/quotes`, `/invoices`, `/financials-auditing`.
+- [x] Create an quote, send it, open public link, approve/reject once.
 - [x] Create a CO, send it, open public link, approve/reject once.
 - [ ] Create an invoice, send it, open public link, approve/dispute once.
 - [ ] Confirm no unexpected logout/flicker during normal navigation.
@@ -46,8 +46,8 @@ Give each tester this exact flow:
 - [ ] Create account (`/register`) and sign in (`/`).
 - [ ] Add a new lead via Quick Add.
 - [ ] Open the new customer record and create/open a project.
-- [ ] Create an estimate with at least 2 line items.
-- [ ] Mark estimate as sent and open public estimate link.
+- [ ] Create an quote with at least 2 line items.
+- [ ] Mark quote as sent and open public quote link.
 - [ ] On the public page, submit either approve or reject with an optional note.
 - [ ] Back in app, create an invoice, set sent status, open public invoice link.
 - [ ] On public invoice page, approve or dispute.

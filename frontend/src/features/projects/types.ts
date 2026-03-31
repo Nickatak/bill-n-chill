@@ -67,7 +67,7 @@ export type ProjectTraceabilityBucket = {
   records: ProjectTraceabilityRecord[];
 };
 
-export type ApprovedEstimate = {
+export type ApprovedQuote = {
   id: number;
   title: string;
   grand_total: string;

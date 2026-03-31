@@ -141,7 +141,7 @@ describe("OnboardingChecklist", () => {
     });
 
     // Sub-steps are visible but locked
-    expect(screen.getByText("Build & send an estimate")).toBeInTheDocument();
+    expect(screen.getByText("Build & send a quote")).toBeInTheDocument();
     expect(screen.getByText("Create an invoice & record payment")).toBeInTheDocument();
     expect(screen.getByText("Track expenses")).toBeInTheDocument();
     expect(screen.getByText("Complete this step to unlock")).toBeInTheDocument();
@@ -159,8 +159,8 @@ describe("OnboardingChecklist", () => {
     const invoiceLink = screen.getByText("Invoices \u2192");
     expect(invoiceLink.getAttribute("href")).toBe("/projects/5/invoices");
 
-    const estimateLink = screen.getByText("Estimates \u2192");
-    expect(estimateLink.getAttribute("href")).toBe("/projects/5/estimates");
+    const quoteLink = screen.getByText("Quotes \u2192");
+    expect(quoteLink.getAttribute("href")).toBe("/projects/5/quotes");
   });
 
   it("shows sub-step links only when project exists (no links in locked state)", async () => {
@@ -173,7 +173,7 @@ describe("OnboardingChecklist", () => {
 
     // Sub-step link labels should not appear as links when locked
     expect(screen.queryByText("Invoices \u2192")).not.toBeInTheDocument();
-    expect(screen.queryByText("Estimates \u2192")).not.toBeInTheDocument();
+    expect(screen.queryByText("Quotes \u2192")).not.toBeInTheDocument();
   });
 
   it("vendor bill sub-step deep links into project", async () => {
@@ -199,7 +199,7 @@ describe("OnboardingChecklist", () => {
     });
 
     const badges = screen.getAllByText("Optional");
-    // estimate, change-order, bill = 3 optional sub-steps
+    // quote, change-order, bill = 3 optional sub-steps
     expect(badges).toHaveLength(3);
   });
 

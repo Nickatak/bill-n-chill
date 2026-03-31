@@ -13,7 +13,7 @@ Through real-world testing with an actual contractor, we identified a fundamenta
 
 1. **The UI follows the data model, not the user.** The backend's financial rigor (immutable audit records, line-item allocation, snapshot history) is correct and valuable — but it was surfaced directly in the UI, creating a forensic-accounting experience aimed at nobody in our ICP.
 
-2. **We overestimated the ICP's technical comfort.** A 1–10 person GC shop is not staffed with people who think in terms of line-item allocation or payment reconciliation. They think "Mrs. Johnson paid me $5k" and "I owe the lumber yard."
+2. **We overquoted the ICP's technical comfort.** A 1–10 person GC shop is not staffed with people who think in terms of line-item allocation or payment reconciliation. They think "Mrs. Johnson paid me $5k" and "I owe the lumber yard."
 
 3. **The original QBO sync assumption was wrong.** We assumed BnC was a stepping stone to a "real" accounting system. In reality, these users don't live in QBO — their bookkeeper does, quarterly or at tax time. BnC *is* their system of record.
 
@@ -62,7 +62,7 @@ The original MVP doc split workflows into "mobile" (quick lookups, status checks
 
 ### 5. Document templates (idea — unscoped)
 
-A pre-stored document (estimate, invoice, etc.) that can be loaded into the creator at will. A GC who tiles bathrooms every week shouldn't build an invoice from scratch each time — they should tap "Bathroom Tile," adjust the numbers, and send.
+A pre-stored document (quote, invoice, etc.) that can be loaded into the creator at will. A GC who tiles bathrooms every week shouldn't build an invoice from scratch each time — they should tap "Bathroom Tile," adjust the numbers, and send.
 
 This is the potential unlock for mobile-first document creation. Rather than building complex line items on a small screen, the user selects a template and adjusts.
 
@@ -72,11 +72,11 @@ This is the potential unlock for mobile-first document creation. Rather than bui
 
 - **The backend financial model is correct.** Immutable audit records, snapshot history, proper money handling — all of this stays. It's what makes the QBO push reliable and the audit trail trustworthy.
 - **Desktop power-user flows remain dense.** Responsive doesn't mean dumbed-down. Office staff still get full table views with inline editing on wide screens.
-- **The estimate → CO → invoice → payment pipeline is the core product.** This refinement is about how it's presented, not what it does.
+- **The quote → CO → invoice → payment pipeline is the core product.** This refinement is about how it's presented, not what it does.
 
 ## Product positioning (refined)
 
-BnC is the **field-facing financial layer** for small GCs. The contractor never opens QuickBooks. They live in BnC — estimates, invoices, payments, all from their phone or truck dashboard. The books appear in QBO automatically for their accountant.
+BnC is the **field-facing financial layer** for small GCs. The contractor never opens QuickBooks. They live in BnC — quotes, invoices, payments, all from their phone or truck dashboard. The books appear in QBO automatically for their accountant.
 
 **Accounting-grade infrastructure with a UI simple enough for someone who's never opened QuickBooks.**
 

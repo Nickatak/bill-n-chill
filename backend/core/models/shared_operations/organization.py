@@ -36,9 +36,9 @@ class Organization(models.Model):
     license_number = models.CharField(max_length=100, blank=True, default="")
     tax_id = models.CharField(max_length=50, blank=True, default="")
     default_invoice_due_delta = models.PositiveSmallIntegerField(default=30)
-    default_estimate_valid_delta = models.PositiveSmallIntegerField(default=30)
+    default_quote_valid_delta = models.PositiveSmallIntegerField(default=30)
     invoice_terms_and_conditions = models.TextField(blank=True, default="")
-    estimate_terms_and_conditions = models.TextField(blank=True, default="")
+    quote_terms_and_conditions = models.TextField(blank=True, default="")
     change_order_terms_and_conditions = models.TextField(blank=True, default="")
     onboarding_completed = models.BooleanField(default=False)
     created_by = models.ForeignKey(
@@ -92,9 +92,9 @@ class Organization(models.Model):
                 "license_number": self.license_number,
                 "tax_id": self.tax_id,
                 "default_invoice_due_delta": self.default_invoice_due_delta,
-                "default_estimate_valid_delta": self.default_estimate_valid_delta,
+                "default_quote_valid_delta": self.default_quote_valid_delta,
                 "invoice_terms_and_conditions": self.invoice_terms_and_conditions,
-                "estimate_terms_and_conditions": self.estimate_terms_and_conditions,
+                "quote_terms_and_conditions": self.quote_terms_and_conditions,
                 "change_order_terms_and_conditions": self.change_order_terms_and_conditions,
                 "created_by_id": self.created_by_id,
                 "created_at": self.created_at.isoformat() if self.created_at else None,

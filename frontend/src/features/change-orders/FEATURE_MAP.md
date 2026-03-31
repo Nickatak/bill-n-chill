@@ -1,7 +1,7 @@
 # Feature Map: Change Orders
 
 ## Purpose
-Manage project-scoped contract deltas with explicit lifecycle transitions and revision flow from approved estimate context.
+Manage project-scoped contract deltas with explicit lifecycle transitions and revision flow from approved quote context.
 
 ## Route Surface
 1. `/change-orders`
@@ -19,11 +19,11 @@ Manage project-scoped contract deltas with explicit lifecycle transitions and re
    - direct route entry: `frontend/src/app/projects/[projectId]/change-orders/page.tsx` renders `ChangeOrdersConsole`
    - feature export entry: `frontend/src/features/change-orders/index.ts` exports `ChangeOrdersConsole`
 2. Parent/Owner:
-   `ChangeOrdersConsole` owns project scope, estimate linkage, selected change order, and mutation actions.
+   `ChangeOrdersConsole` owns project scope, quote linkage, selected change order, and mutation actions.
 3. Controller/Hook:
    console-level state/effects manage contract policy bootstrap, project datasets, drafts, and quick-status transitions.
 4. Children:
-   inline create/edit panels, estimate-origin viewer, line-item editors.
+   inline create/edit panels, quote-origin viewer, line-item editors.
 5. Default behavior:
    load project data -> render change-order list/editor -> allow create/edit/transition paths.
 6. Overrides:
@@ -37,15 +37,15 @@ Manage project-scoped contract deltas with explicit lifecycle transitions and re
 2. `GET /projects/{id}/change-orders/`:
    loads project change-order rows.
 3. `POST /projects/{id}/change-orders/`:
-   creates change order from selected estimate/context.
+   creates change order from selected quote/context.
 4. `PATCH /change-orders/{id}/`:
    updates selected change order fields and status.
 5. `POST /change-orders/{id}/clone-revision/`:
    creates revision clone from existing change order.
 6. `GET /projects/{id}/budgets/`:
    loads budget lines used in change-order composition.
-7. `GET /projects/{id}/estimates/`:
-   loads estimate context for origin linkage.
+7. `GET /projects/{id}/quotes/`:
+   loads quote context for origin linkage.
 
 ## Backend Contracts Used
 - Contract endpoint(s): `GET /contracts/change-orders/`
@@ -55,7 +55,7 @@ Manage project-scoped contract deltas with explicit lifecycle transitions and re
   - `default_create_status`
   - `allowed_status_transitions`
   - `revision_rules`
-  - `origin_estimate_rules`
+  - `origin_quote_rules`
   - `approval_metadata_rules`
   - `error_rules`
 - Behavior source: contract-backed status/transition rendering with endpoint responses for create/update/clone workflows
@@ -67,10 +67,10 @@ Manage project-scoped contract deltas with explicit lifecycle transitions and re
     - projects
     - change orders
     - budget lines
-    - project estimates
+    - project quotes
   - Local UI State:
     - selected project
-    - selected estimate
+    - selected quote
     - selected change order
     - form drafts
     - quick status

@@ -116,7 +116,7 @@ export function QuickAddForm({
         <summary>Optional details</summary>
         <div className={styles.optionalBody}>
           <label className={styles.field}>
-            Ballpark estimate
+            Ballpark quote
             <div className={styles.currencyInput}>
               <span className={styles.currencyPrefix}>$</span>
               <input

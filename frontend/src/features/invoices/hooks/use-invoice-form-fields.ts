@@ -76,7 +76,7 @@ export function useInvoiceFormFields({
   const [workspaceSourceInvoiceId, setWorkspaceSourceInvoiceId] = useState<number | null>(null);
   const [editingDraftInvoiceId, setEditingDraftInvoiceId] = useState<number | null>(null);
   const [workspaceContext, setWorkspaceContext] = useState("New invoice draft");
-  const [relatedEstimate, setRelatedEstimate] = useState<number | null>(null);
+  const [relatedQuote, setRelatedQuote] = useState<number | null>(null);
   const [billingPeriod, setBillingPeriod] = useState<number | null>(null);
 
   // --- Functions ---
@@ -110,7 +110,7 @@ export function useInvoiceFormFields({
       setTermsText(invoice.terms_text || "");
       setLineItems(workspaceLines);
       setNextLineId(workspaceLines.length + 1);
-      setRelatedEstimate(invoice.related_estimate ?? null);
+      setRelatedQuote(invoice.related_quote ?? null);
       setBillingPeriod(invoice.billing_period ?? null);
       setWorkspaceSourceInvoiceId(invoice.id);
       if (invoice.status === "draft") {
@@ -136,7 +136,7 @@ export function useInvoiceFormFields({
       setTermsText(invoice.terms_text || "");
       setLineItems(workspaceLines);
       setNextLineId(workspaceLines.length + 1);
-      setRelatedEstimate(null);
+      setRelatedQuote(null);
       setBillingPeriod(null);
       setWorkspaceSourceInvoiceId(null);
       setEditingDraftInvoiceId(null);
@@ -154,7 +154,7 @@ export function useInvoiceFormFields({
     setTaxPercent("0");
     setTermsText(organizationInvoiceDefaults?.invoice_terms_and_conditions || "");
     resetLines();
-    setRelatedEstimate(null);
+    setRelatedQuote(null);
     setBillingPeriod(null);
     setWorkspaceSourceInvoiceId(null);
     setEditingDraftInvoiceId(null);
@@ -169,7 +169,7 @@ export function useInvoiceFormFields({
     dueDate,
     taxPercent,
     termsText,
-    relatedEstimate,
+    relatedQuote,
     billingPeriod,
     workspaceSourceInvoiceId,
     editingDraftInvoiceId,
@@ -180,7 +180,7 @@ export function useInvoiceFormFields({
     setDueDate,
     setTaxPercent,
     setTermsText,
-    setRelatedEstimate,
+    setRelatedQuote,
     setBillingPeriod,
     setWorkspaceSourceInvoiceId,
     setEditingDraftInvoiceId,

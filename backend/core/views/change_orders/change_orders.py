@@ -18,12 +18,12 @@ from core.models import (
     ChangeOrder,
     ChangeOrderSnapshot,
     ChangeOrderStatusEvent,
-    Estimate,
+    Quote,
     Project,
     SigningCeremonyRecord,
 )
 from core.policies import get_change_order_policy_contract
-from core.serializers import ChangeOrderSerializer, ChangeOrderStatusEventSerializer, ChangeOrderWriteSerializer, EstimateLineItemSerializer
+from core.serializers import ChangeOrderSerializer, ChangeOrderStatusEventSerializer, ChangeOrderWriteSerializer, QuoteLineItemSerializer
 from core.serializers import ChangeOrderSerializer as _ChangeOrderSerializerForHash
 from core.utils.money import MONEY_ZERO, quantize_money
 from django_q.tasks import async_task
@@ -60,7 +60,7 @@ def public_change_order_detail_view(request, public_token):
     """Return public change-order detail for customer share links.
 
     Loads the change order by public token with project, customer,
-    estimate, and line-item relations.  Enriches the response with
+    quote, and line-item relations.  Enriches the response with
     project context, organization context, and signing ceremony consent.
 
     Flow:
@@ -83,8 +83,8 @@ def public_change_order_detail_view(request, public_token):
         change_order = _prefetch_change_order_qs(
             ChangeOrder.objects.filter(public_token=public_token)
         ).prefetch_related(
-            "origin_estimate__line_items",
-            "origin_estimate__line_items__cost_code",
+            "origin_quote__line_items",
+            "origin_quote__line_items__cost_code",
         ).get()
     except ChangeOrder.DoesNotExist:
         return Response(
@@ -102,21 +102,21 @@ def public_change_order_detail_view(request, public_token):
     organization = _resolve_organization_for_public_actor(change_order.requested_by)
     serialized["project_context"] = _serialize_public_project_context(change_order.project)
     serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
-    if change_order.origin_estimate_id:
-        estimate = change_order.origin_estimate
-        serialized["origin_estimate_context"] = {
-            "id": estimate.id,
-            "title": estimate.title,
-            "version": estimate.version,
-            "public_ref": estimate.public_ref,
-            "grand_total": str(estimate.grand_total),
-            "line_items": EstimateLineItemSerializer(
-                estimate.line_items.select_related("cost_code").all(), many=True
+    if change_order.origin_quote_id:
+        quote = change_order.origin_quote
+        serialized["origin_quote_context"] = {
+            "id": quote.id,
+            "title": quote.title,
+            "version": quote.version,
+            "public_ref": quote.public_ref,
+            "grand_total": str(quote.grand_total),
+            "line_items": QuoteLineItemSerializer(
+                quote.line_items.select_related("cost_code").all(), many=True
             ).data,
         }
         sibling_cos = (
             ChangeOrder.objects.filter(
-                origin_estimate_id=estimate.id,
+                origin_quote_id=quote.id,
                 status__in=["approved", "accepted"],
             )
             .exclude(id=change_order.id)
@@ -278,7 +278,7 @@ def public_change_order_decision_view(request, public_token):
         change_order.title,
         change_order.project.customer.display_name,
         decision,
-        f"/projects/{change_order.project_id}/estimates",
+        f"/projects/{change_order.project_id}/quotes",
     )
 
     refreshed = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()
@@ -287,21 +287,21 @@ def public_change_order_decision_view(request, public_token):
     organization = _resolve_organization_for_public_actor(refreshed.requested_by)
     serialized["project_context"] = _serialize_public_project_context(refreshed.project)
     serialized["organization_context"] = _serialize_public_organization_context(organization, request=request)
-    if refreshed.origin_estimate_id:
-        estimate = refreshed.origin_estimate
-        serialized["origin_estimate_context"] = {
-            "id": estimate.id,
-            "title": estimate.title,
-            "version": estimate.version,
-            "public_ref": estimate.public_ref,
-            "grand_total": str(estimate.grand_total),
-            "line_items": EstimateLineItemSerializer(
-                estimate.line_items.select_related("cost_code").all(), many=True
+    if refreshed.origin_quote_id:
+        quote = refreshed.origin_quote
+        serialized["origin_quote_context"] = {
+            "id": quote.id,
+            "title": quote.title,
+            "version": quote.version,
+            "public_ref": quote.public_ref,
+            "grand_total": str(quote.grand_total),
+            "line_items": QuoteLineItemSerializer(
+                quote.line_items.select_related("cost_code").all(), many=True
             ).data,
         }
         sibling_cos = (
             ChangeOrder.objects.filter(
-                origin_estimate_id=estimate.id,
+                origin_quote_id=quote.id,
                 status__in=["approved", "accepted"],
             )
             .exclude(id=refreshed.id)
@@ -463,7 +463,7 @@ def project_change_orders_view(request, project_id):
     GET returns all change orders for the project with line items and a
     latest-revision map for frontend UI gating.  POST creates a new
     change-order family (revision 1) requiring an approved origin
-    estimate, valid line totals matching the amount delta, and atomic
+    quote, valid line totals matching the amount delta, and atomic
     creation of the CO row plus optional line items.
 
     Flow (GET):
@@ -475,8 +475,8 @@ def project_change_orders_view(request, project_id):
     Flow (POST):
         1. Capability gate: ``change_orders.create``.
         1b. Reject if project is cancelled or completed (terminal guard).
-        2. Validate required fields (title, amount_delta, origin_estimate).
-        3. Validate origin estimate exists, is project-scoped, and approved.
+        2. Validate required fields (title, amount_delta, origin_quote).
+        3. Validate origin quote exists, is project-scoped, and approved.
         4. Validate line items and amount consistency.
         5. Create change order + lines (atomic).
 
@@ -484,7 +484,7 @@ def project_change_orders_view(request, project_id):
 
     Request body (POST)::
 
-        { "title": "Scope Addition", "amount_delta": "5000.00", "origin_estimate": 42, "line_items": [...] }
+        { "title": "Scope Addition", "amount_delta": "5000.00", "origin_quote": 42, "line_items": [...] }
 
     Success 200 (GET)::
 
@@ -495,7 +495,7 @@ def project_change_orders_view(request, project_id):
         { "data": { ... } }
 
     Errors:
-        - 400: Validation error (missing fields, invalid estimate, line mismatch).
+        - 400: Validation error (missing fields, invalid quote, line mismatch).
         - 403: Missing ``change_orders.create`` capability.
         - 404: Project not found.
     """
@@ -531,7 +531,7 @@ def project_change_orders_view(request, project_id):
         data = serializer.validated_data
         organization = membership.organization
         incoming_line_items = data.get("line_items", [])
-        origin_estimate = None
+        origin_quote = None
         reason_text = (
             str(data["reason"]).strip()
             if "reason" in data
@@ -554,24 +554,24 @@ def project_change_orders_view(request, project_id):
                 status=400,
             )
 
-        if "origin_estimate" not in data or data["origin_estimate"] is None:
+        if "origin_quote" not in data or data["origin_quote"] is None:
             return Response(
-                {"error": {"code": "validation_error", "message": "Change orders require an approved origin estimate.", "fields": {"origin_estimate": ["Select an approved estimate from this project."]}}},
+                {"error": {"code": "validation_error", "message": "Change orders require an approved origin quote.", "fields": {"origin_quote": ["Select an approved quote from this project."]}}},
                 status=400,
             )
         try:
-            origin_estimate = Estimate.objects.get(
-                id=data["origin_estimate"],
+            origin_quote = Quote.objects.get(
+                id=data["origin_quote"],
                 project=project,
             )
-        except Estimate.DoesNotExist:
+        except Quote.DoesNotExist:
             return Response(
-                {"error": {"code": "validation_error", "message": "origin_estimate is invalid for this project.", "fields": {"origin_estimate": ["Use an estimate from this project."]}}},
+                {"error": {"code": "validation_error", "message": "origin_quote is invalid for this project.", "fields": {"origin_quote": ["Use an quote from this project."]}}},
                 status=400,
             )
-        if origin_estimate.status != Estimate.Status.APPROVED:
+        if origin_quote.status != Quote.Status.APPROVED:
             return Response(
-                {"error": {"code": "validation_error", "message": "Change orders require an approved origin estimate.", "fields": {"origin_estimate": ["Only approved estimates can be used as CO origin."]}}},
+                {"error": {"code": "validation_error", "message": "Change orders require an approved origin quote.", "fields": {"origin_quote": ["Only approved quotes can be used as CO origin."]}}},
                 status=400,
             )
 
@@ -608,7 +608,7 @@ def project_change_orders_view(request, project_id):
                     sender_name=(organization.display_name or "").strip(),
                     sender_address=organization.formatted_billing_address,
                     sender_logo_url=sender_logo_url,
-                    origin_estimate=origin_estimate,
+                    origin_quote=origin_quote,
                     requested_by=request.user,
                 )
                 if incoming_line_items:
@@ -711,7 +711,7 @@ def change_order_detail_view(request, change_order_id):
                 if permission_error:
                     return Response(permission_error, status=403)
 
-        content_fields = {"title", "reason", "amount_delta", "days_delta", "origin_estimate", "line_items", "sections"}
+        content_fields = {"title", "reason", "amount_delta", "days_delta", "origin_quote", "line_items", "sections"}
         attempted_content_fields = sorted(field for field in content_fields if field in data)
 
         if change_order.status != ChangeOrder.Status.DRAFT:

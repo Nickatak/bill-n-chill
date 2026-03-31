@@ -20,7 +20,7 @@ ICs and GCs don't have fundamentally different financial relationships — a GC 
 - **AR (outward):** I do work → I send invoices → customer pays me.
 - **AP (inward):** Someone does work/provides materials for my project → they send me a bill → I pay them.
 
-The sub on the other end is a different user running the same loop. This means bills don't need to model the sub's cost structure (their cost codes, their line item breakdown). Bills are **inbound documents**, not reconstructions of someone else's estimate.
+The sub on the other end is a different user running the same loop. This means bills don't need to model the sub's cost structure (their cost codes, their line item breakdown). Bills are **inbound documents**, not reconstructions of someone else's quote.
 
 ## Decision
 
@@ -31,7 +31,7 @@ The sub on the other end is a different user running the same loop. This means b
 - Lifecycle is about the document: **Received → Approved → Disputed / Voided / Closed**. These are document statuses, not payment statuses. **Closed** is the manual reconciliation mechanism — it settles a bill that is only partially paid (e.g., dispute resolved, negotiated discount, write-off). The bill's original amount stays as-is (it's what the vendor sent), but Closed signals "we're done with this, the gap is intentional."
 - "Paid" is not a bill status — it's derived state from payment allocations covering the balance. (This differs from invoices, which keep an explicit PAID status transition — because you control the invoice amount, there's no reconciliation gap to worry about. On AP, you don't control the bill amount, so derived status + Closed is needed for flexibility.)
 - No `PLANNED` status. That was a budget concept that doesn't belong here.
-- Bill line items are **not** estimate/invoice-style (no qty × rate). They are simple transcriptions of what the vendor wrote on their invoice: **description + amount**. The GC is recording what they received, not reconstructing someone else's cost structure.
+- Bill line items are **not** quote/invoice-style (no qty × rate). They are simple transcriptions of what the vendor wrote on their invoice: **description + amount**. The GC is recording what they received, not reconstructing someone else's cost structure.
 - Cost code on line items is **optional**. The incoming invoice might be from Jobber, Buildr, Procore, or pen and paper — there may be no cost code on the source document at all. The GC *can* tag a line to one of their own cost codes for internal tracking, but it's their choice, not a structural requirement.
 
 **Receipts** are a quick-entry shortcut where the document and payment are the same moment:
@@ -97,6 +97,6 @@ The **accounting page** will eventually have its own entry forms for when you're
 
 ## What This Does NOT Change
 
-- Estimates, invoices, and change orders are unaffected. Invoices keep their explicit PAID status transition (you control both sides of the data).
+- Quotes, invoices, and change orders are unaffected. Invoices keep their explicit PAID status transition (you control both sides of the data).
 - Inbound payment recording against invoices follows the same universal pattern — moves to accounting page as already planned.
 - ~~Vendor model is unaffected~~ — Superseded by [Receipt & Vendor Model Separation](receipt-vendor-separation.md). Receipts are decoupled from bills, vendors become B2B only.

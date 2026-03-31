@@ -5,7 +5,7 @@ from django.core.management import call_command
 from core.tests.common import *
 from core.models import (
     ChangeOrder,
-    Estimate,
+    Quote,
     Invoice,
     Payment,
     VendorBill,
@@ -26,7 +26,7 @@ class AdoptionStageSeedTests(TestCase):
         user = User.objects.get(email="early@test.com")
         self.assertEqual(Customer.objects.filter(created_by=user).count(), 4)
         self.assertEqual(Project.objects.filter(created_by=user).count(), 2)
-        self.assertEqual(Estimate.objects.filter(created_by=user).count(), 2)
+        self.assertEqual(Quote.objects.filter(created_by=user).count(), 2)
 
     def test_mid_account_has_status_coverage(self):
         out = StringIO()
@@ -44,17 +44,17 @@ class AdoptionStageSeedTests(TestCase):
                 f"Missing project with status {status}",
             )
 
-        # Estimate family with archived → rejected → approved
-        family = Estimate.objects.filter(
+        # Quote family with archived → rejected → approved
+        family = Quote.objects.filter(
             created_by=user, title="Baker Office Scope"
         ).order_by("version")
         self.assertEqual(family.count(), 3)
         self.assertEqual(
             list(family.values_list("version", "status")),
             [
-                (1, Estimate.Status.ARCHIVED),
-                (2, Estimate.Status.REJECTED),
-                (3, Estimate.Status.APPROVED),
+                (1, Quote.Status.ARCHIVED),
+                (2, Quote.Status.REJECTED),
+                (3, Quote.Status.APPROVED),
             ],
         )
 
@@ -73,7 +73,7 @@ class AdoptionStageSeedTests(TestCase):
         self.assertEqual(Customer.objects.filter(created_by=user).count(), 35)
         self.assertEqual(Customer.objects.filter(created_by=user, is_archived=True).count(), 3)
         self.assertEqual(Project.objects.filter(created_by=user).count(), 18)
-        self.assertGreaterEqual(Estimate.objects.filter(created_by=user).count(), 18)
+        self.assertGreaterEqual(Quote.objects.filter(created_by=user).count(), 18)
         self.assertGreaterEqual(Invoice.objects.filter(project__created_by=user).count(), 10)
         self.assertGreaterEqual(VendorBill.objects.filter(project__created_by=user).count(), 10)
         self.assertGreaterEqual(Payment.objects.filter(project__created_by=user).count(), 5)

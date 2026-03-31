@@ -9,7 +9,7 @@ _Regenerate: `python scripts/generate_ai_index.py`_
 - [Features — Cost Codes](#features-cost-codes)
 - [Features — Customers](#features-customers)
 - [Features — Dashboard](#features-dashboard)
-- [Features — Estimates](#features-estimates)
+- [Features — Quotes](#features-quotes)
 - [Features — Invoices](#features-invoices)
 - [Features — Onboarding](#features-onboarding)
 - [Features — Organization](#features-organization)
@@ -108,15 +108,15 @@ _Superuser impersonation page — lists all impersonatable users_
 
 - [default] `GlobalError`
 
-### `frontend/src/app/estimate/[publicRef]/page.tsx`
+### `frontend/src/app/quote/[publicRef]/page.tsx`
 
 **Depends on:**
-- `@/features/estimates/components/estimate-approval-preview`
+- `@/features/quotes/components/quote-approval-preview`
 - `@/shared/shell`
 - `@/shared/styles/light-theme.module.css`
 
 - [Component] `generateMetadata({...})`
-- [default] `EstimateReviewPage`
+- [default] `QuoteReviewPage`
 
 ### `frontend/src/app/invoice/[publicRef]/page.tsx`
 
@@ -222,15 +222,15 @@ _Superuser impersonation page — lists all impersonatable users_
 - [Component] `generateMetadata({...})`
 - [default] `ProjectChangeOrdersPage`
 
-### `frontend/src/app/projects/[projectId]/estimates/page.tsx`
+### `frontend/src/app/projects/[projectId]/quotes/page.tsx`
 
 **Depends on:**
-- `@/features/estimates`
+- `@/features/quotes`
 - `@/shared/shell`
 - `@/shared/shell/route-metadata`
 
 - [Component] `generateMetadata({...})`
-- [default] `ProjectEstimatesPage`
+- [default] `ProjectQuotesPage`
 
 ### `frontend/src/app/projects/[projectId]/invoices/page.tsx`
 
@@ -280,24 +280,24 @@ _Superuser impersonation page — lists all impersonatable users_
 
 - [default] `VerifyEmailPage`
 
-## Features — Estimates
+## Features — Quotes
 
-### `frontend/src/features/estimates/api.ts`
-_Estimates feature API layer._
+### `frontend/src/features/quotes/api.ts`
+_Quotes feature API layer._
 
 **Depends on:**
 - `@/shared/api/base`
 - `@/shared/session/auth-headers`
 
-- [fn] `fetchEstimatePolicyContract({...})` — Fetch the estimate policy contract from the backend.
+- [fn] `fetchQuotePolicyContract({...})` — Fetch the quote policy contract from the backend.
 - [re-export] `defaultApiBaseUrl, normalizeApiBaseUrl` from `@/shared/api/base`
 
-### `frontend/src/features/estimates/components/cost-code-combobox.tsx`
+### `frontend/src/features/quotes/components/cost-code-combobox.tsx`
 _Accessible combobox for selecting a cost code._
 
 - [fn] `CostCodeCombobox({...})` — Render a searchable combobox for cost code selection.
 
-### `frontend/src/features/estimates/components/estimate-approval-preview.tsx`
+### `frontend/src/features/quotes/components/quote-approval-preview.tsx`
 
 **Depends on:**
 - `@/shared/date-format`
@@ -309,10 +309,10 @@ _Accessible combobox for selecting a cost code._
 - `@/shared/money-format`
 - `@/shared/styles/decision-stamp.module.css`
 
-- [fn] `EstimateApprovalPreview({...})`
+- [fn] `QuoteApprovalPreview({...})`
 
-### `frontend/src/features/estimates/components/estimate-sheet.tsx`
-_Estimate document creator sheet used for both creating and editing estimates._
+### `frontend/src/features/quotes/components/quote-sheet.tsx`
+_Quote document creator sheet used for both creating and editing quotes._
 
 **Depends on:**
 - `@/shared/date-format`
@@ -323,9 +323,9 @@ _Estimate document creator sheet used for both creating and editing estimates._
 - `@/shared/hooks/use-media-query`
 - `@/shared/money-format`
 
-- [fn] `EstimateSheet({...})` — Composable estimate sheet supporting draft creation, draft editing, and
+- [fn] `QuoteSheet({...})` — Composable quote sheet supporting draft creation, draft editing, and
 
-### `frontend/src/features/estimates/components/estimates-console.tsx`
+### `frontend/src/features/quotes/components/quotes-console.tsx`
 
 **Depends on:**
 - `@/shared/api/base`
@@ -340,92 +340,92 @@ _Estimate document creator sheet used for both creating and editing estimates._
 - `@/shared/session/use-shared-session`
 - `@/shared/shell/printable-context`
 
-- [fn] `EstimatesConsole({...})`
+- [fn] `QuotesConsole({...})`
 
-### `frontend/src/features/estimates/components/estimates-viewer-panel.tsx`
-_Presentational component for the estimates viewer panel._
+### `frontend/src/features/quotes/components/quotes-viewer-panel.tsx`
+_Presentational component for the quotes viewer panel._
 
 **Depends on:**
 - `@/shared/date-format`
 - `@/shared/money-format`
 - `@/shared/project-list-viewer`
 
-- [Component] `EstimatesViewerPanel({...})`
-- [type] `EstimateFamily` { title, items }
-- [type] `EstimatesViewerPanelProps` { selectedProject, isMobile, isViewerExpanded, setIsViewerExpanded, viewerStatusOptions, estimateStatusFilters, ... }
+- [Component] `QuotesViewerPanel({...})`
+- [type] `QuoteFamily` { title, items }
+- [type] `QuotesViewerPanelProps` { selectedProject, isMobile, isViewerExpanded, setIsViewerExpanded, viewerStatusOptions, quoteStatusFilters, ... }
 
-### `frontend/src/features/estimates/components/estimates-workspace-panel.tsx`
-_Workspace panel for the estimates console — toolbar, family-collision_
+### `frontend/src/features/quotes/components/quotes-workspace-panel.tsx`
+_Workspace panel for the quotes console — toolbar, family-collision_
 
 **Depends on:**
 - `@/shared/styles/decision-stamp.module.css`
 
-- [Component] `EstimatesWorkspacePanel({...})`
-- [type] `EstimatesWorkspacePanelProps` { workspaceContextLabel, workspaceContext, workspaceBadgeClass, workspaceBadgeLabel, selectedEstimate, onStartNew, ... }
+- [Component] `QuotesWorkspacePanel({...})`
+- [type] `QuotesWorkspacePanelProps` { workspaceContextLabel, workspaceContext, workspaceBadgeClass, workspaceBadgeLabel, selectedQuote, onStartNew, ... }
 
-### `frontend/src/features/estimates/document-adapter.ts`
-_Document-creator adapter for estimates._
+### `frontend/src/features/quotes/document-adapter.ts`
+_Document-creator adapter for quotes._
 
-- [fn] `toEstimateStatusPolicy(contract)` — Convert the backend policy contract (snake_case) to the creator's
-- [fn] `toEstimateStatusEvents(events)` — Convert backend status event records to the creator's status event
-- [fn] `createEstimateDocumentAdapter(statusPolicy, statusEvents)` — Build a fully configured document-creator adapter for estimates.
+- [fn] `toQuoteStatusPolicy(contract)` — Convert the backend policy contract (snake_case) to the creator's
+- [fn] `toQuoteStatusEvents(events)` — Convert backend status event records to the creator's status event
+- [fn] `createQuoteDocumentAdapter(statusPolicy, statusEvents)` — Build a fully configured document-creator adapter for quotes.
 
-### `frontend/src/features/estimates/helpers.ts`
-_Pure helper functions for the estimates feature._
+### `frontend/src/features/quotes/helpers.ts`
+_Pure helper functions for the quotes feature._
 
 **Depends on:**
 - `@/shared/api/error`
 
-- [fn] `normalizeEstimatePolicy({...})`
-- [fn] `resolveAutoSelectEstimate(rows, activeFilters, hints)` — Pick the best estimate to auto-select after a list load.
-- [fn] `validateEstimateLineItems(lines)`
-- [fn] `resolveEstimateValidationDeltaDays(defaults)`
+- [fn] `normalizeQuotePolicy({...})`
+- [fn] `resolveAutoSelectQuote(rows, activeFilters, hints)` — Pick the best quote to auto-select after a list load.
+- [fn] `validateQuoteLineItems(lines)`
+- [fn] `resolveQuoteValidationDeltaDays(defaults)`
 - [fn] `emptyLine(localId, defaultCostCodeId = "")`
-- [fn] `mapEstimateLineItemsToInputs(items)`
-- [fn] `readEstimateApiError(payload, fallback)`
+- [fn] `mapQuoteLineItemsToInputs(items)`
+- [fn] `readQuoteApiError(payload, fallback)`
 - [fn] `normalizeFamilyTitle(value)`
-- [fn] `mapPublicEstimateLineItems(estimate)`
-- [fn] `mapLineCostCodes(estimate)`
-- [fn] `estimateStatusLabel(status)`
+- [fn] `mapPublicQuoteLineItems(quote)`
+- [fn] `mapLineCostCodes(quote)`
+- [fn] `quoteStatusLabel(status)`
 - [fn] `formatStatusAction(event)`
 - [fn] `isResendStatusEvent(event)`
 - [fn] `isNotatedStatusEvent(event)`
 - [fn] `toNumber(value)`
 - [fn] `computeLineTotal(line)`
-- [fn] `groupEstimateFamilies(estimates)` — Group estimates by title into families, sorted by version within each
-- [fn] `computeEstimateStatusCounts(families)` — Count how many families have each status as their latest version's status.
+- [fn] `groupQuoteFamilies(quotes)` — Group quotes by title into families, sorted by version within each
+- [fn] `computeQuoteStatusCounts(families)` — Count how many families have each status as their latest version's status.
 - [fn] `filterVisibleFamilies(families, statusFilters)` — Filter families to those whose latest version's status is in the active filter set.
-- [type] `NormalizedEstimatePolicy` { statuses, statusLabels, allowedTransitions, quickActionByStatus, defaultCreateStatus, defaultStatusFilters }
+- [type] `NormalizedQuotePolicy` { statuses, statusLabels, allowedTransitions, quickActionByStatus, defaultCreateStatus, defaultStatusFilters }
 - [type] `LineValidationIssue` { localId, rowNumber, message }
 - [type] `LineValidationResult` { issues, issuesByLocalId }
-- [type] `EstimateFamily` { title, items }
+- [type] `QuoteFamily` { title, items }
 
-### `frontend/src/features/estimates/hooks/use-estimate-form-fields.ts`
-_Estimate form field state for the composer panel._
+### `frontend/src/features/quotes/hooks/use-quote-form-fields.ts`
+_Quote form field state for the composer panel._
 
-- [fn] `useEstimateFormFields({...})` — Manage estimate composer form fields: title, dates, tax, terms, sort,
-- [type] `EstimateFamilyCollisionPrompt` { title, latestEstimateId, latestVersion, familySize }
+- [fn] `useQuoteFormFields({...})` — Manage quote composer form fields: title, dates, tax, terms, sort,
+- [type] `QuoteFamilyCollisionPrompt` { title, latestQuoteId, latestVersion, familySize }
 
-### `frontend/src/features/estimates/index.ts`
+### `frontend/src/features/quotes/index.ts`
 
-- [re-export] `EstimatesConsole` from `./components/estimates-console`
-- [re-export] `EstimateSheet` from `./components/estimate-sheet`
+- [re-export] `QuotesConsole` from `./components/quotes-console`
+- [re-export] `QuoteSheet` from `./components/quote-sheet`
 - [re-export] `*` from `./api`
 - [re-export] `*` from `./types`
 
-### `frontend/src/features/estimates/types.ts`
+### `frontend/src/features/quotes/types.ts`
 
 **Depends on:**
 - `@/shared/types/domain`
 
 - [type] `ProjectRecord` { id, name, status, customer, customer_display_name, customer_billing_address, ... }
-- [type] `EstimateRecord` { id, project, version, status, title, valid_through, ... }
-- [type] `EstimateLineItemRecord` { id, cost_code, cost_code_code, cost_code_name, description, quantity, ... }
-- [type] `EstimateStatusEventRecord` { id, from_status, to_status, note, action_type, changed_by_email, ... }
-- [type] `EstimateRelatedChangeOrderRecord` { id, number, revision_number, title, status, origin_estimate, ... }
-- [type] `EstimateLineInput` { localId, costCodeId, description, quantity, unit, unitCost, ... }
-- [type] `EstimatePolicyContract` { policy_version, status_labels, statuses, default_create_status, default_status_filters, allowed_status_transitions, ... }
-- [type] `ApiResponse` { email_sent, conversion_status, code, message, fields, latest_estimate_id, ... }
+- [type] `QuoteRecord` { id, project, version, status, title, valid_through, ... }
+- [type] `QuoteLineItemRecord` { id, cost_code, cost_code_code, cost_code_name, description, quantity, ... }
+- [type] `QuoteStatusEventRecord` { id, from_status, to_status, note, action_type, changed_by_email, ... }
+- [type] `QuoteRelatedChangeOrderRecord` { id, number, revision_number, title, status, origin_quote, ... }
+- [type] `QuoteLineInput` { localId, costCodeId, description, quantity, unit, unitCost, ... }
+- [type] `QuotePolicyContract` { policy_version, status_labels, statuses, default_create_status, default_status_filters, allowed_status_transitions, ... }
+- [type] `ApiResponse` { email_sent, conversion_status, code, message, fields, latest_quote_id, ... }
 
 ## Features — Change Orders
 
@@ -481,10 +481,10 @@ _Pure display helpers for change order consoles and viewers._
 - [fn] `eventActorLabel(event)`
 - [fn] `eventActorHref(event)`
 - [fn] `statusEventActionLabel(event, statusLabels, string>)` — Derive a past-tense action label from a status audit event.
-- [fn] `approvalMeta(estimate)`
-- [fn] `approvedRollingDeltaForEstimate(estimateId, changeOrders)` — Sum approved change order deltas for a given origin estimate.
-- [fn] `originalBudgetTotalForEstimate(estimateId, originEstimateOriginalTotals, number>)`
-- [fn] `currentApprovedBudgetTotalForEstimate({...})`
+- [fn] `approvalMeta(quote)`
+- [fn] `approvedRollingDeltaForQuote(quoteId, changeOrders)` — Sum approved change order deltas for a given origin quote.
+- [fn] `originalBudgetTotalForQuote(quoteId, originQuoteOriginalTotals, number>)`
+- [fn] `currentApprovedBudgetTotalForQuote({...})`
 - [fn] `lastStatusEventForChangeOrder(changeOrderId, projectAuditEvents)` — Find the most recent status event for a specific change order from the project's audit events.
 - [fn] `toLinePayload(lines)`
 
@@ -503,7 +503,7 @@ _Presentational component for the change-orders viewer panel._
 _Workspace panel for the change-orders console -- toolbar, create form,_
 
 **Depends on:**
-- `@/features/estimates/components/cost-code-combobox`
+- `@/features/quotes/components/cost-code-combobox`
 - `@/shared/document-creator`
 - `@/shared/document-creator/change-order-creator.module.css`
 - `@/shared/document-creator/creator-foundation.module.css`
@@ -515,7 +515,7 @@ _Workspace panel for the change-orders console -- toolbar, create form,_
 - `@/shared/styles/decision-stamp.module.css`
 
 - [Component] `ChangeOrdersWorkspacePanel({...})`
-- [type] `ChangeOrdersWorkspacePanelProps` { isMobile, selectedProjectId, selectedViewerEstimateId, selectedViewerEstimate, projectEstimates, selectedChangeOrder, ... }
+- [type] `ChangeOrdersWorkspacePanelProps` { isMobile, selectedProjectId, selectedViewerQuoteId, selectedViewerQuote, projectQuotes, selectedChangeOrder, ... }
 
 ### `frontend/src/features/change-orders/document-adapter.ts`
 _Document-creator adapter for change orders._
@@ -581,8 +581,8 @@ _Viewer-side derived state for the change-orders console._
 - `@/shared/types/domain`
 
 - [type] `ProjectRecord` { id }
-- [type] `OriginEstimateLineItem` { id, cost_code_code, cost_code_name, description, quantity, unit, ... }
-- [type] `OriginEstimateRecord` { id, title, version, approved_at, approved_by_email, grand_total, ... }
+- [type] `OriginQuoteLineItem` { id, cost_code_code, cost_code_name, description, quantity, unit, ... }
+- [type] `OriginQuoteRecord` { id, title, version, approved_at, approved_by_email, grand_total, ... }
 - [type] `AuditEventRecord` { id, event_type, object_type, object_id, from_status, to_status, ... }
 - [type] `CostCodeOption` { id, code, name, is_active }
 - [type] `ChangeOrderLineRecord` { id, change_order, cost_code, cost_code_id, cost_code_code, cost_code_name, ... }
@@ -653,7 +653,7 @@ _Presentational component for the invoices viewer panel._
 _Workspace panel for the invoices console — toolbar, DocumentCreator form,_
 
 **Depends on:**
-- `@/features/estimates/components/cost-code-combobox`
+- `@/features/quotes/components/cost-code-combobox`
 - `@/shared/document-creator`
 - `@/shared/document-creator/creator-foundation.module.css`
 - `@/shared/document-creator/invoice-creator.module.css`
@@ -702,7 +702,7 @@ _Invoice data fetching and list state._
 - `@/shared/session/auth-headers`
 
 - [fn] `useInvoiceData({...})` — Fetch and manage invoice-related data for the scoped project.
-- [type] `ContractBreakdown` { active_estimate, approved_change_orders }
+- [type] `ContractBreakdown` { active_quote, approved_change_orders }
 
 ### `frontend/src/features/invoices/hooks/use-invoice-form-fields.ts`
 _Invoice workspace form field state._
@@ -994,7 +994,7 @@ _Projects feature API configuration._
 - [type] `AccountingSyncEventRecord` { id, project, project_name, provider, object_type, object_id, ... }
 - [type] `ProjectTraceabilityRecord` { id, label, status, amount, detail_endpoint }
 - [type] `ProjectTraceabilityBucket` { ui_route, list_endpoint, total, records }
-- [type] `ApprovedEstimate` { id, title, grand_total }
+- [type] `ApprovedQuote` { id, title, grand_total }
 - [type] `ApiResponse` { retry_status, code, message, fields }
 - [type] `PortfolioProjectSnapshot` { project_id, project_name, project_status, ar_outstanding, ap_outstanding, approved_change_orders_total }
 - [type] `PortfolioSnapshot` { generated_at, date_from, date_to, active_projects_count, ar_total_outstanding, ap_total_outstanding, ... }
@@ -1514,7 +1514,7 @@ _Persistent banner shown when a superuser is impersonating another user._
 - [re-export] `PageShell, PageCard` from `./page-shell`
 - [re-export] `isRouteActive, workflowRoutes, businessMenuRoutes` from `./nav-routes`
 - [re-export] `isNumericRouteId, resolveProjectQueryTitle, resolveProjectParamTitle, ` from `./route-metadata`
-- [re-export] `parsePublicTokenFromRef, composePublicDocumentMetadataTitle, resolvePublicEstimateMetadataTitle, resolvePublicInvoiceMetadataTitle, resolvePublicChangeOrderMetadataTitle, ` from `./public-route-metadata`
+- [re-export] `parsePublicTokenFromRef, composePublicDocumentMetadataTitle, resolvePublicQuoteMetadataTitle, resolvePublicInvoiceMetadataTitle, resolvePublicChangeOrderMetadataTitle, ` from `./public-route-metadata`
 
 ### `frontend/src/shared/shell/mobile-bottom-nav/index.ts`
 
@@ -1565,7 +1565,7 @@ _Server-side metadata resolvers for public (tokenized) document routes._
 
 - [fn] `parsePublicTokenFromRef(publicRef)` — Parse the share token from the `slug--token` style public reference.
 - [fn] `composePublicDocumentMetadataTitle(resolvedTitle, fallbackLabel)` — Compose a `<title>` string for a public document page.
-- [fn] `resolvePublicEstimateMetadataTitle(publicToken)` — Resolve a human-readable title for a public estimate page.
+- [fn] `resolvePublicQuoteMetadataTitle(publicToken)` — Resolve a human-readable title for a public quote page.
 - [fn] `resolvePublicInvoiceMetadataTitle(publicToken)` — Resolve a human-readable title for a public invoice page.
 - [fn] `resolvePublicChangeOrderMetadataTitle(publicToken)` — Resolve a human-readable title for a public change order page.
 
@@ -1732,7 +1732,7 @@ _Context resolution for public (token-authenticated) document viewers._
 - [type] `PublicViewerRecipient` { name, address, addressLines, email, phone }
 
 ### `frontend/src/shared/document-viewer/public-document-frame.tsx`
-_Structural frame for public-facing document pages (invoices, estimates, change orders)._
+_Structural frame for public-facing document pages (invoices, quotes, change orders)._
 
 - [Component] `publicDocumentViewerClassNames(overrides)` — Build a complete `PublicDocumentViewerClassNames` map by merging the
 - [Component] `PublicDocumentFrame({...})` — Render the standard document card frame used by all public viewer pages.
@@ -1762,7 +1762,7 @@ _ReadOnlyLineTable — polished read-only line-items table for reference data._
 ### `frontend/src/shared/types/domain.ts`
 _Shared domain types used across multiple feature modules._
 
-- [type] `OrganizationPublicContext` { display_name, logo_url, billing_address, help_email, invoice_terms_and_conditions, estimate_terms_and_conditions, ... }
+- [type] `OrganizationPublicContext` { display_name, logo_url, billing_address, help_email, invoice_terms_and_conditions, quote_terms_and_conditions, ... }
 - [type] `CostCode` { id, code, name, is_active }
 - [type] `UserData` { token, email }
 

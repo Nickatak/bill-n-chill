@@ -1,25 +1,25 @@
-"""BillingPeriod model — estimate-scoped payment milestones."""
+"""BillingPeriod model — quote-scoped payment milestones."""
 
 from django.db import models
 
 
 class BillingPeriod(models.Model):
-    """Named payment milestone representing a percentage of an estimate's total.
+    """Named payment milestone representing a percentage of a quote's total.
 
-    Billing periods define an estimate's payment schedule as percentages.
+    Billing periods define a quote's payment schedule as percentages.
     Dollar amounts are computed at render/invoice time as
-    ``estimate.grand_total * period.percent / 100`` — nothing financial is
+    ``quote.grand_total * period.percent / 100`` — nothing financial is
     stored on the period itself.
 
     Business workflow:
-    - Authored on the estimate creator (embedded in the estimate payload).
-    - Each estimate owns its own set of billing periods.
-    - Percentages across all periods for an estimate must sum to 100%.
-    - Periods are optional — estimates without periods have no billing schedule.
+    - Authored on the quote creator (embedded in the quote payload).
+    - Each quote owns its own set of billing periods.
+    - Percentages across all periods for a quote must sum to 100%.
+    - Periods are optional — quotes without periods have no billing schedule.
     """
 
-    estimate = models.ForeignKey(
-        "Estimate",
+    quote = models.ForeignKey(
+        "Quote",
         on_delete=models.CASCADE,
         related_name="billing_periods",
     )

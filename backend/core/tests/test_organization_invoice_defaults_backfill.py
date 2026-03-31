@@ -14,18 +14,18 @@ class OrganizationInvoiceDefaultsBackfillCommandTests(TestCase):
             display_name="Backfill Org",
             created_by=owner,
             help_email="",
-            default_estimate_valid_delta=0,
+            default_quote_valid_delta=0,
             invoice_terms_and_conditions="",
-            estimate_terms_and_conditions="",
+            quote_terms_and_conditions="",
             change_order_terms_and_conditions="",
         )
         custom_org = Organization.objects.create(
             display_name="Custom Org",
             created_by=owner,
             help_email="help@custom.org",
-            default_estimate_valid_delta=60,
+            default_quote_valid_delta=60,
             invoice_terms_and_conditions="Custom terms",
-            estimate_terms_and_conditions="Custom estimate terms",
+            quote_terms_and_conditions="Custom quote terms",
             change_order_terms_and_conditions="Custom CO terms",
         )
 
@@ -36,14 +36,14 @@ class OrganizationInvoiceDefaultsBackfillCommandTests(TestCase):
             missing_defaults_org.help_email,
             "backfill-owner@example.com",
         )
-        self.assertEqual(missing_defaults_org.default_estimate_valid_delta, 30)
+        self.assertEqual(missing_defaults_org.default_quote_valid_delta, 30)
         self.assertEqual(
             missing_defaults_org.invoice_terms_and_conditions,
             "Payment due within 30 days of invoice date.",
         )
         self.assertEqual(
-            missing_defaults_org.estimate_terms_and_conditions,
-            "Estimate is valid for 30 days. Scope and pricing are based on visible conditions only; hidden conditions may require a change order.",
+            missing_defaults_org.quote_terms_and_conditions,
+            "Quote is valid for 30 days. Scope and pricing are based on visible conditions only; hidden conditions may require a change order.",
         )
         self.assertEqual(
             missing_defaults_org.change_order_terms_and_conditions,
@@ -53,7 +53,7 @@ class OrganizationInvoiceDefaultsBackfillCommandTests(TestCase):
 
         custom_org.refresh_from_db()
         self.assertEqual(custom_org.help_email, "help@custom.org")
-        self.assertEqual(custom_org.default_estimate_valid_delta, 60)
+        self.assertEqual(custom_org.default_quote_valid_delta, 60)
         self.assertEqual(custom_org.invoice_terms_and_conditions, "Custom terms")
-        self.assertEqual(custom_org.estimate_terms_and_conditions, "Custom estimate terms")
+        self.assertEqual(custom_org.quote_terms_and_conditions, "Custom quote terms")
         self.assertEqual(custom_org.change_order_terms_and_conditions, "Custom CO terms")

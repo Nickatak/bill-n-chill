@@ -77,20 +77,20 @@ describe("resolveProjectQueryTitle", () => {
 
 describe("resolveProjectParamTitle", () => {
   it("builds scoped title for valid project id", () => {
-    expect(resolveProjectParamTitle("17", "Estimates", "Project Estimates")).toBe(
-      "Project #17 Estimates",
+    expect(resolveProjectParamTitle("17", "Quotes", "Project Quotes")).toBe(
+      "Project #17 Quotes",
     );
   });
 
   it("returns fallback for non-numeric id", () => {
-    expect(resolveProjectParamTitle("abc", "Estimates", "Project Estimates")).toBe(
-      "Project Estimates",
+    expect(resolveProjectParamTitle("abc", "Quotes", "Project Quotes")).toBe(
+      "Project Quotes",
     );
   });
 
   it("returns fallback for empty id", () => {
-    expect(resolveProjectParamTitle("", "Estimates", "Project Estimates")).toBe(
-      "Project Estimates",
+    expect(resolveProjectParamTitle("", "Quotes", "Project Quotes")).toBe(
+      "Project Quotes",
     );
   });
 });

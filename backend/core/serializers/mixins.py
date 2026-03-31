@@ -1,7 +1,7 @@
 """Shared helpers for serializer method fields.
 
 These functions extract the duplicated public-decision display logic that
-appears in EstimateStatusEventSerializer and InvoiceStatusEventSerializer.
+appears in QuoteStatusEventSerializer and InvoiceStatusEventSerializer.
 Each serializer provides a ``customer_fn`` callable that navigates from the
 event object to the associated Customer.
 """

@@ -1,13 +1,13 @@
 /**
  * Route classification helpers for the auth gate.
  *
- * Public document routes (estimate, invoice, change-order viewer) and
+ * Public document routes (quote, invoice, change-order viewer) and
  * auth routes (login, register) bypass the global auth gate so
  * unauthenticated visitors can access them.
  */
 
 const PUBLIC_DOCUMENT_ROUTE_PATTERNS = [
-  /^\/estimate\/[^/]+\/?$/,
+  /^\/quote\/[^/]+\/?$/,
   /^\/invoice\/[^/]+\/?$/,
   /^\/change-order\/[^/]+\/?$/,
 ];

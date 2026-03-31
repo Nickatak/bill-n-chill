@@ -473,7 +473,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       taxAmount: draftTaxTotal,
       totalAmount: draftTotal,
       lineItems,
-      relatedEstimate: formFields.relatedEstimate,
+      relatedQuote: formFields.relatedQuote,
       billingPeriod: formFields.billingPeriod,
     }),
     [
@@ -482,7 +482,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
       draftTotal,
       formFields.dueDate,
       formFields.issueDate,
-      formFields.relatedEstimate,
+      formFields.relatedQuote,
       formFields.billingPeriod,
       lineItems,
       formFields.taxPercent,
@@ -543,7 +543,7 @@ export function InvoicesConsole({ scopedProjectId }: InvoicesConsoleProps) {
     formFields.setDueDate(option.dueDate || dueDateFromIssueDate(nextIssueDate, dueDays));
     formFields.setTaxPercent("0");
     formFields.setTermsText(invoiceData.organizationInvoiceDefaults?.invoice_terms_and_conditions || "");
-    formFields.setRelatedEstimate(option.estimateId);
+    formFields.setRelatedQuote(option.quoteId);
     formFields.setBillingPeriod(option.billingPeriodId);
     formFields.setWorkspaceSourceInvoiceId(null);
     formFields.setEditingDraftInvoiceId(null);

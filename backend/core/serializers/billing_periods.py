@@ -12,7 +12,7 @@ class BillingPeriodSerializer(serializers.ModelSerializer):
         model = BillingPeriod
         fields = [
             "id",
-            "estimate",
+            "quote",
             "description",
             "percent",
             "due_date",
@@ -24,7 +24,7 @@ class BillingPeriodSerializer(serializers.ModelSerializer):
 
 
 class BillingPeriodInputSerializer(serializers.Serializer):
-    """Write serializer for a single billing period embedded in an estimate payload."""
+    """Write serializer for a single billing period embedded in an quote payload."""
 
     description = serializers.CharField(max_length=255, allow_blank=True)
     percent = serializers.DecimalField(max_digits=6, decimal_places=2)

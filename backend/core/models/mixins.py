@@ -53,7 +53,7 @@ class StatusTransitionMixin:
 
     Subclasses must define:
     - ``ALLOWED_STATUS_TRANSITIONS``: dict mapping each status to a set of valid next statuses.
-    - ``_status_label``: lowercase noun for error messages (e.g., ``"estimate"``).
+    - ``_status_label``: lowercase noun for error messages (e.g., ``"quote"``).
 
     Provides:
     - ``is_transition_allowed(current, next)`` classmethod.

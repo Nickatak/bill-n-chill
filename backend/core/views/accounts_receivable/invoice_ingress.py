@@ -32,7 +32,7 @@ class InvoiceCreateIngress:
     notes_text: str
     tax_percent: Decimal
     line_items: list[dict[str, Any]]
-    related_estimate_id: int | None
+    related_quote_id: int | None
     billing_period_id: int | None
     initial_status: str
 
@@ -68,7 +68,7 @@ def build_invoice_create_ingress(
         notes_text=(validated_data.get("notes_text") or default_notes_text).strip(),
         tax_percent=validated_data.get("tax_percent", Decimal("0")),
         line_items=line_items,
-        related_estimate_id=validated_data.get("related_estimate"),
+        related_quote_id=validated_data.get("related_quote"),
         billing_period_id=validated_data.get("billing_period"),
         initial_status=validated_data.get("initial_status", "draft"),
     )

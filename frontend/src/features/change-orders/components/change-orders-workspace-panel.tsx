@@ -19,7 +19,7 @@ import type {
   ChangeOrderLineInput,
   ChangeOrderRecord,
   CostCodeOption,
-  OriginEstimateRecord,
+  OriginQuoteRecord,
 } from "../types";
 import type { ChangeOrderFormState } from "../document-adapter";
 import styles from "./change-orders-console.module.css";
@@ -41,11 +41,11 @@ export type ChangeOrdersWorkspacePanelProps = {
   createSheetRef: RefObject<ChangeOrderSheetV2Handle | null>;
   editSheetRef: RefObject<ChangeOrderSheetV2Handle | null>;
 
-  // Project/estimate context
+  // Project/quote context
   selectedProjectId: string;
-  selectedViewerEstimateId: string;
-  selectedViewerEstimate: OriginEstimateRecord | null;
-  projectEstimates: OriginEstimateRecord[];
+  selectedViewerQuoteId: string;
+  selectedViewerQuote: OriginQuoteRecord | null;
+  projectQuotes: OriginQuoteRecord[];
 
   // Workspace context
   selectedChangeOrder: ChangeOrderRecord | null;
@@ -111,11 +111,11 @@ export type ChangeOrdersWorkspacePanelProps = {
   onUpdateEditLine: (localId: number, updates: Partial<ChangeOrderLineInput>) => void;
 
   // Contract breakdown
-  approvedCOsForSelectedEstimate: ChangeOrderRecord[];
+  approvedCOsForSelectedQuote: ChangeOrderRecord[];
   isOriginLineItemsSectionOpen: boolean;
   setIsOriginLineItemsSectionOpen: React.Dispatch<React.SetStateAction<boolean>>;
   currentAcceptedTotal: string | null;
-  originalEstimateTotal: string | null;
+  originalQuoteTotal: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -126,9 +126,9 @@ export function ChangeOrdersWorkspacePanel({
   createSheetRef,
   editSheetRef,
   selectedProjectId,
-  selectedViewerEstimateId,
-  selectedViewerEstimate,
-  projectEstimates,
+  selectedViewerQuoteId,
+  selectedViewerQuote,
+  projectQuotes,
   selectedChangeOrder,
   selectedViewerChangeOrder,
   isSelectedChangeOrderEditable,
@@ -180,11 +180,11 @@ export function ChangeOrdersWorkspacePanel({
   onAddEditLine,
   onRemoveEditLine,
   onUpdateEditLine,
-  approvedCOsForSelectedEstimate,
+  approvedCOsForSelectedQuote,
   isOriginLineItemsSectionOpen,
   setIsOriginLineItemsSectionOpen,
   currentAcceptedTotal,
-  originalEstimateTotal,
+  originalQuoteTotal,
 }: ChangeOrdersWorkspacePanelProps) {
 
   // -------------------------------------------------------------------------
@@ -192,10 +192,10 @@ export function ChangeOrdersWorkspacePanel({
   // -------------------------------------------------------------------------
 
   function renderContractBreakdown(opts?: { style?: React.CSSProperties }) {
-    if (!selectedViewerEstimate) return null;
-    const hasEstimateLines = selectedViewerEstimate.line_items.length > 0;
-    const hasApprovedCOs = approvedCOsForSelectedEstimate.length > 0;
-    if (!hasEstimateLines && !hasApprovedCOs) return null;
+    if (!selectedViewerQuote) return null;
+    const hasQuoteLines = selectedViewerQuote.line_items.length > 0;
+    const hasApprovedCOs = approvedCOsForSelectedQuote.length > 0;
+    if (!hasQuoteLines && !hasApprovedCOs) return null;
 
     return (
       <div className={styles.viewerSection} style={opts?.style}>
@@ -210,11 +210,11 @@ export function ChangeOrdersWorkspacePanel({
         </button>
         {isOriginLineItemsSectionOpen ? (
           <div className={styles.viewerSectionContent}>
-            {hasEstimateLines ? (
+            {hasQuoteLines ? (
               <ReadOnlyLineTable
-                caption={`Approved Estimate: ${selectedViewerEstimate.title} v${selectedViewerEstimate.version}`}
+                caption={`Approved Quote: ${selectedViewerQuote.title} v${selectedViewerQuote.version}`}
                 columns={["Cost code", "Description", "Qty", "Unit", "Unit cost", "Markup %", "Line total"]}
-                rows={selectedViewerEstimate.line_items.map((line) => {
+                rows={selectedViewerQuote.line_items.map((line) => {
                   const qty = Number(line.quantity || 0);
                   const unitCost = Number(line.unit_price || 0);
                   const unit = line.unit || "ea";
@@ -248,8 +248,8 @@ export function ChangeOrdersWorkspacePanel({
                 ]}
                 afterTable={
                   <div className={styles.viewerMetaRow}>
-                    <span className={styles.viewerMetaLabel}>Estimate grand total</span>
-                    <strong>${selectedViewerEstimate.grand_total}</strong>
+                    <span className={styles.viewerMetaLabel}>Quote grand total</span>
+                    <strong>${selectedViewerQuote.grand_total}</strong>
                   </div>
                 }
               />
@@ -257,9 +257,9 @@ export function ChangeOrdersWorkspacePanel({
 
             {hasApprovedCOs ? (
               <ReadOnlyLineTable
-                caption={`Approved Change Orders (${approvedCOsForSelectedEstimate.length})`}
+                caption={`Approved Change Orders (${approvedCOsForSelectedQuote.length})`}
                 columns={["CO #", "Cost code", "Description", "Days delta", "Amount delta"]}
-                rows={approvedCOsForSelectedEstimate.flatMap((co) =>
+                rows={approvedCOsForSelectedQuote.flatMap((co) =>
                   co.line_items.map((line) => {
                     const costCodeLabel = [line.cost_code_code, line.cost_code_name].filter(Boolean).join(" — ") || "—";
                     return {
@@ -379,9 +379,9 @@ export function ChangeOrdersWorkspacePanel({
                       {newTitle || "Untitled"}
                     </div>
                     <div className={`${creatorStyles.blockMuted} ${creatorStyles.printOnly}`}>Project #{selectedProjectId || "—"}</div>
-                    {selectedViewerEstimate ? (
+                    {selectedViewerQuote ? (
                       <div className={`${creatorStyles.blockMuted} ${creatorStyles.printOnly}`}>
-                        Estimate: {selectedViewerEstimate.title || `#${selectedViewerEstimate.id}`} v{selectedViewerEstimate.version}
+                        Quote: {selectedViewerQuote.title || `#${selectedViewerQuote.id}`} v{selectedViewerQuote.version}
                       </div>
                     ) : null}
                   </div>
@@ -420,7 +420,7 @@ export function ChangeOrdersWorkspacePanel({
                       <div className={creatorStyles.summaryRow}>
                         <span>Original total</span>
                         <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
-                          {originalEstimateTotal ? `$${originalEstimateTotal}` : "—"}
+                          {originalQuoteTotal ? `$${originalQuoteTotal}` : "—"}
                         </span>
                       </div>
                       <div className={creatorStyles.summaryRow}>
@@ -439,9 +439,9 @@ export function ChangeOrdersWorkspacePanel({
                       </div>
                     </div>
                     <div className={changeOrderCreatorStyles.coSheetFooterActions}>
-                      {!selectedViewerEstimateId ? (
+                      {!selectedViewerQuoteId ? (
                         <p className={`${creatorStyles.inlineHint} ${changeOrderCreatorStyles.coFooterHint}`}>
-                          Select an approved origin estimate from the history selector before creating a change
+                          Select an approved origin quote from the history selector before creating a change
                           order.
                         </p>
                       ) : null}
@@ -541,12 +541,12 @@ export function ChangeOrdersWorkspacePanel({
                       {editTitle || "Untitled"}
                     </div>
                     {(() => {
-                      const originEst = selectedChangeOrder?.origin_estimate
-                        ? projectEstimates.find((e) => e.id === selectedChangeOrder.origin_estimate)
+                      const originEst = selectedChangeOrder?.origin_quote
+                        ? projectQuotes.find((e) => e.id === selectedChangeOrder.origin_quote)
                         : null;
                       return originEst ? (
                         <div className={`${creatorStyles.blockMuted} ${creatorStyles.printOnly}`}>
-                          Estimate: {originEst.title || `#${originEst.id}`} v{originEst.version}
+                          Quote: {originEst.title || `#${originEst.id}`} v{originEst.version}
                         </div>
                       ) : null;
                     })()}
@@ -588,7 +588,7 @@ export function ChangeOrdersWorkspacePanel({
                       <div className={creatorStyles.summaryRow}>
                         <span>Original total</span>
                         <span className={changeOrderCreatorStyles.coSummarySecondaryValue}>
-                          {originalEstimateTotal ? `$${originalEstimateTotal}` : "—"}
+                          {originalQuoteTotal ? `$${originalQuoteTotal}` : "—"}
                         </span>
                       </div>
                       <div className={creatorStyles.summaryRow}>

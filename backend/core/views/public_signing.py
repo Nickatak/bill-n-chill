@@ -1,6 +1,6 @@
 """Public document signing — OTP request and verification views.
 
-The ``document_type`` URL segment must be one of ``estimate``, ``change_order``,
+The ``document_type`` URL segment must be one of ``quote``, ``change_order``,
 or ``invoice``.  Reusable ceremony validation and consent helpers live in
 ``public_signing_helpers``.
 """
@@ -51,7 +51,7 @@ def public_request_otp_view(request, document_type, public_token):
         { "data": { "otp_required": true, "email_hint": "j***@example.com", "expires_in": 600 } }
 
     Errors:
-        - 400: Invalid ``document_type`` (not in ``estimate``, ``change_order``, ``invoice``).
+        - 400: Invalid ``document_type`` (not in ``quote``, ``change_order``, ``invoice``).
         - 404: No document found for the given ``public_token``.
         - 422: Customer on the project has no email address on file.
         - 429: OTP already requested within the last 60 seconds for this token.

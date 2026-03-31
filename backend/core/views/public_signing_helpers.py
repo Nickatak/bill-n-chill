@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from core.models import (
     ChangeOrder,
     DocumentAccessSession,
-    Estimate,
+    Quote,
     Invoice,
 )
 from core.utils.signing import (
@@ -27,13 +27,13 @@ from core.utils.signing import (
 # ---------------------------------------------------------------------------
 
 _DOCUMENT_MODELS = {
-    "estimate": Estimate,
+    "quote": Quote,
     "change_order": ChangeOrder,
     "invoice": Invoice,
 }
 
 _DOCUMENT_TYPE_LABELS = {
-    "estimate": "Estimate",
+    "quote": "Quote",
     "change_order": "Change Order",
     "invoice": "Invoice",
 }
@@ -85,8 +85,8 @@ def _resolve_document_title(document_type: str, document: models.Model) -> str:
 
     Examples: ``"Kitchen Remodel"``, ``"CO-3-v2"``, ``"INV-001"``.
     """
-    if document_type == "estimate":
-        return document.title or f"Estimate #{document.id}"
+    if document_type == "quote":
+        return document.title or f"Quote #{document.id}"
     elif document_type == "change_order":
         return f"CO-{document.family_key}"
     elif document_type == "invoice":

@@ -24,7 +24,7 @@ class DocumentAccessSession(models.Model):
     """
 
     class DocumentType(models.TextChoices):
-        ESTIMATE = "estimate", "Estimate"
+        QUOTE = "quote", "Quote"
         CHANGE_ORDER = "change_order", "Change Order"
         INVOICE = "invoice", "Invoice"
 

@@ -1,7 +1,7 @@
 /**
  * Shared hook for fetching and normalizing backend policy contracts.
  *
- * All document consoles (estimates, invoices, change orders, vendor bills)
+ * All document consoles (quotes, invoices, change orders, vendor bills)
  * follow the same pattern: fetch a policy contract endpoint, validate the
  * shape, normalize status transitions, and merge labels with fallbacks.
  * This hook extracts that common lifecycle.

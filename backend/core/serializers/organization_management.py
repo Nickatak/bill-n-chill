@@ -30,9 +30,9 @@ class OrganizationProfileSerializer(serializers.ModelSerializer):
             "license_number",
             "tax_id",
             "default_invoice_due_delta",
-            "default_estimate_valid_delta",
+            "default_quote_valid_delta",
             "invoice_terms_and_conditions",
-            "estimate_terms_and_conditions",
+            "quote_terms_and_conditions",
             "change_order_terms_and_conditions",
             "created_at",
             "updated_at",
@@ -115,9 +115,9 @@ class OrganizationProfileUpdateSerializer(serializers.Serializer):
     license_number = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
     tax_id = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
     default_invoice_due_delta = serializers.IntegerField(required=False, min_value=1, max_value=365)
-    default_estimate_valid_delta = serializers.IntegerField(required=False, min_value=1, max_value=365)
+    default_quote_valid_delta = serializers.IntegerField(required=False, min_value=1, max_value=365)
     invoice_terms_and_conditions = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
-    estimate_terms_and_conditions = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
+    quote_terms_and_conditions = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
     change_order_terms_and_conditions = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")
 
     def validate(self, attrs):

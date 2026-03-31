@@ -11,7 +11,7 @@ Machine-readable structural index of the codebase. Designed for AI assistant con
 
 1. **Start here, not in the source.** When beginning a task, read the relevant section of the index to locate which files matter. This avoids burning context on large files you don't need.
 2. **Use the dependency chains.** Each file lists its `Depends on` imports. Trace these to understand how a change propagates across layers (model -> serializer -> view -> frontend API -> component).
-3. **Use signatures to skip irrelevant code.** If you need to modify `estimate_detail_view`, the index tells you it's a `GET/PATCH` endpoint at a specific location with specific helpers. Read only that function, not the entire 892-line view file.
+3. **Use signatures to skip irrelevant code.** If you need to modify `quote_detail_view`, the index tells you it's a `GET/PATCH` endpoint at a specific location with specific helpers. Read only that function, not the entire 892-line view file.
 4. **Types tell you the API shape.** Frontend type definitions list field names — use these to understand what the API returns without reading serializer code.
 
 ## Regenerating

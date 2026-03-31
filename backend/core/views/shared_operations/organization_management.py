@@ -96,8 +96,8 @@ def organization_profile_view(request):
             "phone_number", "website_url", "license_number", "tax_id",
         }
         _preset_fields = {
-            "help_email", "default_invoice_due_delta", "default_estimate_valid_delta",
-            "invoice_terms_and_conditions", "estimate_terms_and_conditions",
+            "help_email", "default_invoice_due_delta", "default_quote_valid_delta",
+            "invoice_terms_and_conditions", "quote_terms_and_conditions",
             "change_order_terms_and_conditions",
         }
         if _identity_fields & incoming.keys():
@@ -126,7 +126,7 @@ def organization_profile_view(request):
             "license_number": {"attr": "license_number", "strip": True},
             "tax_id": {"attr": "tax_id", "strip": True},
             "invoice_terms_and_conditions": {"attr": "invoice_terms_and_conditions", "strip": True},
-            "estimate_terms_and_conditions": {"attr": "estimate_terms_and_conditions", "strip": True},
+            "quote_terms_and_conditions": {"attr": "quote_terms_and_conditions", "strip": True},
             "change_order_terms_and_conditions": {"attr": "change_order_terms_and_conditions", "strip": True},
         }
         for field_name, field_config in _string_fields.items():
@@ -141,7 +141,7 @@ def organization_profile_view(request):
         # Integer fields
         _int_fields = {
             "default_invoice_due_delta": "default_invoice_due_delta",
-            "default_estimate_valid_delta": "default_estimate_valid_delta",
+            "default_quote_valid_delta": "default_quote_valid_delta",
         }
         for field_name, attr in _int_fields.items():
             if field_name not in incoming:

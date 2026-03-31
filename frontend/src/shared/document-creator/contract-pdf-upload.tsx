@@ -8,7 +8,7 @@ import styles from "./contract-pdf-upload.module.css";
 type ContractPdfUploadProps = {
   /** Current URL of the uploaded contract PDF (empty string if none). */
   contractPdfUrl: string;
-  /** API path segment: e.g. "estimates/42" or "change-orders/7". */
+  /** API path segment: e.g. "quotes/42" or "change-orders/7". */
   documentPath: string;
   authToken: string;
   readOnly: boolean;

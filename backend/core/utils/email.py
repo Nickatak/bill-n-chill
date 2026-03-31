@@ -147,7 +147,7 @@ def send_otp_email(recipient_email, code, document_type_label, document_title):
 def send_document_sent_email(*, document_type, document_title, public_url, recipient_email, sender_user):
     """Send notification email when a document is sent to a customer.
 
-    Called after an estimate, invoice, or change order transitions to sent/pending.
+    Called after an quote, invoice, or change order transitions to sent/pending.
     Skips silently if the customer has no email on file. Email delivery failures
     are logged but never block the status transition.
 
@@ -215,7 +215,7 @@ def send_document_decision_email(*, user_id, document_type, document_title, cust
 
     Args:
         user_id: The document owner's user PK.
-        document_type: "estimate", "invoice", or "change_order".
+        document_type: "quote", "invoice", or "change_order".
         document_title: Human-readable document identifier.
         customer_name: The customer who made the decision.
         decision: "approve", "reject", or "dispute".

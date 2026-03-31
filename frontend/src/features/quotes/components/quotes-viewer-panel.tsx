@@ -1,0 +1,696 @@
+/**
+ * Presentational component for the quotes viewer panel.
+ *
+ * Renders the lifecycle section: status filter pills, family-grouped quote
+ * tree, action buttons with confirmation, and status event history. All data
+ * and handlers are received via props — no hooks or side effects live here
+ * (except the action confirmation panel which owns local UI state).
+ *
+ * Parent: QuotesConsole
+ */
+
+import { useState } from "react";
+import Link from "next/link";
+import { ContractPdfUpload } from "@/shared/document-creator/contract-pdf-upload";
+import { formatDateTimeDisplay } from "@/shared/date-format";
+import { formatDecimal } from "@/shared/money-format";
+import { collapseToggleButtonStyles as collapseButtonStyles } from "@/shared/project-list-viewer";
+import { StatusEvents, type StatusEvent } from "@/shared/status-events/status-events";
+import statusBadges from "@/shared/styles/status.module.css";
+import { formatStatusAction, isNotatedStatusEvent, isResendStatusEvent } from "../helpers";
+import type { QuoteRecord, QuoteStatusEventRecord, ProjectRecord } from "../types";
+import styles from "./quotes-console.module.css";
+
+// ---------------------------------------------------------------------------
+// Pure display helpers (no component state dependency)
+// ---------------------------------------------------------------------------
+
+/** Parse a numeric string, returning 0 for non-finite values. */
+function toNumber(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Format a date string for display, falling back to the raw value. */
+function formatEventDate(dateValue: string): string {
+  return formatDateTimeDisplay(dateValue, dateValue);
+}
+
+/** Format the "last action" date for an quote row. */
+function formatQuoteLastActionDate(quote: QuoteRecord): string {
+  return formatEventDate(quote.updated_at || quote.created_at);
+}
+
+// ---------------------------------------------------------------------------
+// Status → CSS class mapping (depends only on the CSS module)
+// ---------------------------------------------------------------------------
+
+const statusClasses: Record<string, string> = {
+  draft: styles.statusDraft,
+  sent: styles.statusSent,
+  approved: styles.statusApproved,
+  rejected: styles.statusRejected,
+  void: styles.statusArchived,
+  archived: styles.statusArchived,
+};
+
+const eventBadgeClasses: Record<string, string> = {
+  draft: statusBadges.draft ?? "",
+  sent: statusBadges.sent ?? "",
+  approved: statusBadges.approved ?? "",
+  rejected: statusBadges.rejected ?? "",
+  void: statusBadges.archived ?? "",
+  archived: statusBadges.archived ?? "",
+};
+
+function mapStatusEvents(
+  events: QuoteStatusEventRecord[],
+): StatusEvent[] {
+  return events.map((event) => {
+    const badgeClass = isResendStatusEvent(event)
+      ? eventBadgeClasses["sent"] ?? ""
+      : isNotatedStatusEvent(event)
+        ? statusBadges.neutral ?? ""
+        : eventBadgeClasses[event.to_status] ?? "";
+
+    return {
+      id: event.id,
+      badge: { label: formatStatusAction(event), className: badgeClass },
+      date: formatEventDate(event.changed_at),
+      note: event.note,
+      actor: event.changed_by_customer_id ? (
+        <Link href={`/customers?customer=${event.changed_by_customer_id}`}>
+          {event.changed_by_display || `Customer #${event.changed_by_customer_id}`}
+        </Link>
+      ) : (
+        event.changed_by_display || event.changed_by_email || "Unknown user"
+      ),
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Action button definitions
+// ---------------------------------------------------------------------------
+
+/** Map a status value to its action button color class. */
+function actionButtonColorClass(statusValue: string): string {
+  switch (statusValue) {
+    case "sent": return styles.actionButtonSent;
+    case "approved": return styles.actionButtonApproved;
+    case "rejected": return styles.actionButtonRejected;
+    case "void": return styles.actionButtonVoid;
+    default: return "";
+  }
+}
+
+/** Map a status transition to a user-facing action label. */
+function actionLabel(statusValue: string, optionLabel: string): string {
+  switch (statusValue) {
+    case "sent": return optionLabel === "Re-send" ? "Re-send" : "Send to Customer";
+    case "approved": return "Mark Approved";
+    case "rejected": return "Mark Rejected";
+    case "void": return "Void Quote";
+    default: return optionLabel;
+  }
+}
+
+/** Build the confirmation message for an action. */
+function actionConfirmationMessage(
+  statusValue: string,
+  optionLabel: string,
+  quote: QuoteRecord,
+  customerName: string,
+  customerEmail: string,
+): string {
+  const docLabel = `${quote.title || "Untitled"} v${quote.version}`;
+  const isResend = optionLabel === "Re-send";
+  if (statusValue === "sent") {
+    const verb = isResend ? "Re-send" : "Send";
+    return `${verb} ${docLabel} to ${customerName || "customer"}.`;
+  }
+  if (statusValue === "approved") return `Mark ${docLabel} as approved.`;
+  if (statusValue === "rejected") return `Mark ${docLabel} as rejected.`;
+  if (statusValue === "void") return `Void ${docLabel}.`;
+  return `Transition ${docLabel} to ${optionLabel.toLowerCase()}.`;
+}
+
+/** No-email hint with link to edit customer. */
+function noEmailHint(customerId?: number) {
+  return (
+    <>
+      No email on file.{" "}
+      {customerId ? <Link href={`/customers?customer=${customerId}`}>Edit customer to add email &rarr;</Link> : null}
+    </>
+  );
+}
+
+/** Action confirmation panel — owns its own expanded/collapsed state. */
+function QuoteActionPanel({
+  selectedQuote,
+  nextStatusOptions,
+  selectedProject,
+  selectedStatus,
+  setSelectedStatus,
+  statusNote,
+  setStatusNote,
+  actionMessage,
+  actionTone,
+  handleUpdateQuoteStatus,
+  handleAddQuoteStatusNote,
+  canSubmitStatusNote,
+}: {
+  selectedQuote: QuoteRecord;
+  nextStatusOptions: Array<{ value: string; label: string }>;
+  selectedProject: ProjectRecord | null;
+  selectedStatus: string;
+  setSelectedStatus: (status: string) => void;
+  statusNote: string;
+  setStatusNote: (note: string) => void;
+  actionMessage: string;
+  actionTone: string;
+  handleUpdateQuoteStatus: (notifyCustomer?: boolean) => Promise<QuoteRecord | null>;
+  handleAddQuoteStatusNote: () => void;
+  canSubmitStatusNote: boolean;
+}) {
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [shareMessage, setShareMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const customerName = selectedProject?.customer_display_name || "";
+  const customerEmail = (selectedProject?.customer_email || "").trim();
+  const hasEmail = customerEmail.length > 0;
+  const [notifyCustomer, setNotifyCustomer] = useState(hasEmail);
+
+  function handleActionClick(statusValue: string) {
+    setShareMessage("");
+    if (pendingAction === statusValue) {
+      setPendingAction(null);
+      setSelectedStatus("");
+      return;
+    }
+    setPendingAction(statusValue);
+    setSelectedStatus(statusValue);
+    setNotifyCustomer(hasEmail);
+  }
+
+  async function handleConfirm() {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+    const updated = await handleUpdateQuoteStatus(pendingAction === "sent" ? notifyCustomer : undefined);
+    if (!updated) return; // failed — error message shown by handler
+    setPendingAction(null);
+
+    // Trigger share mechanism for send/re-send actions
+    if (pendingAction === "sent" && updated.public_ref) {
+      const publicUrl = `${window.location.origin}/quote/${updated.public_ref}`;
+      const senderName = (updated.sender_name || "").trim();
+      const greeting = customerName ? `Hi ${customerName} — ` : "";
+      const from = senderName ? ` from ${senderName}` : "";
+      const shareText = `${greeting}here's your quote${from}:\n${publicUrl}`;
+
+      if (typeof navigator.share === "function") {
+        try {
+          await navigator.share({ title: updated.title || "Quote", text: shareText });
+        } catch {
+          // User cancelled share sheet — not an error
+        }
+      } else {
+        try {
+          await navigator.clipboard.writeText(publicUrl);
+          setShareMessage("Link copied to clipboard.");
+        } catch {
+          // Clipboard API not available
+        }
+      }
+    }
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleCancel() {
+    setPendingAction(null);
+    setSelectedStatus("");
+    setStatusNote("");
+  }
+
+  const pendingOption = nextStatusOptions.find((o) => o.value === pendingAction);
+
+  return (
+    <div className={styles.lifecycleGrid}>
+      {nextStatusOptions.length > 0 ? (
+        <div className={styles.actionButtons}>
+          {nextStatusOptions.map((option) => {
+            const label = actionLabel(option.value, option.label);
+            const isActive = pendingAction === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={`${styles.lifecycleActionButton} ${actionButtonColorClass(option.value)} ${
+                  isActive ? styles.lifecycleActionButtonActive : ""
+                }`}
+                onClick={() => handleActionClick(option.value)}
+                aria-pressed={isActive}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {nextStatusOptions.length === 0 && selectedQuote.status === "approved" && selectedProject ? (
+        <div className={styles.actionButtons}>
+          <Link
+            href={`/projects/${selectedProject.id}/change-orders?origin_quote=${selectedQuote.id}`}
+            className={`${styles.lifecycleActionButton} ${styles.actionButtonApproved}`}
+            style={{ flex: "1 1 100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            View Change Orders
+          </Link>
+        </div>
+      ) : null}
+
+      {pendingAction && pendingOption ? (
+        <div className={styles.actionConfirmPanel}>
+          <p className={styles.actionConfirmMessage}>
+            {actionConfirmationMessage(
+              pendingAction,
+              pendingOption.label,
+              selectedQuote,
+              customerName,
+              customerEmail,
+            )}
+          </p>
+          <label className={styles.lifecycleField}>
+            <span className={styles.lifecycleFieldLabel}>Note (optional)</span>
+            <textarea
+              className={styles.statusNote}
+              value={statusNote}
+              onChange={(event) => setStatusNote(event.target.value)}
+              placeholder="Optional note for this action"
+              rows={2}
+            />
+          </label>
+          {(pendingAction === "sent") ? (
+            <>
+              <label className={styles.notifyCheckbox}>
+                <input
+                  type="checkbox"
+                  checked={notifyCustomer}
+                  disabled={!hasEmail}
+                  onChange={(e) => setNotifyCustomer(e.target.checked)}
+                />
+                <span>Email customer{hasEmail ? ` (${customerEmail})` : ""}</span>
+              </label>
+              {!hasEmail ? (
+                <p className={styles.actionConfirmDetail}>
+                  {noEmailHint(selectedProject?.customer)}
+                </p>
+              ) : null}
+            </>
+          ) : null}
+          <div className={styles.actionConfirmActions}>
+            <button
+              type="button"
+              className={styles.lifecycleActionButton}
+              onClick={handleCancel}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={`${styles.lifecycleActionButton} ${actionButtonColorClass(pendingAction)}`}
+              onClick={handleConfirm}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? <span className={styles.sendingDots}>Sending</span> : `Confirm ${actionLabel(pendingAction, pendingOption.label)}`}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!pendingAction ? (
+        <label className={styles.lifecycleField}>
+          <span className={styles.lifecycleFieldLabel}>Status note</span>
+          <textarea
+            className={styles.statusNote}
+            value={statusNote}
+            onChange={(event) => setStatusNote(event.target.value)}
+            placeholder="Add note for this quote"
+            rows={3}
+          />
+        </label>
+      ) : null}
+
+      {actionMessage && actionTone === "success" ? (
+        <p className={styles.actionSuccess}>{actionMessage}</p>
+      ) : null}
+      {actionMessage && actionTone === "error" ? (
+        <p className={styles.actionError}>{actionMessage}</p>
+      ) : null}
+      {shareMessage ? (
+        <p className={styles.actionSuccess}>{shareMessage}</p>
+      ) : null}
+
+      {!pendingAction ? (
+        <div className={styles.lifecycleActions}>
+          <button
+            type="button"
+            className={styles.lifecycleActionButton}
+            onClick={handleAddQuoteStatusNote}
+            disabled={!canSubmitStatusNote}
+          >
+            Add Quote Status Note
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type QuoteFamily = {
+  title: string;
+  items: QuoteRecord[];
+};
+
+export type QuotesViewerPanelProps = {
+  selectedProject: ProjectRecord | null;
+  isMobile: boolean;
+  isViewerExpanded: boolean;
+  setIsViewerExpanded: React.Dispatch<React.SetStateAction<boolean>>;
+
+  // Filter pills
+  viewerStatusOptions: Array<{ value: string; label: string }>;
+  quoteStatusFilters: string[];
+  toggleQuoteStatusFilter: (value: string) => void;
+  quoteStatusCounts: Record<string, number>;
+  setQuoteStatusFilters: (filters: string[]) => void;
+  quoteStatusFilterValues: string[];
+  defaultQuoteStatusFilters: string[];
+
+  // Family tree
+  visibleQuoteFamilies: QuoteFamily[];
+  quoteFamiliesLength: number;
+  selectedQuoteId: string;
+  openFamilyHistory: Set<string>;
+  handleSelectFamilyLatest: (title: string, latest: QuoteRecord) => void;
+  handleSelectQuote: (quote: QuoteRecord) => void;
+  handleFamilyCardQuickAction: (quote: QuoteRecord) => void;
+  selectedProjectId: string;
+
+  // Display callbacks (depend on parent-derived data)
+  formatQuoteStatus: (status?: string) => string;
+  quickActionKindForStatus: (status: string) => "change_order" | "revision" | null;
+  quickActionTitleForStatus: (status: string) => string;
+
+  // Status lifecycle (only relevant when an quote is selected)
+  selectedQuote: QuoteRecord | null;
+  nextStatusOptions: Array<{ value: string; label: string }>;
+  selectedStatus: string;
+  setSelectedStatus: (status: string) => void;
+  statusNote: string;
+  setStatusNote: (note: string) => void;
+  actionMessage: string;
+  actionTone: string;
+  canSubmitStatusNote: boolean;
+  handleUpdateQuoteStatus: (notifyCustomer?: boolean) => Promise<QuoteRecord | null>;
+  handleAddQuoteStatusNote: () => void;
+  statusEvents: QuoteStatusEventRecord[];
+
+  // Contract PDF
+  authToken: string;
+  readOnly: boolean;
+  onContractPdfUpdate: (newUrl: string) => void;
+};
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export function QuotesViewerPanel({
+  selectedProject,
+  isMobile,
+  isViewerExpanded,
+  setIsViewerExpanded,
+  viewerStatusOptions,
+  quoteStatusFilters,
+  toggleQuoteStatusFilter,
+  quoteStatusCounts,
+  setQuoteStatusFilters,
+  quoteStatusFilterValues,
+  defaultQuoteStatusFilters,
+  visibleQuoteFamilies,
+  quoteFamiliesLength,
+  selectedQuoteId,
+  openFamilyHistory,
+  handleSelectFamilyLatest,
+  handleSelectQuote,
+  handleFamilyCardQuickAction,
+  selectedProjectId,
+  formatQuoteStatus,
+  quickActionKindForStatus,
+  quickActionTitleForStatus,
+  selectedQuote,
+  nextStatusOptions,
+  selectedStatus,
+  setSelectedStatus,
+  statusNote,
+  setStatusNote,
+  actionMessage,
+  actionTone,
+  canSubmitStatusNote,
+  handleUpdateQuoteStatus,
+  handleAddQuoteStatusNote,
+  statusEvents,
+  authToken,
+  readOnly,
+  onContractPdfUpdate,
+}: QuotesViewerPanelProps) {
+  return (
+    <section className={styles.lifecycle}>
+      <div className={styles.lifecycleHeader}>
+        <h3>
+          {selectedProject
+            ? `Quotes for: ${selectedProject.name}`
+            : "Quotes"}
+        </h3>
+        {!isMobile ? (
+          <button
+            type="button"
+            className={collapseButtonStyles.collapseButton}
+            onClick={() => setIsViewerExpanded((current) => !current)}
+            aria-expanded={isViewerExpanded}
+          >
+            {isViewerExpanded ? "Collapse" : "Expand"}
+          </button>
+        ) : null}
+      </div>
+
+      {(isMobile || isViewerExpanded) ? (
+        <>
+          <div className={styles.versionFilters}>
+            <span className={styles.versionFiltersLabel}>Quote status filter</span>
+            <div className={styles.versionFilterButtons}>
+              {viewerStatusOptions.map((option) => {
+                const active = quoteStatusFilters.includes(option.value);
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`${styles.statusPill} ${
+                      active ? statusClasses[option.value] : styles.statusPillInactive
+                    } ${active ? styles.statusPillActive : ""}`}
+                    aria-pressed={active}
+                    onClick={() => toggleQuoteStatusFilter(option.value)}
+                  >
+                    <span>{option.label}</span>
+                    <span className={styles.statusPillCount}>{quoteStatusCounts[option.value] ?? 0}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className={styles.versionFilterActions}>
+              <button
+                type="button"
+                className={styles.versionFilterActionButton}
+                onClick={() => setQuoteStatusFilters(quoteStatusFilterValues)}
+              >
+                Show All Statuses
+              </button>
+              <button
+                type="button"
+                className={styles.versionFilterActionButton}
+                onClick={() => setQuoteStatusFilters(defaultQuoteStatusFilters)}
+              >
+                Reset Filters
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.versionTree}>
+            {visibleQuoteFamilies.length > 0 ? (
+              visibleQuoteFamilies.map((family) => {
+                const latest = family.items[family.items.length - 1];
+                const history = family.items.slice(0, -1).reverse();
+                const selectedInFamily = family.items.find(
+                  (quote) => String(quote.id) === selectedQuoteId,
+                );
+                const isFamilyActive = Boolean(selectedInFamily);
+                const isViewingHistory =
+                  selectedInFamily && String(selectedInFamily.id) !== String(latest.id);
+                const isLatestSelected = String(latest.id) === selectedQuoteId;
+                const isHistoryOpen = openFamilyHistory.has(family.title);
+                const quickActionKind = quickActionKindForStatus(latest.status);
+                const quickActionTitle = quickActionTitleForStatus(latest.status);
+                const latestTotal = formatDecimal(toNumber(latest.grand_total || "0"));
+                return (
+                  <div
+                    key={family.title}
+                    data-family-title={family.title}
+                    className={`${styles.familyGroup} ${
+                      isFamilyActive ? styles.familyGroupActive : ""
+                    }`}
+                  >
+                    <div className={styles.familyRow}>
+                      <div className={styles.familyMainColumn}>
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          className={`${styles.familyMain} ${
+                            isLatestSelected ? styles.familyMainActive : ""
+                          }`}
+                          onClick={() => handleSelectFamilyLatest(family.title, latest)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSelectFamilyLatest(family.title, latest); } }}
+                        >
+                          <div className={styles.familyMainContent}>
+                            <span className={styles.familyTitleRow}>
+                              <span className={styles.familyTitle}>{family.title}</span>
+                              <span
+                                className={`${styles.versionStatus} ${
+                                  statusClasses[latest.status] ?? ""
+                                }`}
+                              >
+                                {formatQuoteStatus(latest.status)}
+                              </span>
+                            </span>
+                            <span className={styles.familyMeta}>
+                              ${latestTotal} · {history.length} history{" "}
+                              {history.length === 1 ? "entry" : "entries"}
+                            </span>
+                            <span className={styles.familyDate}>
+                              Last action: {formatQuoteLastActionDate(latest)}
+                            </span>
+                          </div>
+                        </div>
+                        {isViewingHistory || quickActionKind === "revision" ? (
+                          <div className={styles.familyFooter}>
+                            {isViewingHistory ? (
+                              <span className={styles.historyNotice}>
+                                Viewing v{selectedInFamily?.version}
+                              </span>
+                            ) : null}
+                            {quickActionKind === "revision" ? (
+                              <button
+                                type="button"
+                                className={styles.familyActionButton}
+                                aria-label={`${quickActionTitle} (${latest.title || "Untitled"} v${latest.version})`}
+                                title={quickActionTitle}
+                                onClick={() => void handleFamilyCardQuickAction(latest)}
+                              >
+                                New Revision
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                      {isHistoryOpen && history.length > 0 ? (
+                        <div className={styles.historyRow}>
+                          {history.map((quote) => {
+                              const total = formatDecimal(toNumber(quote.grand_total || "0"));
+                              const isSelected = String(quote.id) === selectedQuoteId;
+                              return (
+                                <div key={quote.id} className={styles.historyCardColumn}>
+                                  <button
+                                    type="button"
+                                    className={`${styles.historyCard} ${
+                                      isSelected ? styles.historyCardActive : ""
+                                    }`}
+                                    onClick={() => handleSelectQuote(quote)}
+                                  >
+                                    <span className={styles.historyMetaRow}>
+                                      <span className={styles.historyVersionMeta}>
+                                        v{quote.version} <span className={styles.historyMeta}>#{quote.id}</span>
+                                      </span>
+                                      <span
+                                        className={`${styles.versionStatus} ${
+                                          statusClasses[quote.status] ?? ""
+                                        } ${styles.historyStatus}`}
+                                      >
+                                        {formatQuoteStatus(quote.status)}
+                                      </span>
+                                    </span>
+                                    <span className={styles.historyAmount}>${total}</span>
+                                    <span className={styles.historyDate}>
+                                      {formatQuoteLastActionDate(quote)}
+                                    </span>
+                                  </button>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })
+            ) : quoteFamiliesLength > 0 ? (
+              <p className={styles.inlineHint}>No quote families match the selected status filters.</p>
+            ) : (
+              <p className={styles.inlineHint}>No quotes yet. Use the workspace above to create one.</p>
+            )}
+          </div>
+
+          {selectedQuoteId && selectedQuote ? (
+            <QuoteActionPanel
+              selectedQuote={selectedQuote}
+              nextStatusOptions={nextStatusOptions}
+              selectedProject={selectedProject}
+              selectedStatus={selectedStatus}
+              setSelectedStatus={setSelectedStatus}
+              statusNote={statusNote}
+              setStatusNote={setStatusNote}
+              actionMessage={actionMessage}
+              actionTone={actionTone}
+              handleUpdateQuoteStatus={handleUpdateQuoteStatus}
+              handleAddQuoteStatusNote={handleAddQuoteStatusNote}
+              canSubmitStatusNote={canSubmitStatusNote}
+            />
+          ) : null}
+
+          {selectedQuoteId && selectedQuote ? (
+            <ContractPdfUpload
+              contractPdfUrl={selectedQuote.contract_pdf_url ?? ""}
+              documentPath={`quotes/${selectedQuote.id}`}
+              authToken={authToken}
+              readOnly={readOnly}
+              onUpdate={onContractPdfUpdate}
+            />
+          ) : null}
+
+          {selectedQuoteId ? (
+            <StatusEvents events={mapStatusEvents(statusEvents)} />
+          ) : null}
+        </>
+      ) : (
+        <p className={styles.inlineHint}>Viewer collapsed. Expand to review versions, status transitions, and history.</p>
+      )}
+    </section>
+  );
+}

@@ -13,8 +13,8 @@ import styles from "./landing-page.module.css";
 
 const FEATURES = [
   {
-    title: "Estimates",
-    desc: "Build line-item estimates, send a professional link for customer approval, and lock in your contract baseline.",
+    title: "Quotes",
+    desc: "Build line-item quotes, send a professional link for customer approval, and lock in your contract baseline.",
   },
   {
     title: "Change Orders",
@@ -62,7 +62,7 @@ export function LandingPage() {
             without the headache.
           </h1>
           <p className={styles.subheadline}>
-            Estimates, invoicing, change orders, and payment tracking —
+            Quotes, invoicing, change orders, and payment tracking —
             one place for the money side of every job.
           </p>
           <p className={styles.audience}>

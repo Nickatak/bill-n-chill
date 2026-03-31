@@ -6,7 +6,7 @@
 
 ## Context
 
-The project overview page has a pipeline (Estimates → COs → Invoices → Bills)
+The project overview page has a pipeline (Quotes → COs → Invoices → Bills)
 and a right panel with tabbed quick-entry forms (customer payment, expense
 receipt). These work, but they're isolated from each other. The pipeline shows
 state; the forms let you act — but there's no connection between "where is this
@@ -14,11 +14,11 @@ project?" and "what should I do next?"
 
 Additionally, the payment allocation rules now require every payment to target a
 document. This means actions like "record a deposit" require an invoice to exist
-first. Without a clear path from estimate approval to deposit invoice creation,
+first. Without a clear path from quote approval to deposit invoice creation,
 users hit a friction wall.
 
 More broadly, construction billing involves cross-domain actions that don't
-belong to any single feature module: invoicing from an approved estimate,
+belong to any single feature module: invoicing from an approved quote,
 creating an invoice that incorporates change orders, recording a payment against
 an invoice, logging a receipt against a bill. These are inter-model actions
 scoped to a single project — and the project overview is the natural home for
@@ -29,11 +29,11 @@ them.
 ### 1. Add a persistent action toolbar to the project overview
 
 A horizontal toolbar below the pipeline, ordered left-to-right to match the
-workflow stages above it: estimate actions → CO actions → invoice actions →
+workflow stages above it: quote actions → CO actions → invoice actions →
 payment/receipt actions.
 
 The toolbar is **always visible**. Actions are enabled or disabled based on
-project state (e.g., "Invoice Deposit" is enabled when an approved estimate
+project state (e.g., "Invoice Deposit" is enabled when an approved quote
 exists). The user always sees the full set of possible actions — the state
 determines which are available, not which are shown.
 
@@ -44,9 +44,9 @@ The toolbar owns what the right panel displays:
 
 - **Quick actions** (record payment, log receipt) → clicking the toolbar button
   swaps the right panel to the corresponding inline form.
-- **Launch actions** (create invoice from estimate, invoice deposit) → clicking
+- **Launch actions** (create invoice from quote, invoice deposit) → clicking
   navigates to the dedicated workflow (e.g., invoice creator pre-filled from
-  estimate data).
+  quote data).
 
 One form visible at a time, driven by toolbar selection. The right panel is a
 render target, not a self-contained component with its own navigation.
@@ -55,8 +55,8 @@ render target, not a self-contained component with its own navigation.
 
 Left to right, the toolbar follows workflow order:
 
-1. **Estimate stage:** Invoice Deposit (creates deposit invoice from approved estimate)
-2. **Invoice stage:** Invoice from Estimate + COs (creates invoice pre-filled from current contract state)
+1. **Quote stage:** Invoice Deposit (creates deposit invoice from approved quote)
+2. **Invoice stage:** Invoice from Quote + COs (creates invoice pre-filled from current contract state)
 3. **Payment stage:** Record Customer Payment (inline form in right panel)
 4. **Expense stage:** Log Expense Receipt (inline form in right panel)
 
@@ -71,8 +71,8 @@ the appropriate workflow position.
 The pipeline already fetches document counts and statuses per stage. The toolbar
 reads the same data to determine action availability:
 
-- **Invoice Deposit:** enabled when an approved estimate exists and no deposit invoice has been created
-- **Invoice from Estimate + COs:** enabled when an approved estimate exists
+- **Invoice Deposit:** enabled when an approved quote exists and no deposit invoice has been created
+- **Invoice from Quote + COs:** enabled when an approved quote exists
 - **Record Customer Payment:** enabled when sent/partially-paid invoices exist
 - **Log Expense Receipt:** always enabled (receipts don't require a pre-existing document)
 
@@ -92,12 +92,12 @@ overview.
   cross-domain actions. It does not extend to the accounting page or other
   org-wide views.
 - **MVP action set** is the four actions listed above. Future additions (e.g.,
-  create change order from estimate, generate lien waiver) slot into the
+  create change order from quote, generate lien waiver) slot into the
   existing toolbar pattern.
 
 ## Rationale
 
-- Solves the deposit invoice friction: the path from approved estimate to
+- Solves the deposit invoice friction: the path from approved quote to
   deposit invoice is one click, visible in the toolbar.
 - Unifies the "what can I do?" surface into one place instead of splitting it
   across a pipeline, a tab bar, and implicit knowledge.

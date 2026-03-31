@@ -40,7 +40,7 @@ When a customer acts on a public document link (approves, rejects, disputes), th
 
 **Live page updates via service worker:**
 
-When the SW receives a push event for a document status change (e.g. customer approved an estimate), it can also post a message to any open app tab via `clients.matchAll()` + `client.postMessage()`. The tab receives the message and updates the displayed data in-place — the user sees the status flip to "Approved" without refreshing. This means the push notification system does double duty: background notifications when the app isn't focused, and live data updates when it is. The hook points already exist — the backend decision endpoints record status events that can trigger the push.
+When the SW receives a push event for a document status change (e.g. customer approved an quote), it can also post a message to any open app tab via `clients.matchAll()` + `client.postMessage()`. The tab receives the message and updates the displayed data in-place — the user sees the status flip to "Approved" without refreshing. This means the push notification system does double duty: background notifications when the app isn't focused, and live data updates when it is. The hook points already exist — the backend decision endpoints record status events that can trigger the push.
 
 **Not in scope (yet):**
 - Notification preferences / granularity settings
@@ -84,7 +84,7 @@ Carried forward from `product-direction-refinement.md`.
 
 - **Backend financial model.** Immutable audit records, snapshot history, proper money handling — all stays.
 - **Desktop power-user density.** Responsive doesn't mean dumbed-down.
-- **Estimate → CO → invoice → payment pipeline** is the core product.
+- **Quote → CO → invoice → payment pipeline** is the core product.
 - **Theme requirements.** Dark/light mode, public pages forced light.
 - **Document templates idea** (unscoped). Pre-stored documents loaded into the creator — potential unlock for mobile-first document creation. Still idea phase.
 

@@ -57,9 +57,9 @@ function makeProfile(overrides: Record<string, unknown> = {}) {
     license_number: "CSLB #999",
     tax_id: "12-3456789",
     default_invoice_due_delta: 30,
-    default_estimate_valid_delta: 30,
+    default_quote_valid_delta: 30,
     invoice_terms_and_conditions: "Net 30",
-    estimate_terms_and_conditions: "Valid 30 days",
+    quote_terms_and_conditions: "Valid 30 days",
     change_order_terms_and_conditions: "CO terms",
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
@@ -212,13 +212,13 @@ describe("OrganizationConsole", () => {
     expect(screen.getByText("PM User")).toBeTruthy();
   });
 
-  it("switches to Docs tab and renders estimate fields by default", async () => {
+  it("switches to Docs tab and renders quote fields by default", async () => {
     setupDefaultFetch();
     render(<OrganizationConsole />);
     await waitFor(() => expect(screen.getByText("Company Name")).toBeTruthy());
 
     fireEvent.click(screen.getByText("Docs"));
-    expect(screen.getByText("Estimate Valid Days")).toBeTruthy();
+    expect(screen.getByText("Quote Valid Days")).toBeTruthy();
   });
 
   // -- Error states --
@@ -617,9 +617,9 @@ describe("OrganizationConsole > Docs", () => {
     fireEvent.click(screen.getByText("Docs"));
   }
 
-  it("renders estimate doc type sub-tab by default", async () => {
+  it("renders quote doc type sub-tab by default", async () => {
     await renderAndSwitchToDocuments();
-    expect(screen.getByText("Estimate Valid Days")).toBeTruthy();
+    expect(screen.getByText("Quote Valid Days")).toBeTruthy();
     expect(screen.getByDisplayValue("30")).toBeTruthy();
   });
 
@@ -650,13 +650,13 @@ describe("OrganizationConsole > Docs", () => {
     mockFetch.mockImplementation((url: string, init?: RequestInit) => {
       if (init?.method === "PATCH" && url.includes("/organization/")) {
         const body = JSON.parse(init.body as string);
-        expect(body.default_estimate_valid_delta).toBe(45);
+        expect(body.default_quote_valid_delta).toBe(45);
         expect(body.default_invoice_due_delta).toBe(30);
         return Promise.resolve({
           ok: true,
           json: () =>
             Promise.resolve({
-              data: { organization: makeProfile({ default_estimate_valid_delta: 45 }) },
+              data: { organization: makeProfile({ default_quote_valid_delta: 45 }) },
             }),
         });
       }

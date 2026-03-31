@@ -50,7 +50,7 @@ const VALID_SESSION = {
   email: "nick@test.com",
   role: "owner",
   organization: { id: 1, displayName: "Acme", onboardingCompleted: true },
-  capabilities: { estimates: ["view", "create"] },
+  capabilities: { quotes: ["view", "create"] },
 };
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ describe("SessionAuthorizationProvider", () => {
 
   it("transitions to authorized on successful /auth/me/ response", async () => {
     setSession(VALID_SESSION);
-    mockFetch.mockResolvedValueOnce(okMeResponse({ estimates: ["view"] }));
+    mockFetch.mockResolvedValueOnce(okMeResponse({ quotes: ["view"] }));
 
     const { result } = renderHook(() => useSessionAuthorization(), { wrapper });
     await waitFor(() => expect(result.current.isAuthorized).toBe(true));
@@ -119,7 +119,7 @@ describe("SessionAuthorizationProvider", () => {
 
   it("persists refreshed capabilities from /me response to localStorage", async () => {
     setSession(VALID_SESSION);
-    const fresh = { invoices: ["view", "create"], estimates: ["view"] };
+    const fresh = { invoices: ["view", "create"], quotes: ["view"] };
     mockFetch.mockResolvedValueOnce(okMeResponse(fresh));
 
     const { result } = renderHook(() => useSessionAuthorization(), { wrapper });

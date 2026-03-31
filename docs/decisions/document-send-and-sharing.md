@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-21
 **Status:** Decided
-**Applies to:** Estimates, Invoices, Change Orders
+**Applies to:** Quotes, Invoices, Change Orders
 
 ## Context
 
@@ -50,7 +50,7 @@ The "select next status → update" dropdown is replaced with explicit action
 buttons. Each button describes what it does in plain language. The available
 buttons are determined by the document's current status.
 
-**Estimates:**
+**Quotes:**
 
 | Current status | Available actions |
 |----------------|-------------------|
@@ -141,7 +141,7 @@ After the transition completes, a toast confirms what happened:
 **Other action buttons** (Void, Mark Approved, etc.) — these are
 straightforward status changes. Post-action toast confirms the outcome:
 
-- *"Estimate voided."*
+- *"Quote voided."*
 - *"Marked as approved."*
 
 Every action gives the user clear feedback about what the system did on their
@@ -183,7 +183,7 @@ This is deferred — clipboard + toast is sufficient for MVP.
 
 ## Impact on existing code
 
-- **Public preview endpoints** (estimate, invoice, change order): Add status
+- **Public preview endpoints** (quote, invoice, change order): Add status
   guard rejecting drafts.
 - **Document consoles** (3 consoles): Replace status dropdown with contextual
   action buttons in the expansion panel. Add share mechanism (Web Share API /

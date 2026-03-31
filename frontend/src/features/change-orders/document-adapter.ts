@@ -97,9 +97,9 @@ export function createChangeOrderDocumentAdapter(
     getMetaFields: (document): CreatorMetaField[] => [
       { key: "co_id", label: "Change Order", value: document ? (document.title || "Untitled") : "Draft" },
       {
-        key: "origin_estimate",
-        label: "Original Estimate",
-        value: document?.origin_estimate ? `#${document.origin_estimate}` : "Not set",
+        key: "origin_quote",
+        label: "Original Quote",
+        value: document?.origin_quote ? `#${document.origin_quote}` : "Not set",
       },
       {
         key: "line_delta_total",

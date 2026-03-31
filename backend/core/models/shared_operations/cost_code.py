@@ -12,7 +12,7 @@ class CostCode(models.Model):
 
     Business workflow:
     - Managed per company/user as a shared catalog.
-    - Applied to estimate lines, invoice lines, and vendor bill lines for rollups.
+    - Applied to quote lines, invoice lines, and vendor bill lines for rollups.
 
     Current policy:
     - Cost codes are scoped by `organization` and unique per organization catalog.

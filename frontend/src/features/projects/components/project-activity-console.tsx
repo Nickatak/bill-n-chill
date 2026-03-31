@@ -2,7 +2,7 @@
 
 /**
  * Filterable timeline of audit and workflow events for a single project.
- * Queries the unified project timeline endpoint which merges estimate,
+ * Queries the unified project timeline endpoint which merges quote,
  * invoice, change order, payment, and vendor bill audit records.
  *
  * Parent: app/projects/[projectId]/audit-trail/page.tsx
@@ -31,7 +31,7 @@ const CATEGORY_OPTIONS: { value: TimelineCategory; label: string }[] = [
 ];
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
-  estimate_status: "Estimate",
+  quote_status: "Quote",
   invoice_status: "Invoice",
   change_order_decision: "Change Order",
   payment_record: "Payment",
@@ -40,8 +40,8 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 
 function eventTypeBadgeClass(eventType: string): string {
   switch (eventType) {
-    case "estimate_status":
-      return styles.badgeEstimate;
+    case "quote_status":
+      return styles.badgeQuote;
     case "invoice_status":
       return styles.badgeInvoice;
     case "change_order_decision":

@@ -21,7 +21,7 @@ mitigation strategy.
 ### Why this is dangerous
 
 - The target never consented to leaving their current org.
-- In a financial tool, losing access to invoices, estimates, and payment records
+- In a financial tool, losing access to invoices, quotes, and payment records
   is catastrophic for the target's business operations.
 - The attacker doesn't need any credentials — just a known email and the ability
   to send/share a link.

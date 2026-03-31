@@ -1,8 +1,8 @@
-# Document Composer Contract (Estimate + CO + Invoice)
+# Document Composer Contract (Quote + CO + Invoice)
 
 ## Goal
 Use one shared document surface for:
-- Estimates
+- Quotes
 - Change Orders
 - Invoices
 
@@ -23,7 +23,7 @@ Core primitives:
 - `DocumentComposerProps<TDocument, TLine, TFormState>`
 
 ## Feature Adapters Added
-- `src/features/estimates/document-adapter.ts`
+- `src/features/quotes/document-adapter.ts`
 - `src/features/change-orders/document-adapter.ts`
 - `src/features/invoices/document-adapter.ts`
 
@@ -34,14 +34,14 @@ Each adapter provides:
 4. Meta/totals/line mapping to shared composer primitives.
 
 ## Why This Helps
-1. Stops UX drift between estimate/CO/invoice editors.
+1. Stops UX drift between quote/CO/invoice editors.
 2. Keeps feature-specific business rules local to adapters.
 3. Lets us build one WYSIWYG shell and reuse it everywhere.
 4. Makes future docs (vendor bill, quote variants) easier to add.
 
 ## Next Extraction Steps
 1. Build `DocumentComposer` shell component under `src/shared/document-composer/`.
-2. Start with Estimate: replace `EstimateSheet` internals with shell + estimate adapter.
+2. Start with Quote: replace `QuoteSheet` internals with shell + quote adapter.
 3. Migrate CO editor form to shell section-by-section.
 4. Migrate Invoice create/editor form to same shell.
 5. Keep list rails/status viewers feature-specific until final convergence.

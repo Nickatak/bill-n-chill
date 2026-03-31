@@ -19,23 +19,23 @@ describe("hasAnyRole", () => {
 
 describe("canDo", () => {
   const ownerCaps: Capabilities = {
-    estimates: ["view", "create", "edit", "approve", "send"],
+    quotes: ["view", "create", "edit", "approve", "send"],
     invoices: ["view", "create", "edit"],
     payments: ["view", "create", "edit", "allocate"],
   };
 
   const viewerCaps: Capabilities = {
-    estimates: ["view"],
+    quotes: ["view"],
     invoices: ["view"],
   };
 
   it("returns true when action is in resource array", () => {
-    expect(canDo(ownerCaps, "estimates", "create")).toBe(true);
+    expect(canDo(ownerCaps, "quotes", "create")).toBe(true);
     expect(canDo(ownerCaps, "payments", "allocate")).toBe(true);
   });
 
   it("returns false when action is not in resource array", () => {
-    expect(canDo(viewerCaps, "estimates", "create")).toBe(false);
+    expect(canDo(viewerCaps, "quotes", "create")).toBe(false);
     expect(canDo(viewerCaps, "invoices", "edit")).toBe(false);
   });
 
@@ -44,15 +44,15 @@ describe("canDo", () => {
   });
 
   it("returns false for undefined capabilities", () => {
-    expect(canDo(undefined, "estimates", "create")).toBe(false);
+    expect(canDo(undefined, "quotes", "create")).toBe(false);
   });
 
   it("returns false for empty capabilities", () => {
-    expect(canDo({}, "estimates", "create")).toBe(false);
+    expect(canDo({}, "quotes", "create")).toBe(false);
   });
 
   it("returns true for view action in viewer caps", () => {
-    expect(canDo(viewerCaps, "estimates", "view")).toBe(true);
+    expect(canDo(viewerCaps, "quotes", "view")).toBe(true);
     expect(canDo(viewerCaps, "invoices", "view")).toBe(true);
   });
 });

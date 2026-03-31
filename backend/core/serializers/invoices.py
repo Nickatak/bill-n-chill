@@ -84,15 +84,15 @@ class InvoiceSerializer(serializers.ModelSerializer):
     payment_schedule = serializers.SerializerMethodField()
 
     def get_payment_schedule(self, obj: Invoice) -> dict | None:
-        """Return the linked estimate's billing periods and total, if any."""
-        estimate = obj.related_estimate
-        if not estimate:
+        """Return the linked quote's billing periods and total, if any."""
+        quote = obj.related_quote
+        if not quote:
             return None
-        periods = estimate.billing_periods.all().order_by("order")
+        periods = quote.billing_periods.all().order_by("order")
         if not periods:
             return None
         return {
-            "estimate_total": str(estimate.grand_total),
+            "quote_total": str(quote.grand_total),
             "periods": BillingPeriodSerializer(periods, many=True).data,
         }
 
@@ -107,7 +107,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "invoice_number",
             "public_ref",
             "status",
-            "related_estimate",
+            "related_quote",
             "billing_period",
             "issue_date",
             "due_date",
@@ -135,7 +135,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "customer",
             "customer_display_name",
             "invoice_number",
-            "related_estimate",
+            "related_quote",
             "billing_period",
             "subtotal",
             "tax_total",
@@ -164,7 +164,7 @@ class InvoiceWriteSerializer(serializers.Serializer):
 
     status = serializers.ChoiceField(choices=Invoice.Status.choices, required=False)
     status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True)
-    related_estimate = serializers.IntegerField(required=False, allow_null=True)
+    related_quote = serializers.IntegerField(required=False, allow_null=True)
     billing_period = serializers.IntegerField(required=False, allow_null=True)
     initial_status = serializers.ChoiceField(
         choices=[("draft", "Draft"), ("sent", "Sent")],

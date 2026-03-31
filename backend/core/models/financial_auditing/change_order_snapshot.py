@@ -19,7 +19,7 @@ class ChangeOrderSnapshot(ImmutableModelMixin):
     - Append-only (`create` only). Existing rows are immutable.
     - Decision scope is intentionally limited to terminal decision states:
       `approved`, `rejected`, and `void`.
-    - Snapshot payload intentionally captures `origin_estimate_version` for historical replay
+    - Snapshot payload intentionally captures `origin_quote_version` for historical replay
       and forensic traceability, not as a primary operational field.
     - Lifecycle control: `system-managed`.
     - Visibility: `internal-facing`.

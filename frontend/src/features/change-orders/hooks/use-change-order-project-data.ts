@@ -2,7 +2,7 @@
  * Project-scoped data fetching for the change-orders console.
  *
  * Owns all server-side data that the change-orders console depends on:
- * project metadata, approved estimates, cost codes, audit events,
+ * project metadata, approved quotes, cost codes, audit events,
  * organization branding defaults, and the change-order list itself.
  *
  * Consumer: ChangeOrdersConsole (composed alongside useChangeOrderForm
@@ -14,8 +14,8 @@
  * - selectedProjectName          — display name of the selected project
  * - selectedProjectCustomerEmail — customer email from the selected project
  * - changeOrders                 — full change-order list for the selected project
- * - projectEstimates             — approved origin estimates for the selected project
- * - originEstimateOriginalTotals — map of estimate ID to original grand total
+ * - projectQuotes             — approved origin quotes for the selected project
+ * - originQuoteOriginalTotals — map of quote ID to original grand total
  * - projectAuditEvents           — status events for change orders (fetched per-CO, merged)
  * - costCodes                    — active cost codes for line-item dropdowns
  * - organizationDefaults         — branding and default terms for document headers
@@ -25,9 +25,9 @@
  * - fetchProjectChangeOrders(projectId)
  *     GETs change orders for a project. Returns { rows, error }.
  *
- * - loadProjectEstimates(projectId)
- *     GETs estimates, filters to approved, enriches with approval metadata,
- *     writes into projectEstimates/originEstimateOriginalTotals state.
+ * - loadProjectQuotes(projectId)
+ *     GETs quotes, filters to approved, enriches with approval metadata,
+ *     writes into projectQuotes/originQuoteOriginalTotals state.
  *
  * - loadChangeOrderStatusEvents(changeOrderId)
  *     GETs status events for a CO, maps to AuditEventRecord shape, merges into projectAuditEvents.
@@ -40,7 +40,7 @@
  *
  * - loadProjects(callbacks)
  *     Primary bootstrap: fetches projects, selects the scoped/first project,
- *     cascades into loadProjectEstimates + loadCostCodes
+ *     cascades into loadProjectQuotes + loadCostCodes
  *     + fetchProjectChangeOrders. Uses callbacks to coordinate with form state.
  *
  * ## Effect
@@ -61,8 +61,8 @@ import type {
   ChangeOrderRecord,
   CostCodeOption,
   OrganizationDocumentDefaults,
-  OriginEstimateLineItem,
-  OriginEstimateRecord,
+  OriginQuoteLineItem,
+  OriginQuoteRecord,
 } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ type LoadProjectsCallbacks = {
   /** Called after COs are loaded to hydrate the edit form. */
   onChangeOrdersLoaded: (
     changeOrders: ChangeOrderRecord[],
-    initialOriginEstimateId: number | null,
+    initialOriginQuoteId: number | null,
   ) => void;
   /** Called when the CO list could not be fetched. */
   onChangeOrdersError: () => void;
@@ -84,7 +84,7 @@ type LoadProjectsCallbacks = {
 type UseChangeOrderProjectDataOptions = {
   authToken: string;
   scopedProjectId: number | null;
-  initialOriginEstimateId: number | null;
+  initialOriginQuoteId: number | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -96,13 +96,13 @@ type UseChangeOrderProjectDataOptions = {
  *
  * @param options.authToken              - Auth token for API requests.
  * @param options.scopedProjectId        - Pre-selected project ID (from URL param).
- * @param options.initialOriginEstimateId - Pre-selected estimate ID (from URL param).
+ * @param options.initialOriginQuoteId - Pre-selected quote ID (from URL param).
  * @returns Project data state, setters for cross-hook coordination, and data loaders.
  */
 export function useChangeOrderProjectData({
   authToken,
   scopedProjectId,
-  initialOriginEstimateId,
+  initialOriginQuoteId,
 }: UseChangeOrderProjectDataOptions) {
 
   // --- State ---
@@ -113,15 +113,15 @@ export function useChangeOrderProjectData({
   const [selectedProjectCustomerEmail, setSelectedProjectCustomerEmail] = useState("");
   const [selectedProjectCustomerId, setSelectedProjectCustomerId] = useState<number | null>(null);
   const [changeOrders, setChangeOrders] = useState<ChangeOrderRecord[]>([]);
-  const [projectEstimates, setProjectEstimates] = useState<OriginEstimateRecord[]>([]);
-  const [originEstimateOriginalTotals, setOriginEstimateOriginalTotals] = useState<
+  const [projectQuotes, setProjectQuotes] = useState<OriginQuoteRecord[]>([]);
+  const [originQuoteOriginalTotals, setOriginQuoteOriginalTotals] = useState<
     Record<number, number>
   >({});
   const [projectAuditEvents, setProjectAuditEvents] = useState<AuditEventRecord[]>([]);
   const [costCodes, setCostCodes] = useState<CostCodeOption[]>([]);
   const [organizationDefaults, setOrganizationDefaults] =
     useState<OrganizationDocumentDefaults | null>(null);
-  const [selectedViewerEstimateId, setSelectedViewerEstimateId] = useState("");
+  const [selectedViewerQuoteId, setSelectedViewerQuoteId] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [actionTone, setActionTone] = useState<"error" | "success" | "info">("info");
 
@@ -151,15 +151,15 @@ export function useChangeOrderProjectData({
     return { rows: (payload.data as ChangeOrderRecord[]) ?? [], error: "" };
   }, [authToken]);
 
-  /** Load approved estimates for a project, enriching with approval metadata. */
-  const loadProjectEstimates = useCallback(async (projectId: number) => {
+  /** Load approved quotes for a project, enriching with approval metadata. */
+  const loadProjectQuotes = useCallback(async (projectId: number) => {
     try {
-      const response = await fetch(`${apiBaseUrl}/projects/${projectId}/estimates/`, {
+      const response = await fetch(`${apiBaseUrl}/projects/${projectId}/quotes/`, {
         headers: buildAuthHeaders(authToken),
       });
       const payload: ApiResponse = await response.json();
       if (!response.ok) {
-        setProjectEstimates([]);
+        setProjectQuotes([]);
         return;
       }
       const rows =
@@ -169,21 +169,21 @@ export function useChangeOrderProjectData({
           version: number;
           status?: string;
           grand_total?: string;
-          line_items?: OriginEstimateLineItem[];
+          line_items?: OriginQuoteLineItem[];
         }>) ?? [];
-      const approvedRows = rows.filter((estimate) => estimate.status === "approved");
-      const approvedRowsWithMeta: OriginEstimateRecord[] = await Promise.all(
-        approvedRows.map(async (estimate) => {
+      const approvedRows = rows.filter((quote) => quote.status === "approved");
+      const approvedRowsWithMeta: OriginQuoteRecord[] = await Promise.all(
+        approvedRows.map(async (quote) => {
           const base = {
-            id: estimate.id,
-            title: estimate.title,
-            version: estimate.version,
-            grand_total: estimate.grand_total ?? "0.00",
-            line_items: estimate.line_items ?? [],
+            id: quote.id,
+            title: quote.title,
+            version: quote.version,
+            grand_total: quote.grand_total ?? "0.00",
+            line_items: quote.line_items ?? [],
           };
           try {
             const response = await fetch(
-              `${apiBaseUrl}/estimates/${estimate.id}/status-events/`,
+              `${apiBaseUrl}/quotes/${quote.id}/status-events/`,
               {
                 headers: buildAuthHeaders(authToken),
               },
@@ -219,31 +219,31 @@ export function useChangeOrderProjectData({
           }
         }),
       );
-      const preferredEstimateId =
-        initialOriginEstimateId &&
-        approvedRowsWithMeta.some((estimate) => estimate.id === initialOriginEstimateId)
-          ? String(initialOriginEstimateId)
+      const preferredQuoteId =
+        initialOriginQuoteId &&
+        approvedRowsWithMeta.some((quote) => quote.id === initialOriginQuoteId)
+          ? String(initialOriginQuoteId)
           : "";
-      setProjectEstimates(approvedRowsWithMeta);
+      setProjectQuotes(approvedRowsWithMeta);
       const totalsMap: Record<number, number> = {};
       for (const est of approvedRowsWithMeta) {
         totalsMap[est.id] = parseFloat(est.grand_total) || 0;
       }
-      setOriginEstimateOriginalTotals(totalsMap);
-      setSelectedViewerEstimateId((current) => {
-        if (preferredEstimateId) {
-          return preferredEstimateId;
+      setOriginQuoteOriginalTotals(totalsMap);
+      setSelectedViewerQuoteId((current) => {
+        if (preferredQuoteId) {
+          return preferredQuoteId;
         }
-        if (current && approvedRowsWithMeta.some((estimate) => String(estimate.id) === current)) {
+        if (current && approvedRowsWithMeta.some((quote) => String(quote.id) === current)) {
           return current;
         }
         return approvedRowsWithMeta[0] ? String(approvedRowsWithMeta[0].id) : "";
       });
     } catch {
-      setProjectEstimates([]);
-      setSelectedViewerEstimateId("");
+      setProjectQuotes([]);
+      setSelectedViewerQuoteId("");
     }
-  }, [initialOriginEstimateId, authToken]);
+  }, [initialOriginQuoteId, authToken]);
 
   /** Load status events for a single change order and merge into projectAuditEvents. */
   const loadChangeOrderStatusEvents = useCallback(async (changeOrderId: number) => {
@@ -370,7 +370,7 @@ export function useChangeOrderProjectData({
         setSelectedProjectCustomerId(nextProject.customer ?? null);
         setProjectAuditEvents([]);
         await Promise.all([
-          loadProjectEstimates(nextProject.id),
+          loadProjectQuotes(nextProject.id),
           loadCostCodes(),
         ]);
         const { rows: changeOrderRows, error } = await fetchProjectChangeOrders(nextProject.id);
@@ -381,15 +381,15 @@ export function useChangeOrderProjectData({
           return;
         }
         setChangeOrders(changeOrderRows);
-        callbacks.onChangeOrdersLoaded(changeOrderRows, initialOriginEstimateId);
+        callbacks.onChangeOrdersLoaded(changeOrderRows, initialOriginQuoteId);
         setFeedback("");
       } else {
         setSelectedProjectId("");
         setSelectedProjectName("");
         setSelectedProjectStatus("");
         setSelectedProjectCustomerEmail("");
-        setOriginEstimateOriginalTotals({});
-        setProjectEstimates([]);
+        setOriginQuoteOriginalTotals({});
+        setProjectQuotes([]);
         setProjectAuditEvents([]);
         setChangeOrders([]);
         callbacks.onChangeOrdersError();
@@ -400,9 +400,9 @@ export function useChangeOrderProjectData({
     }
   }, [
     fetchProjectChangeOrders,
-    initialOriginEstimateId,
+    initialOriginQuoteId,
     loadCostCodes,
-    loadProjectEstimates,
+    loadProjectQuotes,
     scopedProjectId,
     setFeedback,
     authToken,
@@ -431,23 +431,23 @@ export function useChangeOrderProjectData({
     selectedProjectCustomerEmail,
     selectedProjectCustomerId,
     changeOrders,
-    projectEstimates,
-    originEstimateOriginalTotals,
+    projectQuotes,
+    originQuoteOriginalTotals,
     projectAuditEvents,
     costCodes,
     organizationDefaults,
-    selectedViewerEstimateId,
+    selectedViewerQuoteId,
     actionMessage,
     actionTone,
 
     // Setters
     setChangeOrders,
-    setSelectedViewerEstimateId,
+    setSelectedViewerQuoteId,
     setFeedback,
 
     // Helpers
     fetchProjectChangeOrders,
-    loadProjectEstimates,
+    loadProjectQuotes,
     loadChangeOrderStatusEvents,
     loadCostCodes,
     loadOrganizationDefaults,

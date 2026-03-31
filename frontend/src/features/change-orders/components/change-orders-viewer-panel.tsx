@@ -1,7 +1,7 @@
 /**
  * Presentational component for the change-orders viewer panel.
  *
- * Renders the estimate rail, CO list with pagination, action buttons
+ * Renders the quote rail, CO list with pagination, action buttons
  * with confirmation, audit event history, line items detail, and
  * contract breakdown. All data and handlers are received via props —
  * no hooks or side effects live here (except the action panel which
@@ -24,15 +24,15 @@ import {
   eventActorHref,
   statusEventActionLabel,
   approvalMeta,
-  approvedRollingDeltaForEstimate,
-  originalBudgetTotalForEstimate,
-  currentApprovedBudgetTotalForEstimate,
+  approvedRollingDeltaForQuote,
+  originalBudgetTotalForQuote,
+  currentApprovedBudgetTotalForQuote,
   lastStatusEventForChangeOrder,
 } from "./change-orders-display";
 import type {
   AuditEventRecord,
   ChangeOrderRecord,
-  OriginEstimateRecord,
+  OriginQuoteRecord,
 } from "../types";
 import styles from "./change-orders-console.module.css";
 import creatorStyles from "@/shared/document-creator/creator-foundation.module.css";
@@ -384,15 +384,15 @@ export type ChangeOrdersViewerPanelProps = {
   selectedProjectCustomerEmail: string;
   selectedProjectCustomerId: number | null;
 
-  // Estimate rail
-  projectEstimates: OriginEstimateRecord[];
-  selectedViewerEstimateId: string;
+  // Quote rail
+  projectQuotes: OriginQuoteRecord[];
+  selectedViewerQuoteId: string;
   changeOrders: ChangeOrderRecord[];
-  originEstimateOriginalTotals: Record<number, number>;
-  onSelectEstimate: (estimateId: string) => void;
+  originQuoteOriginalTotals: Record<number, number>;
+  onSelectQuote: (quoteId: string) => void;
 
   // CO list
-  selectedViewerEstimate: OriginEstimateRecord | null;
+  selectedViewerQuote: OriginQuoteRecord | null;
   viewerChangeOrders: ChangeOrderRecord[];
   paginatedChangeOrders: ChangeOrderRecord[];
   selectedChangeOrderId: string;
@@ -441,12 +441,12 @@ export function ChangeOrdersViewerPanel({
   selectedProjectName,
   selectedProjectCustomerEmail,
   selectedProjectCustomerId,
-  projectEstimates,
-  selectedViewerEstimateId,
+  projectQuotes,
+  selectedViewerQuoteId,
   changeOrders,
-  originEstimateOriginalTotals,
-  onSelectEstimate,
-  selectedViewerEstimate,
+  originQuoteOriginalTotals,
+  onSelectQuote,
+  selectedViewerQuote,
   viewerChangeOrders,
   paginatedChangeOrders,
   selectedChangeOrderId,
@@ -490,56 +490,56 @@ export function ChangeOrdersViewerPanel({
           ) : null}
         </div>
         <p>
-          Select an estimate to view its change orders.
+          Select an quote to view its change orders.
         </p>
       </div>
-      {(isMobile || isViewerExpanded) ? (projectEstimates.length > 0 ? (
+      {(isMobile || isViewerExpanded) ? (projectQuotes.length > 0 ? (
         <div className={styles.viewerGrid}>
           <div className={styles.viewerRail}>
             <div className={styles.viewerRailHeader}>
-              <span className={styles.viewerRailHeading}>Approved Estimates</span>
+              <span className={styles.viewerRailHeading}>Approved Quotes</span>
             </div>
-            {projectEstimates.map((estimate) => {
-              const active = String(estimate.id) === selectedViewerEstimateId;
+            {projectQuotes.map((quote) => {
+              const active = String(quote.id) === selectedViewerQuoteId;
               const relatedCount = changeOrders.filter(
-                (changeOrder) => changeOrder.origin_estimate === estimate.id,
+                (changeOrder) => changeOrder.origin_quote === quote.id,
               ).length;
               return (
-                <div key={estimate.id} className={styles.viewerRailEntry}>
+                <div key={quote.id} className={styles.viewerRailEntry}>
                   <button
                     type="button"
                     className={`${styles.viewerRailItem} ${active ? styles.viewerRailItemActive : ""}`}
-                    onClick={() => onSelectEstimate(String(estimate.id))}
+                    onClick={() => onSelectQuote(String(quote.id))}
                   >
                     <span className={styles.viewerRailTitle}>
-                      {estimate.title}
+                      {quote.title}
                       <span className={styles.viewerRailVersion}>
-                        v{estimate.version} · {relatedCount} COs
+                        v{quote.version} · {relatedCount} COs
                       </span>
                     </span>
                     <span className={styles.viewerRailSubtext}>
-                      {approvalMeta(estimate)}
+                      {approvalMeta(quote)}
                     </span>
                     <span className={styles.viewerRailMetrics}>
                       <span className={styles.viewerMetricCurrent}>
-                        Current ${currentApprovedBudgetTotalForEstimate(estimate.id, changeOrders, originEstimateOriginalTotals)}
+                        Current ${currentApprovedBudgetTotalForQuote(quote.id, changeOrders, originQuoteOriginalTotals)}
                       </span>
                       {" · "}
                       <span className={styles.viewerMetricOriginal}>
-                        Original ${originalBudgetTotalForEstimate(estimate.id, originEstimateOriginalTotals)}
+                        Original ${originalBudgetTotalForQuote(quote.id, originQuoteOriginalTotals)}
                       </span>
                       {" · "}
                       <span className={styles.viewerMetricDelta}>
-                        CO Delta ${approvedRollingDeltaForEstimate(estimate.id, changeOrders)}
+                        CO Delta ${approvedRollingDeltaForQuote(quote.id, changeOrders)}
                       </span>
                     </span>
                     {selectedProjectId ? (
                       <Link
-                        href={`/projects/${selectedProjectId}/estimates?estimate=${estimate.id}`}
+                        href={`/projects/${selectedProjectId}/quotes?quote=${quote.id}`}
                         className={styles.viewerCardLinkBar}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        View Estimate →
+                        View Quote →
                       </Link>
                     ) : null}
                   </button>
@@ -547,7 +547,7 @@ export function ChangeOrdersViewerPanel({
               );
             })}
           </div>
-          {selectedViewerEstimate ? (
+          {selectedViewerQuote ? (
             <div className={styles.viewerDetail}>
               {viewerChangeOrders.length > 0 ? (
                 <>
@@ -622,18 +622,18 @@ export function ChangeOrdersViewerPanel({
                 </>
               ) : (
                 <p className={styles.viewerHint}>
-                  No change orders have been created yet for this approved origin estimate.
+                  No change orders have been created yet for this approved origin quote.
                 </p>
               )}
             </div>
           ) : (
-            <p>Select an approved estimate to view linked change orders.</p>
+            <p>Select an approved quote to view linked change orders.</p>
           )}
         </div>
       ) : (
-        <p className={styles.viewerHint}>No approved estimates yet for this project.</p>
+        <p className={styles.viewerHint}>No approved quotes yet for this project.</p>
       )) : (
-        <p className={styles.viewerHint}>Viewer collapsed. Expand when you need linked estimate/CO context.</p>
+        <p className={styles.viewerHint}>Viewer collapsed. Expand when you need linked quote/CO context.</p>
       )}
     </section>
   );

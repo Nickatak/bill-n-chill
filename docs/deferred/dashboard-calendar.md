@@ -4,7 +4,7 @@
 
 Replace the placeholder dashboard with a calendar-based overview showing upcoming and overdue items across all projects:
 
-- **Expiring/expired estimates** (valid_through dates)
+- **Expiring/expired quotes** (valid_through dates)
 - **Project milestone dates** (start, target completion)
 - **Overdue invoices** (past due dates)
 - **Upcoming payment dates**

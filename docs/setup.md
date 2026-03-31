@@ -151,7 +151,7 @@ Seeds four accounts representing different adoption stages of the platform:
 | Account | Stage | Data |
 |---|---|---|
 | `new@test.com` | Fresh signup | Empty workspace (org + cost codes only) |
-| `early@test.com` | ~2 months | 4 customers, 2 projects, 2 estimates |
+| `early@test.com` | ~2 months | 4 customers, 2 projects, 2 quotes |
 | `mid@test.com` | ~8 months | 12 customers, 6 projects, full status coverage |
 | `late@test.com` | ~2 years | 35 customers, 18 projects, full financial lifecycle |
 

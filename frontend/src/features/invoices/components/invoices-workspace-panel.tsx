@@ -14,11 +14,11 @@ import { DndContext, closestCenter, type DragEndEvent, type Modifier } from "@dn
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { parseAmount, formatDecimal, formatCurrency } from "@/shared/money-format";
-import { BillingScheduleEditor } from "@/features/estimates/components/billing-schedule-editor";
-import type { BillingPeriodInput } from "@/features/estimates/types";
+import { BillingScheduleEditor } from "@/features/quotes/components/billing-schedule-editor";
+import type { BillingPeriodInput } from "@/features/quotes/types";
 import { DocumentCreator } from "@/shared/document-creator";
 import type { DocumentCreatorAdapter, CreatorLineDraft } from "@/shared/document-creator/types";
-import { CostCodeCombobox } from "@/features/estimates/components/cost-code-combobox";
+import { CostCodeCombobox } from "@/features/quotes/components/cost-code-combobox";
 import { ReadOnlyLineTable } from "@/shared/document-viewer/read-only-line-table";
 import type {
   CostCode,
@@ -208,7 +208,7 @@ export function InvoicesWorkspacePanel({
       dueDate: p.due_date || "",
     }));
   }, [periods]);
-  const scheduleTotal = schedule ? parseAmount(schedule.estimate_total) : 0;
+  const scheduleTotal = schedule ? parseAmount(schedule.quote_total) : 0;
 
   return (
     <div className={styles.workspace}>
@@ -548,7 +548,7 @@ export function InvoicesWorkspacePanel({
               {schedulePeriods.length > 0 ? (
                 <BillingScheduleEditor
                   periods={schedulePeriods}
-                  estimateTotal={scheduleTotal}
+                  quoteTotal={scheduleTotal}
                   readOnly
                 />
               ) : null}

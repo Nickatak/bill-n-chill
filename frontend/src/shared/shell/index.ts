@@ -18,7 +18,7 @@ export {
 export {
   parsePublicTokenFromRef,
   composePublicDocumentMetadataTitle,
-  resolvePublicEstimateMetadataTitle,
+  resolvePublicQuoteMetadataTitle,
   resolvePublicInvoiceMetadataTitle,
   resolvePublicChangeOrderMetadataTitle,
 } from "./public-route-metadata";

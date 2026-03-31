@@ -36,7 +36,7 @@ This map defines how to trace behavior from route to feature code and how to com
 | `/onboarding` | `frontend/src/app/onboarding/page.tsx` | Onboarding checklist for new orgs |
 | `/projects` | `frontend/src/app/projects/page.tsx` | `frontend/src/features/projects/components/projects-console.tsx` |
 | `/projects/[projectId]/activity` | `frontend/src/app/projects/[projectId]/activity/page.tsx` | `frontend/src/features/projects/components/project-activity-console.tsx` |
-| `/projects/[projectId]/estimates` | `frontend/src/app/projects/[projectId]/estimates/page.tsx` | `frontend/src/features/estimates/components/estimates-console.tsx` |
+| `/projects/[projectId]/quotes` | `frontend/src/app/projects/[projectId]/quotes/page.tsx` | `frontend/src/features/quotes/components/quotes-console.tsx` |
 | `/projects/[projectId]/change-orders` | `frontend/src/app/projects/[projectId]/change-orders/page.tsx` | `frontend/src/features/change-orders/components/change-orders-console.tsx` |
 | `/invoices` | `frontend/src/app/invoices/page.tsx` | `frontend/src/features/invoices/components/invoices-console.tsx` |
 | `/bills` | `frontend/src/app/bills/page.tsx` | `frontend/src/features/vendor-bills/components/vendor-bills-console.tsx` |
@@ -44,7 +44,7 @@ This map defines how to trace behavior from route to feature code and how to com
 | `/customers` | `frontend/src/app/customers/page.tsx` | `frontend/src/features/customers/components/customers-console.tsx` |
 | `/cost-codes` | `frontend/src/app/cost-codes/page.tsx` | `frontend/src/features/cost-codes/components/cost-codes-console.tsx` |
 | `/financials-auditing` | `frontend/src/app/financials-auditing/page.tsx` | `frontend/src/features/financials-auditing/components/financials-auditing-console.tsx` + `frontend/src/features/payments/components/payments-console.tsx` |
-| `/estimate/[publicRef]` | `frontend/src/app/estimate/[publicRef]/page.tsx` | `frontend/src/features/estimates/components/estimate-approval-preview.tsx` |
+| `/quote/[publicRef]` | `frontend/src/app/quote/[publicRef]/page.tsx` | `frontend/src/features/quotes/components/quote-approval-preview.tsx` |
 | `/invoice/[publicRef]` | `frontend/src/app/invoice/[publicRef]/page.tsx` | `frontend/src/features/invoices/components/invoice-public-preview.tsx` |
 | `/change-order/[publicRef]` | `frontend/src/app/change-order/[publicRef]/page.tsx` | `frontend/src/features/change-orders/components/change-order-public-preview.tsx` |
 
@@ -52,15 +52,15 @@ This map defines how to trace behavior from route to feature code and how to com
 Use this ordering for navigation and page ownership.
 
 1. `Projects` is the operational hub for scope planning and control.
-2. `Estimates` and `Change Orders` are project-scoped scope controls and belong with project workflow.
+2. `Quotes` and `Change Orders` are project-scoped scope controls and belong with project workflow.
 3. `Billing` comes after scope decisions and owns invoice/vendor-bill/payment execution.
-4. Keep project-origin links to estimates/change-orders in project context; reserve top-level billing nav for post-approval financial flow.
+4. Keep project-origin links to quotes/change-orders in project context; reserve top-level billing nav for post-approval financial flow.
 
 ## Workflow Contract Features
 These features consume backend policy-contract endpoints for UI status options and transition behavior.
 
 1. `change-orders` -> `GET /contracts/change-orders/`
-2. `estimates` -> `GET /contracts/estimates/`
+2. `quotes` -> `GET /contracts/quotes/`
 3. `vendor-bills` -> `GET /contracts/vendor-bills/`
 4. `payments` -> `GET /contracts/payments/`
 
@@ -76,7 +76,7 @@ When debugging UI behavior, walk this path in order.
 
 ## Feature Map Coverage
 1. `frontend/src/features/change-orders/FEATURE_MAP.md`
-2. `frontend/src/features/estimates/FEATURE_MAP.md`
+2. `frontend/src/features/quotes/FEATURE_MAP.md`
 3. `frontend/src/features/vendor-bills/FEATURE_MAP.md`
 4. `frontend/src/features/payments/FEATURE_MAP.md`
 5. `frontend/src/features/budgets/FEATURE_MAP.md`

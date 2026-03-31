@@ -15,7 +15,7 @@ exactly is the line, and who/what enforces it?
 
 A prospect project is pre-commitment. It may contain:
 
-- Draft estimates (not yet sent to the customer)
+- Draft quotes (not yet sent to the customer)
 - Draft invoices (not yet sent)
 
 It should **not** contain:
@@ -29,14 +29,14 @@ It should **not** contain:
 
 Any of these four actions **automatically promote a prospect project to active**:
 
-1. **Sending an estimate** — entering the customer engagement loop
+1. **Sending an quote** — entering the customer engagement loop
 2. **Sending an invoice** — billing for work
 3. **Creating a vendor bill** — incurring costs from a vendor
 4. **Creating a receipt** — spending money on the project
 
 The promotion is silent (no confirmation dialog, no toast). The project status
 simply updates. Change orders are not listed because they require an approved
-estimate, which requires sending (action 1), so the project is already active.
+quote, which requires sending (action 1), so the project is already active.
 
 ### Payment visibility
 
@@ -63,8 +63,8 @@ commitment. The two guards are independent:
 ## Implementation
 
 - **Backend:** `_promote_prospect_to_active(project)` in `views/helpers.py` —
-  called from estimate send, invoice send, vendor bill create, receipt create.
+  called from quote send, invoice send, vendor bill create, receipt create.
 - **Frontend:** `isSelectedProjectProspect` flag disables "Record Payment" button.
-- **Replaces:** `_activate_project_from_estimate_approval()` which only fired on
-  estimate approval and also handled on_hold → active (removed — on_hold projects
+- **Replaces:** `_activate_project_from_quote_approval()` which only fired on
+  quote approval and also handled on_hold → active (removed — on_hold projects
   are already considered active for financial purposes).

@@ -143,7 +143,7 @@ function ICWorkflow() {
           <ol style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
             <li>User enters name + email in Quick Add.</li>
             <li>Email is lowercased and validated.</li>
-            <li>Customer created &mdash; email enables document delivery (estimates, invoices, COs).</li>
+            <li>Customer created &mdash; email enables document delivery (quotes, invoices, COs).</li>
           </ol>
 
           <h4 style={{ margin: "0 0 0.5rem" }}>B. With phone only</h4>
@@ -226,7 +226,7 @@ function ICWorkflow() {
             <li>Standalone creation (<code>POST /customers/&lt;id&gt;/projects/</code>) has no immutable audit record.</li>
           </ul>
         </Step>
-        <Step num={4} title={<><strong>[Optional]</strong> Estimate &rarr; approval cycle. <span style={{ opacity: 0.5 }}>(Same mechanics as GC, just not strictly necessary for ICs.)</span></>}>
+        <Step num={4} title={<><strong>[Optional]</strong> Quote &rarr; approval cycle. <span style={{ opacity: 0.5 }}>(Same mechanics as GC, just not strictly necessary for ICs.)</span></>}>
           <h4 style={{ margin: "0 0 0.5rem" }}>Statuses</h4>
           <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
             <li><strong>Draft</strong> &rarr; mutable, user can edit freely.</li>
@@ -239,17 +239,17 @@ function ICWorkflow() {
 
           <h4 style={{ margin: "0 0 0.5rem" }}>A. Happy Path: Draft &rarr; Send &rarr; Approved</h4>
           <ol style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>User creates estimate with title, line items (cost code + qty + unit price + markup%), tax%.</li>
+            <li>User creates quote with title, line items (cost code + qty + unit price + markup%), tax%.</li>
             <li>User sends &rarr; org identity frozen (name, address, logo, terms). Email sent to customer.</li>
             <li>Customer receives email (or Copy Link), opens public preview.</li>
             <li>Customer completes OTP ceremony (email verification).</li>
-            <li>Customer approves &rarr; project transitions to active. Estimate locked.</li>
+            <li>Customer approves &rarr; project transitions to active. Quote locked.</li>
           </ol>
 
           <h4 style={{ margin: "0 0 0.5rem" }}>B. Rejection &rarr; Revision Cycle</h4>
           <ol style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>Customer rejects estimate (with optional note).</li>
-            <li>User clones rejected estimate &rarr; new draft in same title family, version incremented (v1 &rarr; v2).</li>
+            <li>Customer rejects quote (with optional note).</li>
+            <li>User clones rejected quote &rarr; new draft in same title family, version incremented (v1 &rarr; v2).</li>
             <li>User edits line items / pricing, re-sends.</li>
             <li>Previous version auto-archived when new version is created.</li>
             <li>Repeat until approved or voided.</li>
@@ -257,7 +257,7 @@ function ICWorkflow() {
 
           <h4 style={{ margin: "0 0 0.5rem" }}>C. Resend (Sent &rarr; Sent)</h4>
           <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>User can resend a sent estimate &mdash; triggers new email, same document.</li>
+            <li>User can resend a sent quote &mdash; triggers new email, same document.</li>
             <li>Recorded as a resend event in audit trail.</li>
           </ul>
 
@@ -278,8 +278,8 @@ function ICWorkflow() {
 
           <h4 style={{ margin: "0 0 0.5rem" }}>Audit</h4>
           <ul style={{ margin: "0 0 0.5rem", paddingLeft: "1.25rem" }}>
-            <li><strong>EstimateStatusEvent</strong> &mdash; immutable record on every status transition, resend, and note append. Captures from/to status, note, actor, IP, user-agent.</li>
-            <li><strong>EmailRecord</strong> &mdash; DOCUMENT_SENT type logged when estimate is emailed to customer.</li>
+            <li><strong>QuoteStatusEvent</strong> &mdash; immutable record on every status transition, resend, and note append. Captures from/to status, note, actor, IP, user-agent.</li>
+            <li><strong>EmailRecord</strong> &mdash; DOCUMENT_SENT type logged when quote is emailed to customer.</li>
             <li><strong>SigningCeremonyRecord</strong> &mdash; immutable record on customer approve/reject. Captures content hash, signer name, consent, session token.</li>
             <li><strong>DocumentAccessSession</strong> &mdash; OTP session created for public decision flow. Tracks code, verified_at, expiry.</li>
           </ul>
@@ -326,7 +326,7 @@ function ICWorkflow() {
 
           <h4 style={{ margin: "0 0 0.5rem" }}>Key Mechanics</h4>
           <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li><strong>No versioning:</strong> Unlike estimates, invoices have no title families or revision cloning. Duplication is a frontend-only convenience (copies lines into a fresh create).</li>
+            <li><strong>No versioning:</strong> Unlike quotes, invoices have no title families or revision cloning. Duplication is a frontend-only convenience (copies lines into a fresh create).</li>
             <li><strong>Invoice # auto-generated:</strong> Sequential per project (INV-0001, INV-0002). Unique constraint on (project, invoice_number).</li>
             <li><strong>Identity freeze:</strong> Sender name/address/logo/terms backfilled from org on leaving draft.</li>
             <li><strong>Balance tracking:</strong> <code>balance_due = total - sum(settled allocations)</code>. Clamped to 0.</li>
@@ -403,7 +403,7 @@ function ICWorkflow() {
       <div style={note.box}>
         <p style={note.label}>Insight: Copy Link for SMS delivery</p>
         <p style={{ margin: 0 }}>
-          Public document links (estimates, invoices, COs) are already fully functional standalone pages
+          Public document links (quotes, invoices, COs) are already fully functional standalone pages
           with tokenized URLs. Currently the only delivery mechanism is &quot;Send&quot; (Mailgun email).
           But ICs are more likely to text their customers than email them. A &quot;Copy Link&quot; / tap-to-copy
           action next to Send would let them paste the URL into SMS, iMessage, WhatsApp, etc.
@@ -419,7 +419,7 @@ function GCWorkflow() {
   return (
     <div>
       <h2>General Contractor Workflow</h2>
-      <p style={{ opacity: 0.6 }}>Expand each step for lifecycle notes. Same core as IC with estimates (expected), change orders, and vendor bills.</p>
+      <p style={{ opacity: 0.6 }}>Expand each step for lifecycle notes. Same core as IC with quotes (expected), change orders, and vendor bills.</p>
 
       <ol style={{ listStyle: "none", padding: 0, margin: 0 }}>
         <Step num={1} title="User registers.">
@@ -470,7 +470,7 @@ function GCWorkflow() {
           <ol style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
             <li>User enters name + email in Quick Add.</li>
             <li>Email is lowercased and validated.</li>
-            <li>Customer created &mdash; email enables document delivery (estimates, invoices, COs).</li>
+            <li>Customer created &mdash; email enables document delivery (quotes, invoices, COs).</li>
           </ol>
 
           <h4 style={{ margin: "0 0 0.5rem" }}>B. With phone only</h4>
@@ -545,7 +545,7 @@ function GCWorkflow() {
             <li>Standalone creation has no immutable audit record.</li>
           </ul>
         </Step>
-        <Step num={4} title={<>Estimate &rarr; approval cycle. <span style={{ opacity: 0.5 }}>(Not hard-required, but 100% expected for GCs.)</span></>}>
+        <Step num={4} title={<>Quote &rarr; approval cycle. <span style={{ opacity: 0.5 }}>(Not hard-required, but 100% expected for GCs.)</span></>}>
           <h4 style={{ margin: "0 0 0.5rem" }}>Statuses</h4>
           <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
             <li><strong>Draft</strong> &rarr; mutable, user can edit freely.</li>
@@ -558,17 +558,17 @@ function GCWorkflow() {
 
           <h4 style={{ margin: "0 0 0.5rem" }}>A. Happy Path: Draft &rarr; Send &rarr; Approved</h4>
           <ol style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>User creates estimate with title, line items (cost code + qty + unit price + markup%), tax%.</li>
+            <li>User creates quote with title, line items (cost code + qty + unit price + markup%), tax%.</li>
             <li>User sends &rarr; org identity frozen (name, address, logo, terms). Email sent to customer.</li>
             <li>Customer receives email (or Copy Link), opens public preview.</li>
             <li>Customer completes OTP ceremony (email verification).</li>
-            <li>Customer approves &rarr; project transitions to active. Estimate locked.</li>
+            <li>Customer approves &rarr; project transitions to active. Quote locked.</li>
           </ol>
 
           <h4 style={{ margin: "0 0 0.5rem" }}>B. Rejection &rarr; Revision Cycle</h4>
           <ol style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>Customer rejects estimate (with optional note).</li>
-            <li>User clones rejected estimate &rarr; new draft in same title family, version incremented (v1 &rarr; v2).</li>
+            <li>Customer rejects quote (with optional note).</li>
+            <li>User clones rejected quote &rarr; new draft in same title family, version incremented (v1 &rarr; v2).</li>
             <li>User edits line items / pricing, re-sends.</li>
             <li>Previous version auto-archived when new version is created.</li>
             <li>Repeat until approved or voided.</li>
@@ -576,7 +576,7 @@ function GCWorkflow() {
 
           <h4 style={{ margin: "0 0 0.5rem" }}>C. Resend (Sent &rarr; Sent)</h4>
           <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>User can resend a sent estimate &mdash; triggers new email, same document.</li>
+            <li>User can resend a sent quote &mdash; triggers new email, same document.</li>
             <li>Recorded as a resend event in audit trail.</li>
           </ul>
 
@@ -597,8 +597,8 @@ function GCWorkflow() {
 
           <h4 style={{ margin: "0 0 0.5rem" }}>Audit</h4>
           <ul style={{ margin: "0 0 0.5rem", paddingLeft: "1.25rem" }}>
-            <li><strong>EstimateStatusEvent</strong> &mdash; immutable record on every status transition, resend, and note append. Captures from/to status, note, actor, IP, user-agent.</li>
-            <li><strong>EmailRecord</strong> &mdash; DOCUMENT_SENT type logged when estimate is emailed to customer.</li>
+            <li><strong>QuoteStatusEvent</strong> &mdash; immutable record on every status transition, resend, and note append. Captures from/to status, note, actor, IP, user-agent.</li>
+            <li><strong>EmailRecord</strong> &mdash; DOCUMENT_SENT type logged when quote is emailed to customer.</li>
             <li><strong>SigningCeremonyRecord</strong> &mdash; immutable record on customer approve/reject. Captures content hash, signer name, consent, session token.</li>
             <li><strong>DocumentAccessSession</strong> &mdash; OTP session created for public decision flow. Tracks code, verified_at, expiry.</li>
           </ul>
@@ -615,7 +615,7 @@ function GCWorkflow() {
 
           <h4 style={{ margin: "0 0 0.5rem" }}>A. Happy Path: Draft &rarr; Pending &rarr; Approved</h4>
           <ol style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li>User creates CO linked to an approved estimate (<code>origin_estimate</code> required).</li>
+            <li>User creates CO linked to an approved quote (<code>origin_quote</code> required).</li>
             <li>Adds line items (cost code + description + amount_delta + days_delta). Line totals must sum to CO amount_delta.</li>
             <li>User sends &rarr; status to sent. Org identity frozen. Email sent to customer.</li>
             <li>Customer opens public preview, completes OTP ceremony.</li>
@@ -640,11 +640,11 @@ function GCWorkflow() {
 
           <h4 style={{ margin: "0 0 0.5rem" }}>Key Mechanics</h4>
           <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li><strong>Origin estimate required:</strong> Every CO must link to an approved estimate. Immutable once set.</li>
+            <li><strong>Origin quote required:</strong> Every CO must link to an approved quote. Immutable once set.</li>
             <li><strong>Family + revision:</strong> <code>family_key</code> groups revisions. Revision numbers are 1-based, unique per family per project.</li>
             <li><strong>Contract value propagation:</strong> Approved CO&apos;s <code>amount_delta</code> atomically added to <code>project.contract_value_current</code>.</li>
             <li><strong>Identity freeze:</strong> Sender name/address/logo/terms captured when leaving draft.</li>
-            <li><strong>Public OTP ceremony:</strong> Same mechanism as estimates.</li>
+            <li><strong>Public OTP ceremony:</strong> Same mechanism as quotes.</li>
           </ul>
 
           <h4 style={{ margin: "0 0 0.5rem" }}>Audit</h4>
@@ -695,7 +695,7 @@ function GCWorkflow() {
 
           <h4 style={{ margin: "0 0 0.5rem" }}>Key Mechanics</h4>
           <ul style={{ margin: "0 0 1rem", paddingLeft: "1.25rem" }}>
-            <li><strong>No versioning:</strong> Unlike estimates, invoices have no title families or revision cloning.</li>
+            <li><strong>No versioning:</strong> Unlike quotes, invoices have no title families or revision cloning.</li>
             <li><strong>Invoice # auto-generated:</strong> Sequential per project (INV-0001, INV-0002).</li>
             <li><strong>Identity freeze:</strong> Sender name/address/logo/terms backfilled from org on leaving draft.</li>
             <li><strong>Balance tracking:</strong> <code>balance_due = total - sum(settled allocations)</code>. Clamped to 0.</li>
@@ -810,7 +810,7 @@ function GCWorkflow() {
       <div style={note.box}>
         <p style={note.label}>Insight: Copy Link for SMS delivery</p>
         <p style={{ margin: 0 }}>
-          Public document links (estimates, invoices, COs) are already fully functional standalone pages
+          Public document links (quotes, invoices, COs) are already fully functional standalone pages
           with tokenized URLs. A &quot;Copy Link&quot; / tap-to-copy action next to Send would let users
           share via SMS, iMessage, WhatsApp, etc. Same flow, different delivery channel.
         </p>

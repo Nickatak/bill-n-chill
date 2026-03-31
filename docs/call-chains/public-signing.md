@@ -2,19 +2,19 @@
 
 > **Line anchors are pinned manually.** Update after refactors that move function definitions.
 
-OTP-verified e-sign ceremony for public document approval links — estimates, change orders, invoices.
+OTP-verified e-sign ceremony for public document approval links — quotes, change orders, invoices.
 
 ## Key Source Files
 
 | Layer | File | Purpose |
 |-------|------|---------|
 | Frontend | [`shared/document-viewer/signing-ceremony.tsx`](../../frontend/src/shared/document-viewer/signing-ceremony.tsx) | Shared ceremony component (OTP + consent + decision) |
-| Frontend | [`features/estimates/components/estimate-approval-preview.tsx`](../../frontend/src/features/estimates/components/estimate-approval-preview.tsx) | Estimate public preview page |
+| Frontend | [`features/quotes/components/quote-approval-preview.tsx`](../../frontend/src/features/quotes/components/quote-approval-preview.tsx) | Quote public preview page |
 | Frontend | [`features/change-orders/components/change-order-public-preview.tsx`](../../frontend/src/features/change-orders/components/change-order-public-preview.tsx) | Change order public preview page |
 | Frontend | [`features/invoices/components/invoice-public-preview.tsx`](../../frontend/src/features/invoices/components/invoice-public-preview.tsx) | Invoice public preview page |
 | Backend | [`views/public_signing.py`](../../backend/core/views/public_signing.py) | Thin OTP endpoint wrappers |
 | Backend | [`views/public_signing_helpers.py`](../../backend/core/views/public_signing_helpers.py) | OTP handlers + ceremony validation |
-| Backend | [`views/estimating/estimates.py`](../../backend/core/views/estimating/estimates.py) | Estimate decision view |
+| Backend | [`views/quoting/quotes.py`](../../backend/core/views/quoting/quotes.py) | Quote decision view |
 | Backend | [`views/change_orders/change_orders.py`](../../backend/core/views/change_orders/change_orders.py) | Change order decision view |
 | Backend | [`views/accounts_receivable/invoices.py`](../../backend/core/views/accounts_receivable/invoices.py) | Invoice decision view |
 | Backend | [`utils/signing.py`](../../backend/core/utils/signing.py) | Content hashing, consent text, email masking |
@@ -35,7 +35,7 @@ Customer clicks "Send verification code" in the signing ceremony panel.
 ---
 
 `BACKEND` — thin view wrapper (one per document type):
-- [`public_estimate_request_otp_view`](../../backend/core/views/public_signing.py#L20)
+- [`public_quote_request_otp_view`](../../backend/core/views/public_signing.py#L20)
 - [`public_change_order_request_otp_view`](../../backend/core/views/public_signing.py#L39)
 - [`public_invoice_request_otp_view`](../../backend/core/views/public_signing.py#L58)
 
@@ -87,7 +87,7 @@ Customer enters 6-digit code and clicks "Verify Code".
 ---
 
 `BACKEND` — thin view wrapper:
-- [`public_estimate_verify_otp_view`](../../backend/core/views/public_signing.py#L27)
+- [`public_quote_verify_otp_view`](../../backend/core/views/public_signing.py#L27)
 - [`public_change_order_verify_otp_view`](../../backend/core/views/public_signing.py#L46)
 - [`public_invoice_verify_otp_view`](../../backend/core/views/public_signing.py#L65)
 
@@ -117,24 +117,24 @@ Each delegates to [`_verify_otp_handler(request, document_type, public_token)`](
 
 ---
 
-## 3. Submit Decision (Estimate — Approve/Reject)
+## 3. Submit Decision (Quote — Approve/Reject)
 
-Customer types name, checks consent, clicks "Approve Estimate" or "Reject Estimate".
+Customer types name, checks consent, clicks "Approve Quote" or "Reject Quote".
 
 `FRONTEND` — [`SigningCeremony`](../../frontend/src/shared/document-viewer/signing-ceremony.tsx#L77) calls `onDecision(decision, ceremonyPayload)`
 
-→ [`EstimateApprovalPreview`](../../frontend/src/features/estimates/components/estimate-approval-preview.tsx#L41)
-- [`applyDecision(decision, ceremony)`](../../frontend/src/features/estimates/components/estimate-approval-preview.tsx#L130)
-  - `fetch POST /api/v1/public/estimates/{publicToken}/decision/`
+→ [`QuoteApprovalPreview`](../../frontend/src/features/quotes/components/quote-approval-preview.tsx#L41)
+- [`applyDecision(decision, ceremony)`](../../frontend/src/features/quotes/components/quote-approval-preview.tsx#L130)
+  - `fetch POST /api/v1/public/quotes/{publicToken}/decision/`
   - Body: `{ decision, note, session_token, signer_name, consent_accepted }`
 
 ---
 
-`BACKEND` — [`public_estimate_decision_view`](../../backend/core/views/estimating/estimates.py#L71)
+`BACKEND` — [`public_quote_decision_view`](../../backend/core/views/quoting/quotes.py#L71)
 
 *── lookup + status guard ──*
 
-- `Estimate.objects.select_related(...).prefetch_related(...).get(public_token=...)`
+- `Quote.objects.select_related(...).prefetch_related(...).get(public_token=...)`
 - Not `sent` status → **409** `conflict`
 - Invalid decision value → **400** `validation_error`
 
@@ -158,16 +158,16 @@ Customer types name, checks consent, clicks "Approve Estimate" or "Reject Estima
 *── persist decision (atomic) ──*
 
 - `transaction.atomic():`
-  - Approve: `estimate.status = APPROVED`, `estimate.save()`
-    - `EstimateStatusEvent.record(from=SENT, to=APPROVED, note=...)`
+  - Approve: `quote.status = APPROVED`, `quote.save()`
+    - `QuoteStatusEvent.record(from=SENT, to=APPROVED, note=...)`
     - Auto-activates project if PROSPECT → ACTIVE
-  - Reject: `estimate.status = REJECTED`, `estimate.save()`
-    - `EstimateStatusEvent.record(from=SENT, to=REJECTED, note=...)`
+  - Reject: `quote.status = REJECTED`, `quote.save()`
+    - `QuoteStatusEvent.record(from=SENT, to=REJECTED, note=...)`
 
 *── signing ceremony artifact ──*
 
 - [`get_ceremony_context()`](../../backend/core/views/public_signing_helpers.py#L234) → `(consent_text, consent_version)`
-- [`compute_document_content_hash("estimate", serialized_data)`](../../backend/core/utils/signing.py#L55)
+- [`compute_document_content_hash("quote", serialized_data)`](../../backend/core/utils/signing.py#L55)
   - Extracts: title, version, tax_percent, terms_text, line_items (description, quantity, unit_cost, markup_percent, cost_code, unit)
   - JSON-serializes with sorted keys → SHA-256
 - [`SigningCeremonyRecord.record(...)`](../../backend/core/models/shared_operations/signing_ceremony.py#L55)
@@ -177,8 +177,8 @@ Customer types name, checks consent, clicks "Approve Estimate" or "Reject Estima
 
 `HTTP 200` → `FRONTEND`
 
-- Response: `{ "data": { ...refreshed estimate... } }`
-- `setEstimate(nextEstimate)` — re-renders with new status
+- Response: `{ "data": { ...refreshed quote... } }`
+- `setQuote(nextQuote)` — re-renders with new status
 - Decision stamp flashes in via `sheetFlash` animation
 - `canDecide` becomes `false` → ceremony section replaced by stamp
 
@@ -198,7 +198,7 @@ Same ceremony flow. Different document type and decision side effects.
 
 *── ceremony validation ──*
 
-- Same as estimate: [`validate_ceremony_on_decision()`](../../backend/core/views/public_signing_helpers.py#L184)
+- Same as quote: [`validate_ceremony_on_decision()`](../../backend/core/views/public_signing_helpers.py#L184)
 
 *── persist decision (atomic) ──*
 

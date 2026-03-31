@@ -9,8 +9,8 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { BillingScheduleEditor } from "@/features/estimates/components/billing-schedule-editor";
-import type { BillingPeriodInput } from "@/features/estimates/types";
+import { BillingScheduleEditor } from "@/features/quotes/components/billing-schedule-editor";
+import type { BillingPeriodInput } from "@/features/quotes/types";
 import { useCreatorFlash } from "@/shared/hooks/use-creator-flash";
 import { PublicDocumentViewerShell } from "@/shared/document-viewer/public-document-viewer-shell";
 import {
@@ -78,7 +78,7 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
     }));
   }, [invoice?.payment_schedule]);
   const scheduleTotal = invoice?.payment_schedule
-    ? parseAmount(invoice.payment_schedule.estimate_total)
+    ? parseAmount(invoice.payment_schedule.quote_total)
     : 0;
   const canDecide =
     invoice?.status === "sent" || invoice?.status === "outstanding";
@@ -291,7 +291,7 @@ export function InvoicePublicPreview({ publicToken }: InvoicePublicPreviewProps)
                 {schedulePeriods.length > 0 ? (
                   <BillingScheduleEditor
                     periods={schedulePeriods}
-                    estimateTotal={scheduleTotal}
+                    quoteTotal={scheduleTotal}
                     readOnly
                   />
                 ) : null}

@@ -4,7 +4,7 @@ Decision date: 2026-03-01
 
 ## Decision
 
-Currency fields have been intentionally removed from vendor bills (and are not present on invoices, estimates, or change orders). The app assumes USD for all monetary values.
+Currency fields have been intentionally removed from vendor bills (and are not present on invoices, quotes, or change orders). The app assumes USD for all monetary values.
 
 ## Rationale
 

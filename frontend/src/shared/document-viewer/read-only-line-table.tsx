@@ -1,7 +1,7 @@
 /**
  * ReadOnlyLineTable — polished read-only line-items table for reference data.
  *
- * Used for contract breakdowns (approved estimate lines, approved CO lines)
+ * Used for contract breakdowns (approved quote lines, approved CO lines)
  * and any other context where line items need to be displayed as a styled,
  * non-editable table with automatic mobile card conversion.
  *
@@ -31,7 +31,7 @@ type MobileColumnHint = {
 };
 
 type ReadOnlyLineTableProps = {
-  /** Optional heading rendered above the table (e.g. "Approved Estimate: ..."). */
+  /** Optional heading rendered above the table (e.g. "Approved Quote: ..."). */
   caption?: string;
   /** Column header labels. */
   columns: string[];

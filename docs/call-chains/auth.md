@@ -397,7 +397,7 @@ Flow B is unchanged by email verification — the invite token proves email owne
 
 ## First RBAC-Gated Request
 
-`FRONTEND` — any console (e.g. [`estimates-console.tsx`](../../frontend/src/features/estimates/components/estimates-console.tsx))
+`FRONTEND` — any console (e.g. [`quotes-console.tsx`](../../frontend/src/features/quotes/components/quotes-console.tsx))
 
 *── UI gating ──*
 
@@ -420,7 +420,7 @@ Flow B is unchanged by email verification — the invite token proves email owne
 
 *── capability enforcement ──*
 
-- View function (e.g. `estimates_view`)
+- View function (e.g. `quotes_view`)
   - [`_capability_gate(request.user, resource, action)`](../../backend/core/rbac.py#L18)
     - [`_resolve_user_capabilities(user)`](../../backend/core/user_helpers.py#L58)
       - [`_ensure_org_membership(user)`](../../backend/core/user_helpers.py#L134)
