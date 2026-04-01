@@ -18,12 +18,16 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 
 from core.models import (
+    BillingPeriod,
     ChangeOrder,
     ChangeOrderLine,
+    ChangeOrderSection,
+    ChangeOrderStatusEvent,
     CostCode,
     Customer,
     Quote,
     QuoteLineItem,
+    QuoteSection,
     QuoteStatusEvent,
     Invoice,
     InvoiceLine,
@@ -65,23 +69,38 @@ class Command(BaseCommand):
         return user, token, membership
 
     def _cost_codes(self, user):
-        """Return two cost codes for quote line seeding."""
+        """Return a dict of cost codes keyed by category for quote/CO/invoice line seeding.
+
+        Sets taxable=True on material codes and taxable=False on labor codes.
+        Returns: {"labor1": CostCode, "labor2": CostCode, "material1": CostCode, "material2": CostCode}
+        """
         membership = _ensure_org_membership(user)
-        codes = list(
-            CostCode.objects.filter(organization=membership.organization, is_active=True)
-            .order_by("code")[:2]
-        )
-        if len(codes) < 2:
-            c1, _ = CostCode.objects.get_or_create(
-                organization=membership.organization, code="01-100",
-                defaults={"name": "General", "is_active": True, "created_by": user},
+        org = membership.organization
+        specs = [
+            # (code, name, taxable) — labor codes are not taxed, material codes are
+            ("06-100", "Rough Carpentry / Framing", False),       # labor1
+            ("26-100", "Electrical Rough", False),                 # labor2
+            ("09-300", "Flooring", True),                          # material1
+            ("09-400", "Tile & Stone", True),                      # material2
+        ]
+        result = {}
+        keys = ["labor1", "labor2", "material1", "material2"]
+        for key, (code, name, taxable) in zip(keys, specs):
+            cc, _ = CostCode.objects.get_or_create(
+                organization=org, code=code,
+                defaults={"name": name, "is_active": True, "taxable": taxable, "created_by": user},
             )
-            c2, _ = CostCode.objects.get_or_create(
-                organization=membership.organization, code="03-100",
-                defaults={"name": "Concrete", "is_active": True, "created_by": user},
-            )
-            codes = [c1, c2]
-        return codes[0], codes[1]
+            if cc.taxable != taxable:
+                cc.taxable = taxable
+                cc.save(update_fields=["taxable", "updated_at"])
+            result[key] = cc
+        # Also ensure a few more codes have correct taxable flags
+        for code, taxable in [
+            ("22-100", False), ("22-200", True), ("23-100", False), ("23-200", True),
+            ("09-100", False), ("09-200", False), ("06-200", False), ("06-300", True),
+        ]:
+            CostCode.objects.filter(organization=org, code=code).update(taxable=taxable)
+        return result
 
     def _add_team_member(self, owner_membership, email, full_name, role):
         """Create a user and add them as a team member on the owner's org."""
@@ -157,62 +176,131 @@ class Command(BaseCommand):
         p.save()
         return p
 
-    def _make_quote(self, user, project, title, version, status, subtotal, code1, code2):
+    def _make_quote(self, user, project, title, version, status, subtotal, codes, **kwargs):
+        """Create or update a quote with line items, sections, and markups.
+
+        kwargs:
+            sections: list of (name, line_specs) where line_specs is list of
+                      (code_key, description, amount, unit, qty) tuples.
+                      If omitted, generates two generic lines from subtotal.
+            markups: dict with optional keys contingency_percent,
+                     overhead_profit_percent, insurance_percent.
+            billing_periods: list of (description, percent) tuples. Must sum to 100.
+        """
+        markups = kwargs.get("markups", {})
+        cont_pct = Decimal(str(markups.get("contingency_percent", 0)))
+        ohp_pct = Decimal(str(markups.get("overhead_profit_percent", 0)))
+        ins_pct = Decimal(str(markups.get("insurance_percent", 0)))
+
+        # Compute markup totals from subtotal
+        cont_total = (subtotal * cont_pct / 100).quantize(Decimal("0.01"))
+        ohp_total = (subtotal * ohp_pct / 100).quantize(Decimal("0.01"))
+        ins_total = (subtotal * ins_pct / 100).quantize(Decimal("0.01"))
+        markup_total = cont_total + ohp_total + ins_total
+        grand_total = subtotal + markup_total  # tax applied on grand_total later if needed
+
         est, _ = Quote.objects.get_or_create(
             created_by=user, project=project, title=title, version=version,
             defaults={
                 "status": status,
                 "subtotal": subtotal,
-                "markup_total": Decimal("0.00"),
+                "markup_total": markup_total,
+                "contingency_percent": cont_pct,
+                "contingency_total": cont_total,
+                "overhead_profit_percent": ohp_pct,
+                "overhead_profit_total": ohp_total,
+                "insurance_percent": ins_pct,
+                "insurance_total": ins_total,
                 "tax_percent": Decimal("0.00"),
                 "tax_total": Decimal("0.00"),
-                "grand_total": subtotal,
+                "grand_total": grand_total,
             },
         )
         est.status = status
         est.subtotal = subtotal
-        est.markup_total = Decimal("0.00")
+        est.markup_total = markup_total
+        est.contingency_percent = cont_pct
+        est.contingency_total = cont_total
+        est.overhead_profit_percent = ohp_pct
+        est.overhead_profit_total = ohp_total
+        est.insurance_percent = ins_pct
+        est.insurance_total = ins_total
         est.tax_percent = Decimal("0.00")
         est.tax_total = Decimal("0.00")
-        est.grand_total = subtotal
+        est.grand_total = grand_total
         est.save(update_fields=[
-            "status", "subtotal", "markup_total", "tax_percent",
-            "tax_total", "grand_total", "updated_at",
+            "status", "subtotal", "markup_total",
+            "contingency_percent", "contingency_total",
+            "overhead_profit_percent", "overhead_profit_total",
+            "insurance_percent", "insurance_total",
+            "tax_percent", "tax_total", "grand_total", "updated_at",
         ])
-        self._sync_quote_lines(est, code1, code2, subtotal)
+        self._sync_quote_lines(est, codes, subtotal, kwargs.get("sections"))
         self._sync_quote_status_history(est, status, user)
+        self._sync_billing_periods(est, kwargs.get("billing_periods"))
         return est
 
-    def _sync_quote_lines(self, quote, code1, code2, subtotal):
-        subtotal = Decimal(subtotal).quantize(Decimal("0.01"))
-        primary_total = (subtotal * Decimal("0.40")).quantize(Decimal("0.01"))
-        secondary_total = subtotal - primary_total
-        specs = [
-            (code1, f"{quote.title} — {code1.name}", primary_total),
-            (code2, f"{quote.title} — {code2.name}", secondary_total),
-        ]
-        keep_ids = []
-        for cost_code, description, line_total in specs:
-            line, _ = QuoteLineItem.objects.get_or_create(
-                quote=quote, cost_code=cost_code, description=description,
-                defaults={
-                    "quantity": Decimal("1.00"),
-                    "unit": "ea",
-                    "unit_price": line_total,
-                    "markup_percent": Decimal("0.00"),
-                    "line_total": line_total,
-                },
+    def _sync_quote_lines(self, quote, codes, subtotal, sections_spec):
+        """Sync sections and line items for a quote.
+
+        sections_spec: list of (section_name, [(code_key, desc, amount, unit, qty), ...])
+                       If None, generates a flat two-line default.
+        """
+        QuoteSection.objects.filter(quote=quote).delete()
+        QuoteLineItem.objects.filter(quote=quote).delete()
+
+        if sections_spec is None:
+            # Default: two lines, no sections
+            subtotal = Decimal(subtotal).quantize(Decimal("0.01"))
+            primary_total = (subtotal * Decimal("0.40")).quantize(Decimal("0.01"))
+            secondary_total = subtotal - primary_total
+            c1, c2 = codes["labor1"], codes["material1"]
+            QuoteLineItem.objects.create(
+                quote=quote, cost_code=c1, description=f"{quote.title} — {c1.name}",
+                quantity=Decimal("1.00"), unit="ea", unit_price=primary_total,
+                markup_percent=Decimal("0.00"), line_total=primary_total, order=0,
             )
-            line.quantity = Decimal("1.00")
-            line.unit = "ea"
-            line.unit_price = line_total
-            line.markup_percent = Decimal("0.00")
-            line.line_total = line_total
-            line.save(update_fields=[
-                "quantity", "unit", "unit_price", "markup_percent", "line_total", "updated_at",
-            ])
-            keep_ids.append(line.id)
-        QuoteLineItem.objects.filter(quote=quote).exclude(id__in=keep_ids).delete()
+            QuoteLineItem.objects.create(
+                quote=quote, cost_code=c2, description=f"{quote.title} — {c2.name}",
+                quantity=Decimal("1.00"), unit="ea", unit_price=secondary_total,
+                markup_percent=Decimal("0.00"), line_total=secondary_total, order=1,
+            )
+            return
+
+        order_counter = 0
+        for section_name, line_specs in sections_spec:
+            section_subtotal = Decimal("0.00")
+            QuoteSection.objects.create(
+                quote=quote, name=section_name, order=order_counter, subtotal=Decimal("0.00"),
+            )
+            section_order = order_counter
+            order_counter += 1
+            for code_key, desc, amount, unit, qty in line_specs:
+                amount = Decimal(str(amount)).quantize(Decimal("0.01"))
+                qty = Decimal(str(qty))
+                unit_price = (amount / qty).quantize(Decimal("0.01")) if qty else amount
+                QuoteLineItem.objects.create(
+                    quote=quote, cost_code=codes[code_key], description=desc,
+                    quantity=qty, unit=unit, unit_price=unit_price,
+                    markup_percent=Decimal("0.00"), line_total=amount, order=order_counter,
+                )
+                section_subtotal += amount
+                order_counter += 1
+            # Update section subtotal
+            QuoteSection.objects.filter(quote=quote, order=section_order).update(
+                subtotal=section_subtotal,
+            )
+
+    def _sync_billing_periods(self, quote, periods_spec):
+        """Sync billing periods for a quote. periods_spec: [(description, percent), ...]"""
+        BillingPeriod.objects.filter(quote=quote).delete()
+        if not periods_spec:
+            return
+        for i, (desc, pct) in enumerate(periods_spec):
+            BillingPeriod.objects.create(
+                quote=quote, description=desc,
+                percent=Decimal(str(pct)), order=i,
+            )
 
     def _sync_quote_status_history(self, quote, target_status, user):
         history = {
@@ -252,11 +340,17 @@ class Command(BaseCommand):
                 note=note, changed_by=user,
             )
 
-    def _make_change_order(self, user, project, family_key, title, status, amount, **kwargs):
+    def _make_change_order(self, user, project, family_key, title, status, amount, codes, **kwargs):
+        """Create or update a change order with line items, sections, and status history.
+
+        kwargs:
+            days_delta, reason, origin_quote,
+            lines: list of (code_key, desc, amount_delta, days_delta, adjustment_reason)
+            sections: list of (section_name, [(code_key, desc, amt, days, reason), ...])
+        """
         origin_quote = kwargs.get("origin_quote") or Quote.objects.filter(
             project=project, status=Quote.Status.APPROVED,
         ).order_by("-version").first()
-        code1, code2 = self._cost_codes(user)
         co, _ = ChangeOrder.objects.get_or_create(
             project=project, family_key=family_key,
             defaults={
@@ -281,19 +375,94 @@ class Command(BaseCommand):
         co.approved_at = timezone.now() if status == ChangeOrder.Status.APPROVED else None
         co.origin_quote = origin_quote
         co.save()
-        # Seed a single line item matching the CO delta
-        ChangeOrderLine.objects.filter(change_order=co).delete()
-        ChangeOrderLine.objects.create(
-            change_order=co,
-            cost_code=code1,
-            description=title,
-            amount_delta=amount,
-            days_delta=kwargs.get("days_delta", 0),
-        )
+
+        # Sync lines — with optional sections
+        self._sync_co_lines(co, codes, amount, kwargs)
+        self._sync_co_status_history(co, status, user)
         return co
+
+    def _sync_co_lines(self, co, codes, amount, kwargs):
+        """Sync change order lines and optional sections."""
+        ChangeOrderLine.objects.filter(change_order=co).delete()
+        ChangeOrderSection.objects.filter(change_order=co).delete()
+
+        sections_spec = kwargs.get("sections")
+        if sections_spec:
+            order_counter = 0
+            for section_name, line_specs in sections_spec:
+                section_subtotal = Decimal("0.00")
+                ChangeOrderSection.objects.create(
+                    change_order=co, name=section_name, order=order_counter, subtotal=Decimal("0.00"),
+                )
+                section_order = order_counter
+                order_counter += 1
+                for code_key, desc, amt, days, reason in line_specs:
+                    amt = Decimal(str(amt))
+                    ChangeOrderLine.objects.create(
+                        change_order=co, cost_code=codes[code_key], description=desc,
+                        amount_delta=amt, days_delta=days,
+                        adjustment_reason=reason, order=order_counter,
+                    )
+                    section_subtotal += amt
+                    order_counter += 1
+                ChangeOrderSection.objects.filter(
+                    change_order=co, order=section_order,
+                ).update(subtotal=section_subtotal)
+            return
+
+        lines_spec = kwargs.get("lines")
+        if lines_spec:
+            for i, (code_key, desc, amt, days, reason) in enumerate(lines_spec):
+                ChangeOrderLine.objects.create(
+                    change_order=co, cost_code=codes[code_key], description=desc,
+                    amount_delta=Decimal(str(amt)), days_delta=days,
+                    adjustment_reason=reason, order=i,
+                )
+            return
+
+        # Default: single line matching CO delta
+        ChangeOrderLine.objects.create(
+            change_order=co, cost_code=codes["labor1"], description=co.title,
+            amount_delta=amount, days_delta=kwargs.get("days_delta", 0),
+            adjustment_reason="Scope addition per owner request.", order=0,
+        )
+
+    def _sync_co_status_history(self, co, target_status, user):
+        """Seed CO status event audit trail, symmetric with quote status history."""
+        history = {
+            ChangeOrder.Status.DRAFT: [
+                (None, ChangeOrder.Status.DRAFT, "Change order created."),
+            ],
+            ChangeOrder.Status.SENT: [
+                (None, ChangeOrder.Status.DRAFT, "Change order created."),
+                (ChangeOrder.Status.DRAFT, ChangeOrder.Status.SENT, "Change order sent to customer."),
+            ],
+            ChangeOrder.Status.APPROVED: [
+                (None, ChangeOrder.Status.DRAFT, "Change order created."),
+                (ChangeOrder.Status.DRAFT, ChangeOrder.Status.SENT, "Change order sent to customer."),
+                (ChangeOrder.Status.SENT, ChangeOrder.Status.APPROVED, "Change order approved by customer."),
+            ],
+            ChangeOrder.Status.REJECTED: [
+                (None, ChangeOrder.Status.DRAFT, "Change order created."),
+                (ChangeOrder.Status.DRAFT, ChangeOrder.Status.SENT, "Change order sent to customer."),
+                (ChangeOrder.Status.SENT, ChangeOrder.Status.REJECTED, "Change order rejected by customer."),
+            ],
+            ChangeOrder.Status.VOID: [
+                (None, ChangeOrder.Status.DRAFT, "Change order created."),
+                (ChangeOrder.Status.DRAFT, ChangeOrder.Status.VOID, "Change order voided."),
+            ],
+        }
+        events = history.get(target_status, history[ChangeOrder.Status.DRAFT])
+        ChangeOrderStatusEvent.objects.filter(change_order=co).delete()
+        for from_s, to_s, note in events:
+            ChangeOrderStatusEvent.objects.create(
+                change_order=co, from_status=from_s, to_status=to_s,
+                note=note, changed_by=user,
+            )
 
     def _make_invoice(self, user, project, customer, number, status, total, balance_due, **kwargs):
         today = date.today()
+        related_quote = kwargs.get("related_quote")
         inv, _ = Invoice.objects.get_or_create(
             project=project, invoice_number=number,
             defaults={
@@ -306,6 +475,7 @@ class Command(BaseCommand):
                 "tax_total": Decimal("0.00"),
                 "total": total,
                 "balance_due": balance_due,
+                "related_quote": related_quote,
                 "created_by": user,
             },
         )
@@ -318,6 +488,7 @@ class Command(BaseCommand):
         inv.tax_total = Decimal("0.00")
         inv.total = total
         inv.balance_due = balance_due
+        inv.related_quote = related_quote
         inv.created_by = user
         inv.save()
         # Single line item per invoice
@@ -454,7 +625,7 @@ class Command(BaseCommand):
     def _seed_early(self):
         """~2 months in. First customers, first projects, first quotes."""
         user, token, membership = self._get_or_create_user("early@test.com")
-        code1, code2 = self._cost_codes(user)
+        codes = self._cost_codes(user)
 
         # 4 customers
         c_johnson = self._make_customer(user, "Johnson Family",
@@ -484,9 +655,9 @@ class Command(BaseCommand):
 
         # 2 quotes: 1 draft (prospect), 1 sent (active)
         self._make_quote(user, p_prospect, "Kitchen Remodel Scope", 1,
-            Quote.Status.DRAFT, Decimal("12000.00"), code1, code2)
+            Quote.Status.DRAFT, Decimal("12000.00"), codes)
         self._make_quote(user, p_active, "Bathroom Renovation Scope", 1,
-            Quote.Status.SENT, Decimal("8500.00"), code1, code2)
+            Quote.Status.SENT, Decimal("8500.00"), codes)
 
         # 1 custom vendor
         Vendor.objects.get_or_create(
@@ -507,7 +678,7 @@ class Command(BaseCommand):
     def _seed_mid(self):
         """~8 months in. One of each status for every entity type."""
         user, token, membership = self._get_or_create_user("mid@test.com")
-        code1, code2 = self._cost_codes(user)
+        codes = self._cost_codes(user)
 
         # 12 customers (1 archived)
         customers_data = [
@@ -557,53 +728,114 @@ class Command(BaseCommand):
             contract_value_current=Decimal("15000.00"))
 
         # Quote family on active project (v1 archived → v2 rejected → v3 approved)
+        # v1/v2: flat lines. v3 (approved): sectioned with markups + billing schedule.
         self._make_quote(user, p_active1, "Baker Office Scope", 1,
-            Quote.Status.ARCHIVED, Decimal("22000.00"), code1, code2)
+            Quote.Status.ARCHIVED, Decimal("22000.00"), codes)
         self._make_quote(user, p_active1, "Baker Office Scope", 2,
-            Quote.Status.REJECTED, Decimal("23500.00"), code1, code2)
-        self._make_quote(user, p_active1, "Baker Office Scope", 3,
-            Quote.Status.APPROVED, Decimal("24000.00"), code1, code2)
+            Quote.Status.REJECTED, Decimal("23500.00"), codes)
+        q_baker = self._make_quote(user, p_active1, "Baker Office Scope", 3,
+            Quote.Status.APPROVED, Decimal("24000.00"), codes,
+            sections=[
+                ("Rough Work", [
+                    ("labor1", "Framing — walls and ceiling grid", 6400, "sf", 800),
+                    ("labor2", "Electrical rough-in — circuits and panels", 4800, "ea", 12),
+                ]),
+                ("Finishes", [
+                    ("material1", "LVP flooring — main office area", 7200, "sf", 1200),
+                    ("material2", "Tile — kitchenette backsplash and restroom", 5600, "sf", 140),
+                ]),
+            ],
+            markups={"contingency_percent": 5, "overhead_profit_percent": 10},
+            billing_periods=[
+                ("Deposit", 10),
+                ("Rough-in complete", 45),
+                ("Final completion", 45),
+            ])
 
         # More quotes in other statuses
         self._make_quote(user, p_prospect, "Anderson Bath Scope", 1,
-            Quote.Status.DRAFT, Decimal("14000.00"), code1, code2)
+            Quote.Status.DRAFT, Decimal("14000.00"), codes,
+            sections=[
+                ("Demo & Prep", [
+                    ("labor1", "Selective demo — existing bath", 3200, "ls", 1),
+                ]),
+                ("Fixtures & Finishes", [
+                    ("material2", "Tile — floor and shower walls", 5800, "sf", 120),
+                    ("material1", "Vanity and fixtures", 5000, "ea", 1),
+                ]),
+            ])
         self._make_quote(user, p_active2, "Clark Kitchen Scope", 1,
-            Quote.Status.SENT, Decimal("18000.00"), code1, code2)
-        self._make_quote(user, p_completed, "Evans Garage Scope", 1,
-            Quote.Status.APPROVED, Decimal("32000.00"), code1, code2)
+            Quote.Status.SENT, Decimal("18000.00"), codes,
+            markups={"overhead_profit_percent": 8},
+            billing_periods=[
+                ("Deposit", 10),
+                ("Balance due on completion", 90),
+            ])
+        q_evans = self._make_quote(user, p_completed, "Evans Garage Scope", 1,
+            Quote.Status.APPROVED, Decimal("32000.00"), codes,
+            markups={"contingency_percent": 3, "overhead_profit_percent": 10, "insurance_percent": 2},
+            billing_periods=[
+                ("Deposit", 10),
+                ("Framing complete", 35),
+                ("Drywall & MEP", 35),
+                ("Final walkthrough", 20),
+            ])
         self._make_quote(user, p_cancelled, "Foster Basement Scope", 1,
-            Quote.Status.VOID, Decimal("15000.00"), code1, code2)
+            Quote.Status.VOID, Decimal("15000.00"), codes)
         self._make_quote(user, p_hold, "Davis Deck Scope", 1,
-            Quote.Status.APPROVED, Decimal("9500.00"), code1, code2)
+            Quote.Status.APPROVED, Decimal("9500.00"), codes,
+            billing_periods=[
+                ("Lump sum on completion", 100),
+            ])
 
-        # Change orders: draft, pending, approved, rejected, void
+        # Change orders: draft, sent, approved, rejected, void
         self._make_change_order(user, p_active1, "1", "Add conference room outlets",
-            ChangeOrder.Status.APPROVED, Decimal("2500.00"), days_delta=2)
+            ChangeOrder.Status.APPROVED, Decimal("2500.00"), codes, days_delta=2,
+            lines=[
+                ("labor2", "Run 4 dedicated 20A circuits to conference room", 1800, 1,
+                 "Owner requested AV-ready outlets at all four walls."),
+                ("material2", "Outlet covers and junction boxes", 700, 0,
+                 "Commercial-grade spec per architect."),
+            ])
         self._make_change_order(user, p_active1, "2", "Upgrade lighting fixtures",
-            ChangeOrder.Status.DRAFT, Decimal("800.00"))
+            ChangeOrder.Status.DRAFT, Decimal("800.00"), codes,
+            lines=[
+                ("labor2", "Swap fluorescent troffers for recessed LED panels", 800, 0,
+                 "Owner prefers warmer lighting — upgrade to 3000K LED."),
+            ])
         self._make_change_order(user, p_active1, "3", "Add network drops",
-            ChangeOrder.Status.SENT, Decimal("1200.00"))
+            ChangeOrder.Status.SENT, Decimal("1200.00"), codes,
+            lines=[
+                ("labor2", "Pull Cat6a to 6 desk locations", 900, 1,
+                 "IT requires hardwired connections for VoIP phones."),
+                ("material1", "Patch panel and cable management", 300, 0,
+                 "Materials for IDF closet buildout."),
+            ])
         self._make_change_order(user, p_completed, "1", "Garage door upgrade",
-            ChangeOrder.Status.APPROVED, Decimal("1200.00"), days_delta=1)
+            ChangeOrder.Status.APPROVED, Decimal("1200.00"), codes, days_delta=1,
+            lines=[
+                ("material1", "Insulated steel garage door — 16x7", 1200, 1,
+                 "Owner upgraded from standard to insulated for workshop use."),
+            ])
         self._make_change_order(user, p_completed, "2", "Cancel window relocation",
-            ChangeOrder.Status.VOID, Decimal("600.00"))
+            ChangeOrder.Status.VOID, Decimal("600.00"), codes)
 
-        # Invoices across statuses
+        # Invoices across statuses — link some to related_quote
         self._make_invoice(user, p_active1, mid_customers[1], "INV-001",
             Invoice.Status.DRAFT, Decimal("6000.00"), Decimal("6000.00"),
-            cost_code=code1)
+            cost_code=codes["labor1"], related_quote=q_baker)
         self._make_invoice(user, p_active1, mid_customers[1], "INV-002",
             Invoice.Status.SENT, Decimal("8000.00"), Decimal("8000.00"),
-            cost_code=code2)
+            cost_code=codes["material1"], related_quote=q_baker)
         self._make_invoice(user, p_active1, mid_customers[1], "INV-003",
             Invoice.Status.OUTSTANDING, Decimal("5000.00"), Decimal("2000.00"),
-            cost_code=code1)
+            cost_code=codes["labor1"])
         inv_paid = self._make_invoice(user, p_completed, mid_customers[4], "INV-004",
             Invoice.Status.CLOSED, Decimal("16000.00"), Decimal("0.00"),
-            cost_code=code2)
+            cost_code=codes["material1"], related_quote=q_evans)
         self._make_invoice(user, p_cancelled, mid_customers[5], "INV-005",
             Invoice.Status.VOID, Decimal("5000.00"), Decimal("0.00"),
-            cost_code=code1)
+            cost_code=codes["labor1"])
 
         # Custom vendors
         v_trade1, _ = Vendor.objects.get_or_create(
@@ -709,7 +941,7 @@ class Command(BaseCommand):
     def _seed_late(self):
         """~2 years in. Full portfolio with history across all domains."""
         user, token, membership = self._get_or_create_user("late@test.com")
-        code1, code2 = self._cost_codes(user)
+        codes = self._cost_codes(user)
 
         # 35 customers (3 archived)
         late_customer_names = [
@@ -790,79 +1022,125 @@ class Command(BaseCommand):
             late_projects.append(p)
 
         # Quotes for every project — active/completed get full families
+        # Billing period patterns to rotate through on approved quotes
+        bp_patterns = [
+            [("Deposit", 10), ("Rough-in complete", 45), ("Final completion", 45)],
+            [("Deposit", 10), ("Balance due on completion", 90)],
+            [("Deposit", 10), ("Framing & rough", 35), ("Finishes & trim", 55)],
+            [("Lump sum on completion", 100)],
+        ]
+        # Markup patterns to rotate through on approved quotes
+        markup_patterns = [
+            {"contingency_percent": 5, "overhead_profit_percent": 10},
+            {"overhead_profit_percent": 8, "insurance_percent": 2},
+            {"contingency_percent": 3, "overhead_profit_percent": 12, "insurance_percent": 2},
+            {},  # no markups
+        ]
+        late_approved_quotes = {}  # p_idx → approved Quote for invoice linking
+        bp_idx = 0
         for i, p in enumerate(late_projects):
             base_amount = Decimal(str(3000 + i * 2500))
             if p.status in {Project.Status.ACTIVE, Project.Status.COMPLETED}:
-                # Full v1→v2→v3 family
+                # Full v1→v2→v3 family — v1/v2 flat, v3 has markups + billing periods
                 self._make_quote(user, p, f"{p.name} Scope", 1,
-                    Quote.Status.ARCHIVED, base_amount * Decimal("0.90"), code1, code2)
+                    Quote.Status.ARCHIVED, base_amount * Decimal("0.90"), codes)
                 self._make_quote(user, p, f"{p.name} Scope", 2,
-                    Quote.Status.REJECTED, base_amount * Decimal("0.95"), code1, code2)
-                self._make_quote(user, p, f"{p.name} Scope", 3,
-                    Quote.Status.APPROVED, base_amount, code1, code2)
+                    Quote.Status.REJECTED, base_amount * Decimal("0.95"), codes)
+                q = self._make_quote(user, p, f"{p.name} Scope", 3,
+                    Quote.Status.APPROVED, base_amount, codes,
+                    markups=markup_patterns[bp_idx % len(markup_patterns)],
+                    billing_periods=bp_patterns[bp_idx % len(bp_patterns)])
+                late_approved_quotes[i] = q
+                bp_idx += 1
             elif p.status == Project.Status.PROSPECT:
                 self._make_quote(user, p, f"{p.name} Scope", 1,
-                    Quote.Status.DRAFT, base_amount, code1, code2)
+                    Quote.Status.DRAFT, base_amount, codes)
             elif p.status == Project.Status.ON_HOLD:
-                self._make_quote(user, p, f"{p.name} Scope", 1,
-                    Quote.Status.APPROVED, base_amount, code1, code2)
+                q = self._make_quote(user, p, f"{p.name} Scope", 1,
+                    Quote.Status.APPROVED, base_amount, codes,
+                    billing_periods=bp_patterns[bp_idx % len(bp_patterns)])
+                late_approved_quotes[i] = q
+                bp_idx += 1
             elif p.status == Project.Status.CANCELLED:
                 self._make_quote(user, p, f"{p.name} Scope", 1,
-                    Quote.Status.VOID, base_amount, code1, code2)
+                    Quote.Status.VOID, base_amount, codes)
 
-        # Change orders on active + completed projects
+        # Change orders on active + completed projects — with adjustment reasons
         co_specs = [
-            (3, "1", "Upgrade master fixtures", ChangeOrder.Status.APPROVED, "7000"),
-            (3, "2", "Add mudroom entry", ChangeOrder.Status.SENT, "3500"),
-            (4, "1", "Conference room AV upgrade", ChangeOrder.Status.APPROVED, "7500"),
-            (4, "2", "Parking lot resurfacing", ChangeOrder.Status.DRAFT, "12000"),
-            (7, "1", "Server room cooling", ChangeOrder.Status.APPROVED, "3200"),
-            (10, "1", "Garage door opener upgrade", ChangeOrder.Status.APPROVED, "1200"),
-            (11, "1", "Pool house kitchenette", ChangeOrder.Status.APPROVED, "3400"),
-            (14, "1", "Kitchen hood upgrade", ChangeOrder.Status.APPROVED, "7000"),
-            (14, "2", "Patio dining extension", ChangeOrder.Status.REJECTED, "15000"),
-            (14, "3", "Walk-in cooler expansion", ChangeOrder.Status.VOID, "8000"),
-            (16, "1", "Foundation change", ChangeOrder.Status.VOID, "6000"),
+            (3, "1", "Upgrade master fixtures", ChangeOrder.Status.APPROVED, "7000", 3,
+             [("material2", "Upgrade to porcelain fixtures", 4500, 2, "Owner selected premium line from showroom visit."),
+              ("labor1", "Additional plumbing labor for fixture swap", 2500, 1, "New fixtures require modified supply lines.")]),
+            (3, "2", "Add mudroom entry", ChangeOrder.Status.SENT, "3500", 0,
+             [("labor1", "Frame and finish mudroom alcove", 2200, 2, "Owner wants drop zone by garage entry."),
+              ("material1", "Tile flooring — mudroom", 1300, 0, "Durable tile for high-traffic entry.")]),
+            (4, "1", "Conference room AV upgrade", ChangeOrder.Status.APPROVED, "7500", 2,
+             [("labor2", "Run conduit and low-voltage for AV system", 4500, 1, "Tenant requires presentation-ready conference room."),
+              ("material1", "AV mounting hardware and cable management", 3000, 0, "Commercial-grade AV infrastructure.")]),
+            (4, "2", "Parking lot resurfacing", ChangeOrder.Status.DRAFT, "12000", 0,
+             [("labor1", "Mill and overlay parking surface", 8000, 5, "Existing surface failing — landlord approved resurface."),
+              ("material1", "Asphalt and striping materials", 4000, 0, "2-inch overlay with re-striping.")]),
+            (7, "1", "Server room cooling", ChangeOrder.Status.APPROVED, "3200", 1,
+             [("labor2", "Install dedicated mini-split for server closet", 3200, 1, "IT equipment requires independent climate control.")]),
+            (10, "1", "Garage door opener upgrade", ChangeOrder.Status.APPROVED, "1200", 0,
+             [("material1", "Belt-drive opener with smart controls", 1200, 0, "Owner upgraded from chain to belt drive for noise reduction.")]),
+            (11, "1", "Pool house kitchenette", ChangeOrder.Status.APPROVED, "3400", 2,
+             [("labor1", "Rough and finish kitchenette plumbing", 1800, 1, "Added wet bar per owner request."),
+              ("material2", "Countertop and sink — kitchenette", 1600, 0, "Quartz counter with undermount sink.")]),
+            (14, "1", "Kitchen hood upgrade", ChangeOrder.Status.APPROVED, "7000", 1,
+             [("labor2", "Install commercial exhaust ductwork", 4000, 1, "Health dept requires Type I hood for new menu."),
+              ("material1", "Stainless hood and make-up air unit", 3000, 0, "Commercial-rated equipment per code.")]),
+            (14, "2", "Patio dining extension", ChangeOrder.Status.REJECTED, "15000", 0,
+             [("labor1", "Concrete pad and pergola framing", 10000, 10, "Owner wanted outdoor seating — rejected due to permit timeline."),
+              ("material1", "Pergola materials and concrete", 5000, 0, "Deferred to Phase 2.")]),
+            (14, "3", "Walk-in cooler expansion", ChangeOrder.Status.VOID, "8000", 0,
+             [("labor1", "Expand cooler footprint by 40sf", 5000, 3, "Voided — owner decided existing capacity sufficient."),
+              ("material1", "Insulated panels and refrigeration piping", 3000, 0, "Materials order cancelled.")]),
+            (16, "1", "Foundation change", ChangeOrder.Status.VOID, "6000", 0,
+             [("labor1", "Switch from slab to crawlspace foundation", 6000, 5, "Voided with project cancellation.")]),
         ]
-        for p_idx, fk, title, status, amt in co_specs:
-            self._make_change_order(user, late_projects[p_idx], fk, title, status, Decimal(amt))
+        for p_idx, fk, title, status, amt, days, lines in co_specs:
+            self._make_change_order(user, late_projects[p_idx], fk, title, status,
+                Decimal(amt), codes, days_delta=days, lines=lines)
 
         # Invoices — multiple per active/completed project
+        # Link sent invoices to related_quote when one exists, leave drafts unlinked
         inv_num = 1
         # Active projects: draft + sent invoices
         for p_idx in [3, 4, 5, 6, 7]:
             p = late_projects[p_idx]
             c = late_customers[p_idx]
+            rq = late_approved_quotes.get(p_idx)
             self._make_invoice(user, p, c, f"INV-{inv_num:03d}",
                 Invoice.Status.SENT, Decimal("8000.00"), Decimal("8000.00"),
-                cost_code=code1)
+                cost_code=codes["labor1"], related_quote=rq)
             inv_num += 1
             self._make_invoice(user, p, c, f"INV-{inv_num:03d}",
                 Invoice.Status.DRAFT, Decimal("6000.00"), Decimal("6000.00"),
-                cost_code=code2)
+                cost_code=codes["material1"])
             inv_num += 1
 
-        # Completed projects: paid invoices
+        # Completed projects: paid invoices — linked to quote
         paid_invoices = []
         for p_idx in [10, 11, 12, 13, 14, 15]:
             p = late_projects[p_idx]
             c = late_customers[p_idx]
+            rq = late_approved_quotes.get(p_idx)
             inv = self._make_invoice(user, p, c, f"INV-{inv_num:03d}",
                 Invoice.Status.CLOSED, Decimal("12000.00"), Decimal("0.00"),
-                cost_code=code1)
+                cost_code=codes["labor1"], related_quote=rq)
             paid_invoices.append(inv)
             inv_num += 1
 
-        # One outstanding (partial payment)
+        # One outstanding (partial payment) — linked
         self._make_invoice(user, late_projects[3], late_customers[3], f"INV-{inv_num:03d}",
             Invoice.Status.OUTSTANDING, Decimal("10000.00"), Decimal("4000.00"),
-            cost_code=code2)
+            cost_code=codes["material1"], related_quote=late_approved_quotes.get(3))
         inv_num += 1
 
-        # One void
+        # One void — no quote link
         self._make_invoice(user, late_projects[16], late_customers[16], f"INV-{inv_num:03d}",
             Invoice.Status.VOID, Decimal("15000.00"), Decimal("0.00"),
-            cost_code=code1)
+            cost_code=codes["labor1"])
 
         # Custom vendors
         vendor_names = [
