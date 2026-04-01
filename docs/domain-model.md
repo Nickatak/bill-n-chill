@@ -478,7 +478,6 @@ Key fields:
 - `issue_date`
 - `due_date`
 - `sender_name`
-- `sender_email`
 - `sender_address`
 - `sender_logo_url`
 - `terms_text`

@@ -515,8 +515,8 @@ class Command(BaseCommand):
                 "issue_date": kwargs.get("issue_date", today),
                 "due_date": kwargs.get("due_date", today + timedelta(days=21)),
                 "subtotal": total,
-                "tax_amount": Decimal("0.00"),
-                "shipping_amount": Decimal("0.00"),
+                "tax_total": Decimal("0.00"),
+                "shipping_total": Decimal("0.00"),
                 "total": total,
                 "balance_due": balance_due,
                 "notes": kwargs.get("notes", ""),
@@ -527,8 +527,8 @@ class Command(BaseCommand):
         vb.issue_date = kwargs.get("issue_date", today)
         vb.due_date = kwargs.get("due_date", today + timedelta(days=21))
         vb.subtotal = total
-        vb.tax_amount = Decimal("0.00")
-        vb.shipping_amount = Decimal("0.00")
+        vb.tax_total = Decimal("0.00")
+        vb.shipping_total = Decimal("0.00")
         vb.total = total
         vb.balance_due = balance_due
         vb.notes = kwargs.get("notes", "")

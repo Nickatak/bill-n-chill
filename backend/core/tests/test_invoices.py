@@ -309,7 +309,6 @@ class InvoiceTests(TestCase):
         self.assertEqual(payload["issue_date"], expected_issue_date)
         self.assertEqual(payload["due_date"], expected_due_date)
         self.assertEqual(payload["sender_name"], organization.display_name)
-        self.assertEqual(payload["sender_email"], "")
         self.assertEqual(payload["sender_address"], organization.formatted_billing_address)
         self.assertEqual(payload["sender_logo_url"], "")
         self.assertEqual(payload["terms_text"], organization.invoice_terms_and_conditions)
@@ -342,7 +341,6 @@ class InvoiceTests(TestCase):
                 "issue_date": "2026-02-20",
                 "due_date": "2026-03-05",
                 "sender_name": "Manual Sender",
-                "sender_email": "manual@sender.example.com",
                 "sender_address": "Manual Sender Address",
                 "sender_logo_url": "https://example.com/logo-manual.png",
                 "terms_text": "Manual terms",
@@ -363,7 +361,6 @@ class InvoiceTests(TestCase):
         self.assertEqual(response.status_code, 201)
         payload = response.json()["data"]
         self.assertEqual(payload["sender_name"], "Manual Sender")
-        self.assertEqual(payload["sender_email"], "manual@sender.example.com")
         self.assertEqual(payload["sender_address"], "Manual Sender Address")
         self.assertEqual(payload["sender_logo_url"], "https://example.com/logo-manual.png")
         self.assertEqual(payload["terms_text"], "Manual terms")
@@ -377,7 +374,6 @@ class InvoiceTests(TestCase):
             f"/api/v1/invoices/{invoice_id}/",
             data={
                 "sender_name": "Updated Sender",
-                "sender_email": "updated@sender.example.com",
                 "sender_address": "Updated Sender Address",
                 "sender_logo_url": "https://example.com/logo-updated.png",
                 "terms_text": "Updated terms",
@@ -390,7 +386,6 @@ class InvoiceTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()["data"]
         self.assertEqual(payload["sender_name"], "Updated Sender")
-        self.assertEqual(payload["sender_email"], "updated@sender.example.com")
         self.assertEqual(payload["sender_address"], "Updated Sender Address")
         self.assertEqual(payload["sender_logo_url"], "https://example.com/logo-updated.png")
         self.assertEqual(payload["terms_text"], "Updated terms")

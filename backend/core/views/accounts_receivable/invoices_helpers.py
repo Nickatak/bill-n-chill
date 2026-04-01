@@ -349,9 +349,6 @@ def _handle_invoice_document_save(request: Request, invoice: Invoice, ingress: I
         if ingress.has_sender_name:
             invoice.sender_name = (ingress.sender_name or "").strip()
             update_fields.append("sender_name")
-        if ingress.has_sender_email:
-            invoice.sender_email = (ingress.sender_email or "").strip()
-            update_fields.append("sender_email")
         if ingress.has_sender_address:
             invoice.sender_address = (ingress.sender_address or "").strip()
             update_fields.append("sender_address")

@@ -19,8 +19,8 @@ Return ONLY a JSON object with these keys — no markdown, no explanation:
   "issue_date": "the document date or invoice date in YYYY-MM-DD format, or empty string if unreadable",
   "due_date": "the due date or payment due date in YYYY-MM-DD format, or empty string if not found",
   "subtotal": "the subtotal before tax as a decimal string like '130.00', or empty string if not found",
-  "tax_amount": "the tax amount as a decimal string like '12.87', or empty string if not found",
-  "shipping_amount": "shipping or freight charges as a decimal string, or empty string if not found",
+  "tax_total": "the tax amount as a decimal string like '12.87', or empty string if not found",
+  "shipping_total": "shipping or freight charges as a decimal string, or empty string if not found",
   "total": "the total amount as a decimal string like '142.87', or empty string if unreadable",
   "line_items": [
     {
@@ -61,8 +61,8 @@ def _parse_gemini_response(text: str) -> dict:
 # Keys that should always be present in the response with string defaults.
 _STRING_FIELDS = (
     "document_type", "vendor_name", "bill_number",
-    "issue_date", "due_date", "subtotal", "tax_amount",
-    "shipping_amount", "total",
+    "issue_date", "due_date", "subtotal", "tax_total",
+    "shipping_total", "total",
 )
 
 

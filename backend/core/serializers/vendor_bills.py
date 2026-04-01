@@ -78,8 +78,8 @@ class VendorBillSerializer(serializers.ModelSerializer):
             "issue_date",
             "due_date",
             "subtotal",
-            "tax_amount",
-            "shipping_amount",
+            "tax_total",
+            "shipping_total",
             "total",
             "balance_due",
             "allocations",
@@ -177,8 +177,8 @@ class VendorBillWriteSerializer(serializers.Serializer):
     issue_date = serializers.DateField(required=False, allow_null=True)
     due_date = serializers.DateField(required=False, allow_null=True)
     subtotal = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
-    tax_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
-    shipping_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    tax_total = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    shipping_total = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     total = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
     notes = serializers.CharField(max_length=5000, required=False, allow_blank=True)
     status_note = serializers.CharField(max_length=5000, required=False, allow_blank=True)

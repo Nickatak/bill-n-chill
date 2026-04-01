@@ -70,7 +70,6 @@ class Invoice(StatusTransitionMixin, models.Model):
     issue_date = models.DateField()
     due_date = models.DateField()
     sender_name = models.CharField(max_length=255, blank=True, default="")
-    sender_email = models.EmailField(blank=True, default="")
     sender_address = models.TextField(blank=True, default="")
     sender_logo_url = models.URLField(blank=True, default="")
     terms_text = models.TextField(blank=True, default="")
@@ -200,7 +199,7 @@ class InvoiceLine(models.Model):
         blank=True,
     )
     description = models.CharField(max_length=255)
-    quantity = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    quantity = models.DecimalField(max_digits=12, decimal_places=2, default=1)
     unit = models.CharField(max_length=30, default="ea")
     unit_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     line_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)

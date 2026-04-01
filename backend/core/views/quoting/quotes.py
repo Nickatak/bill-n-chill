@@ -191,7 +191,7 @@ def public_quote_decision_view(request, public_token):
         quote.status = next_status
         quote.save(update_fields=["status", "updated_at"])
         client_ip = get_client_ip(request)
-        user_agent = request.META.get("HTTP_USER_AGENT", "")
+        client_user_agent = request.META.get("HTTP_USER_AGENT", "")
         QuoteStatusEvent.record(
             quote=quote,
             from_status=previous_status,
@@ -199,7 +199,7 @@ def public_quote_decision_view(request, public_token):
             note=decision_note,
             changed_by=quote.created_by,
             ip_address=client_ip,
-            user_agent=user_agent,
+            user_agent=client_user_agent,
         )
         if quote.status == Quote.Status.APPROVED:
             _promote_prospect_to_active(quote.project)
@@ -215,7 +215,7 @@ def public_quote_decision_view(request, public_token):
             email_verified=ceremony_session is not None,
             content_hash=content_hash,
             ip_address=client_ip,
-            user_agent=user_agent,
+            user_agent=client_user_agent,
             consent_text_version=consent_version,
             consent_text_snapshot=consent_text,
             note=str(request.data.get("note", "") or "").strip(),

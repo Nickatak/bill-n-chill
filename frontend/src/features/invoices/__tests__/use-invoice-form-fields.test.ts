@@ -26,7 +26,6 @@ function makeInvoice(overrides: Partial<InvoiceRecord> = {}): InvoiceRecord {
     issue_date: "2026-02-01",
     due_date: "2026-03-03",
     sender_name: "Acme Construction",
-    sender_email: "billing@acme.com",
     sender_address: "123 Main St",
     sender_logo_url: "",
     terms_text: "Net 30",

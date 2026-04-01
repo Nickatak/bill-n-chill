@@ -1250,7 +1250,7 @@ _Invoice ingress adapter for normalizing external write payloads._
 > Immutable ingress payload for invoice PATCH with per-field presence tracking.
 
 - `_normalize_invoice_line_item(item: dict[str, Any])` — Normalize and whitespace-strip a single invoice line item payload dict.
-- `build_invoice_create_ingress(validated_data: dict[str, Any], default_issue_date: date, default_due_days: int, default_sender_name: str, default_sender_email: str, default_sender_address: str, default_sender_logo_url: str, default_terms_text: str, default_footer_text: str, default_notes_text: str)` — Build an InvoiceCreateIngress from validated request data, applying org defaults for missing fields.
+- `build_invoice_create_ingress(validated_data: dict[str, Any], default_issue_date: date, default_due_days: int, default_sender_name: str, default_sender_address: str, default_sender_logo_url: str, default_terms_text: str, default_footer_text: str, default_notes_text: str)` — Build an InvoiceCreateIngress from validated request data, applying org defaults for missing fields.
 - `build_invoice_patch_ingress(validated_data: dict[str, Any])` — Build an InvoicePatchIngress from validated request data with has_* presence flags.
 
 ### `backend/core/views/accounts_receivable/invoices.py`
@@ -1357,7 +1357,7 @@ _Domain-specific helpers for vendor bill views._
 
 - `_find_duplicate_vendor_bills(user, vendor_id: int, bill_number: str, exclude_vendor_bill_id: int | None)` — Find existing vendor bills with the same vendor + bill_number (case-insensitive).
 - `_calculate_vendor_bill_line_totals(line_items_data: list[dict])` — Compute per-line amounts and return normalized items with a running subtotal.
-- `_apply_vendor_bill_lines_and_totals(vendor_bill: VendorBill, line_items_data: list[dict], tax_amount: Decimal, shipping_amount: Decimal, user)` — Replace a vendor bill's line items and recompute all totals.
+- `_apply_vendor_bill_lines_and_totals(vendor_bill: VendorBill, line_items_data: list[dict], tax_total: Decimal, shipping_total: Decimal, user)` — Replace a vendor bill's line items and recompute all totals.
 - `_vendor_bill_line_apply_error_response(apply_error: dict)` — Convert an ``_apply_vendor_bill_lines_and_totals`` error dict into an HTTP response tuple.
 - `_prefetch_vendor_bill_qs(queryset: QuerySet)` — Eagerly load vendor bill relations to prevent N+1 query problems.
 - `_validate_vb_dates(next_status: str, next_issue_date: datetime.date | None, next_due_date: datetime.date | None)` — Validate date requirements for a vendor bill status.

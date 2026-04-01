@@ -41,8 +41,8 @@ export type VendorBillRecord = {
   issue_date: string | null;
   due_date: string | null;
   subtotal: string;
-  tax_amount: string;
-  shipping_amount: string;
+  tax_total: string;
+  shipping_total: string;
   total: string;
   balance_due: string;
   allocations: VendorBillAllocationRecord[];
@@ -89,8 +89,8 @@ export type VendorBillPayload = {
   issue_date: string;
   due_date: string;
   subtotal?: string;
-  tax_amount?: string;
-  shipping_amount?: string;
+  tax_total?: string;
+  shipping_total?: string;
   total: string;
   notes: string;
   line_items?: VendorBillLineInput[];
@@ -109,8 +109,8 @@ export type ScanResult = {
   issue_date: string;
   due_date: string;
   subtotal: string;
-  tax_amount: string;
-  shipping_amount: string;
+  tax_total: string;
+  shipping_total: string;
   total: string;
   line_items: ScanResultLineItem[];
 };

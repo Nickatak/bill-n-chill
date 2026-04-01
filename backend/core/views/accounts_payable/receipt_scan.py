@@ -53,8 +53,8 @@ def receipt_scan_view(request):
             "issue_date": "...",
             "due_date": "...",
             "subtotal": "...",
-            "tax_amount": "...",
-            "shipping_amount": "...",
+            "tax_total": "...",
+            "shipping_total": "...",
             "total": "...",
             "line_items": [
               {"description": "...", "quantity": "...", "unit_price": "..."}

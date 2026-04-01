@@ -697,7 +697,6 @@ CO-02 extends existing CO endpoints with propagation behavior.
     - `issue_date` (optional; defaults to today)
     - `due_date` (optional; defaults to `issue_date + organization.default_invoice_due_delta`)
     - `sender_name` (optional; defaults to org invoice sender name/display name)
-    - `sender_email` (optional; defaults to org invoice sender email)
     - `sender_address` (optional; defaults to org invoice sender address)
     - `sender_logo_url` (optional; defaults to org logo URL)
     - `terms_text` (optional; defaults to org invoice terms template)
@@ -737,7 +736,6 @@ CO-02 extends existing CO endpoints with propagation behavior.
     - `issue_date`
     - `due_date`
     - `sender_name`
-    - `sender_email`
     - `sender_address`
     - `sender_logo_url`
     - `terms_text`

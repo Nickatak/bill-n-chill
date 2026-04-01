@@ -112,7 +112,6 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "issue_date",
             "due_date",
             "sender_name",
-            "sender_email",
             "sender_address",
             "sender_logo_url",
             "terms_text",
@@ -173,7 +172,6 @@ class InvoiceWriteSerializer(serializers.Serializer):
     issue_date = serializers.DateField(required=False)
     due_date = serializers.DateField(required=False)
     sender_name = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
-    sender_email = serializers.EmailField(required=False, allow_blank=True, default="")
     sender_address = serializers.CharField(max_length=5000, required=False, allow_blank=True, default="")
     sender_logo_url = serializers.URLField(required=False, allow_blank=True, default="")
     terms_text = serializers.CharField(max_length=10000, required=False, allow_blank=True, default="")

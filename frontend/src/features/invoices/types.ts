@@ -25,7 +25,6 @@ export type InvoiceRecord = {
   issue_date: string;
   due_date: string;
   sender_name: string;
-  sender_email: string;
   sender_address: string;
   sender_logo_url: string;
   terms_text: string;

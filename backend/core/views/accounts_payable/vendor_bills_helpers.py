@@ -81,8 +81,8 @@ def _calculate_vendor_bill_line_totals(line_items_data: list[dict]) -> tuple[lis
 def _apply_vendor_bill_lines_and_totals(
     vendor_bill: VendorBill,
     line_items_data: list[dict],
-    tax_amount: Decimal,
-    shipping_amount: Decimal,
+    tax_total: Decimal,
+    shipping_total: Decimal,
     user,
 ) -> dict | None:
     """Replace a vendor bill's line items and recompute all totals.
@@ -100,9 +100,9 @@ def _apply_vendor_bill_lines_and_totals(
     if missing:
         return {"missing_cost_codes": missing}
 
-    tax_amount = quantize_money(Decimal(str(tax_amount)))
-    shipping_amount = quantize_money(Decimal(str(shipping_amount)))
-    total = quantize_money(subtotal + tax_amount + shipping_amount)
+    tax_total = quantize_money(Decimal(str(tax_total)))
+    shipping_total = quantize_money(Decimal(str(shipping_total)))
+    total = quantize_money(subtotal + tax_total + shipping_total)
 
     vendor_bill.line_items.all().delete()
     new_lines = []
@@ -122,14 +122,14 @@ def _apply_vendor_bill_lines_and_totals(
     VendorBillLine.objects.bulk_create(new_lines)
 
     vendor_bill.subtotal = subtotal
-    vendor_bill.tax_amount = tax_amount
-    vendor_bill.shipping_amount = shipping_amount
+    vendor_bill.tax_total = tax_total
+    vendor_bill.shipping_total = shipping_total
     vendor_bill.total = total
     vendor_bill.save(
         update_fields=[
             "subtotal",
-            "tax_amount",
-            "shipping_amount",
+            "tax_total",
+            "shipping_total",
             "total",
             "updated_at",
         ]
@@ -309,8 +309,8 @@ def _handle_vb_document_save(request: Request, vendor_bill: VendorBill, data: di
             vendor_bill.save(update_fields=update_fields)
 
         if has_line_items:
-            next_tax = quantize_money(data.get("tax_amount", vendor_bill.tax_amount))
-            next_shipping = quantize_money(data.get("shipping_amount", vendor_bill.shipping_amount))
+            next_tax = quantize_money(data.get("tax_total", vendor_bill.tax_total))
+            next_shipping = quantize_money(data.get("shipping_total", vendor_bill.shipping_total))
             apply_error = _apply_vendor_bill_lines_and_totals(
                 vendor_bill, line_items, next_tax, next_shipping, request.user,
             )
@@ -318,7 +318,7 @@ def _handle_vb_document_save(request: Request, vendor_bill: VendorBill, data: di
                 transaction.set_rollback(True)
                 payload, status_code = _vendor_bill_line_apply_error_response(apply_error)
                 return Response(payload, status=status_code)
-        elif "tax_amount" in data or "shipping_amount" in data:
+        elif "tax_total" in data or "shipping_total" in data:
             current_line_dicts = [
                 {
                     "cost_code": line.cost_code_id,
@@ -329,8 +329,8 @@ def _handle_vb_document_save(request: Request, vendor_bill: VendorBill, data: di
                 for line in vendor_bill.line_items.all()
             ]
             if current_line_dicts:
-                next_tax = quantize_money(data.get("tax_amount", vendor_bill.tax_amount))
-                next_shipping = quantize_money(data.get("shipping_amount", vendor_bill.shipping_amount))
+                next_tax = quantize_money(data.get("tax_total", vendor_bill.tax_total))
+                next_shipping = quantize_money(data.get("shipping_total", vendor_bill.shipping_total))
                 _apply_vendor_bill_lines_and_totals(
                     vendor_bill, current_line_dicts, next_tax, next_shipping, request.user,
                 )
@@ -419,8 +419,8 @@ def _handle_vb_status_transition(
         vendor_bill.save(update_fields=update_fields)
 
         if has_line_items:
-            next_tax = quantize_money(data.get("tax_amount", vendor_bill.tax_amount))
-            next_shipping = quantize_money(data.get("shipping_amount", vendor_bill.shipping_amount))
+            next_tax = quantize_money(data.get("tax_total", vendor_bill.tax_total))
+            next_shipping = quantize_money(data.get("shipping_total", vendor_bill.shipping_total))
             apply_error = _apply_vendor_bill_lines_and_totals(
                 vendor_bill, line_items, next_tax, next_shipping, request.user,
             )
@@ -428,7 +428,7 @@ def _handle_vb_status_transition(
                 transaction.set_rollback(True)
                 payload, status_code = _vendor_bill_line_apply_error_response(apply_error)
                 return Response(payload, status=status_code)
-        elif "tax_amount" in data or "shipping_amount" in data:
+        elif "tax_total" in data or "shipping_total" in data:
             current_line_dicts = [
                 {
                     "cost_code": line.cost_code_id,
@@ -439,8 +439,8 @@ def _handle_vb_status_transition(
                 for line in vendor_bill.line_items.all()
             ]
             if current_line_dicts:
-                next_tax = quantize_money(data.get("tax_amount", vendor_bill.tax_amount))
-                next_shipping = quantize_money(data.get("shipping_amount", vendor_bill.shipping_amount))
+                next_tax = quantize_money(data.get("tax_total", vendor_bill.tax_total))
+                next_shipping = quantize_money(data.get("shipping_total", vendor_bill.shipping_total))
                 _apply_vendor_bill_lines_and_totals(
                     vendor_bill, current_line_dicts, next_tax, next_shipping, request.user,
                 )

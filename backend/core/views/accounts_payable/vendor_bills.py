@@ -112,8 +112,8 @@ def project_vendor_bills_view(request, project_id: int):
             "bill_number": "string (required)",
             "issue_date": "YYYY-MM-DD (required)",
             "due_date": "YYYY-MM-DD (required, >= issue_date)",
-            "tax_amount": "decimal (optional, default=0)",
-            "shipping_amount": "decimal (optional, default=0)",
+            "tax_total": "decimal (optional, default=0)",
+            "shipping_total": "decimal (optional, default=0)",
             "notes": "string (optional)",
             "line_items": [ { "cost_code": "int?", "description": "str?", "amount": "decimal" } ]
         }
@@ -252,8 +252,8 @@ def project_vendor_bills_view(request, project_id: int):
                 status=409,
             )
 
-        tax_amount = quantize_money(data.get("tax_amount", 0))
-        shipping_amount = quantize_money(data.get("shipping_amount", 0))
+        tax_total = quantize_money(data.get("tax_total", 0))
+        shipping_total = quantize_money(data.get("shipping_total", 0))
         received_date = data.get("received_date")
 
         with transaction.atomic():
@@ -270,7 +270,7 @@ def project_vendor_bills_view(request, project_id: int):
             )
 
             apply_error = _apply_vendor_bill_lines_and_totals(
-                vendor_bill, line_items, tax_amount, shipping_amount, request.user,
+                vendor_bill, line_items, tax_total, shipping_total, request.user,
             )
             if apply_error:
                 transaction.set_rollback(True)

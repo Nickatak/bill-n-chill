@@ -221,7 +221,7 @@ def public_change_order_decision_view(request, public_token):
 
     consent_text, consent_version = get_ceremony_context()
     client_ip = get_client_ip(request)
-    client_ua = request.META.get("HTTP_USER_AGENT", "")
+    client_user_agent = request.META.get("HTTP_USER_AGENT", "")
     with transaction.atomic():
         change_order.status = next_status
         change_order.save(update_fields=update_fields)
@@ -236,7 +236,7 @@ def public_change_order_decision_view(request, public_token):
             applied_financial_delta=financial_delta,
             decided_by=change_order.requested_by,
             ip_address=client_ip,
-            user_agent=client_ua,
+            user_agent=client_user_agent,
         )
 
         content_hash = compute_document_content_hash(
@@ -252,7 +252,7 @@ def public_change_order_decision_view(request, public_token):
             email_verified=ceremony_session is not None,
             content_hash=content_hash,
             ip_address=client_ip,
-            user_agent=client_ua,
+            user_agent=client_user_agent,
             consent_text_version=consent_version,
             consent_text_snapshot=consent_text,
             note=str(request.data.get("note", "") or "").strip(),
@@ -265,7 +265,7 @@ def public_change_order_decision_view(request, public_token):
             note=f"{decision_note} (via public link)",
             changed_by=change_order.requested_by,
             ip_address=client_ip,
-            user_agent=client_ua,
+            user_agent=client_user_agent,
         )
 
     logger.info("Change order public decision: id=%s CO-%s decision=%s delta=$%s from=%s", change_order.id, change_order.family_key, decision, financial_delta, client_ip)
@@ -278,7 +278,7 @@ def public_change_order_decision_view(request, public_token):
         change_order.title,
         change_order.project.customer.display_name,
         decision,
-        f"/projects/{change_order.project_id}/quotes",
+        f"/projects/{change_order.project_id}/change-orders",
     )
 
     refreshed = _prefetch_change_order_qs(ChangeOrder.objects.filter(id=change_order.id)).get()

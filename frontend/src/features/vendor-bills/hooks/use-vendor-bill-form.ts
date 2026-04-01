@@ -187,8 +187,8 @@ export function useVendorBillForm({
     setReceivedDate(item.received_date ?? "");
     setIssueDate(item.issue_date ?? "");
     setDueDate(item.due_date ?? "");
-    setTaxAmount(item.tax_amount);
-    setShippingAmount(item.shipping_amount);
+    setTaxAmount(item.tax_total);
+    setShippingAmount(item.shipping_total);
     setNotes(item.notes);
     setStatus(item.status);
     const mapped = (item.line_items ?? []).map((row) => ({
@@ -226,8 +226,8 @@ export function useVendorBillForm({
     setNewReceivedDate(bill.received_date ?? "");
     setNewIssueDate(bill.issue_date ?? "");
     setNewDueDate(bill.due_date ?? "");
-    setNewTaxAmount(bill.tax_amount);
-    setNewShippingAmount(bill.shipping_amount);
+    setNewTaxAmount(bill.tax_total);
+    setNewShippingAmount(bill.shipping_total);
     setNewNotes(bill.notes || "");
     const copiedLineItems = (bill.line_items ?? []).map((row) => ({
       description: row.description,
@@ -263,8 +263,8 @@ export function useVendorBillForm({
     setNewReceivedDate(todayDateInput());
     setNewIssueDate(scan.issue_date || "");
     setNewDueDate(scan.due_date || "");
-    setNewTaxAmount(scan.tax_amount || "0.00");
-    setNewShippingAmount(scan.shipping_amount || "0.00");
+    setNewTaxAmount(scan.tax_total || "0.00");
+    setNewShippingAmount(scan.shipping_total || "0.00");
     setNewNotes("");
     setDuplicateCandidates([]);
 

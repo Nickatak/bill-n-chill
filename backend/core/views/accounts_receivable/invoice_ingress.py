@@ -24,7 +24,6 @@ class InvoiceCreateIngress:
     issue_date: date
     due_date: date
     sender_name: str
-    sender_email: str
     sender_address: str
     sender_logo_url: str
     terms_text: str
@@ -43,7 +42,6 @@ def build_invoice_create_ingress(
     default_issue_date: date,
     default_due_days: int,
     default_sender_name: str,
-    default_sender_email: str,
     default_sender_address: str,
     default_sender_logo_url: str,
     default_terms_text: str,
@@ -60,7 +58,6 @@ def build_invoice_create_ingress(
         issue_date=issue_date,
         due_date=due_date,
         sender_name=(validated_data.get("sender_name") or default_sender_name).strip(),
-        sender_email=(validated_data.get("sender_email") or default_sender_email).strip(),
         sender_address=(validated_data.get("sender_address") or default_sender_address).strip(),
         sender_logo_url=(validated_data.get("sender_logo_url") or default_sender_logo_url).strip(),
         terms_text=(validated_data.get("terms_text") or default_terms_text).strip(),
@@ -88,8 +85,6 @@ class InvoicePatchIngress:
     due_date: date | None
     has_sender_name: bool
     sender_name: str | None
-    has_sender_email: bool
-    sender_email: str | None
     has_sender_address: bool
     sender_address: str | None
     has_sender_logo_url: bool
@@ -125,8 +120,6 @@ def build_invoice_patch_ingress(validated_data: dict[str, Any]) -> InvoicePatchI
         due_date=validated_data.get("due_date"),
         has_sender_name="sender_name" in validated_data,
         sender_name=validated_data.get("sender_name"),
-        has_sender_email="sender_email" in validated_data,
-        sender_email=validated_data.get("sender_email"),
         has_sender_address="sender_address" in validated_data,
         sender_address=validated_data.get("sender_address"),
         has_sender_logo_url="sender_logo_url" in validated_data,

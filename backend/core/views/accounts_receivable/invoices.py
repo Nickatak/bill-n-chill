@@ -229,7 +229,7 @@ def public_invoice_decision_view(request, public_token: str):
 
     consent_text, consent_version = get_ceremony_context()
     client_ip = get_client_ip(request)
-    user_agent = request.META.get("HTTP_USER_AGENT", "")
+    client_user_agent = request.META.get("HTTP_USER_AGENT", "")
     with transaction.atomic():
         # Customer decisions (approve/dispute) record an audit event but
         # do not change the invoice status.  Payment status is derived from
@@ -241,7 +241,7 @@ def public_invoice_decision_view(request, public_token: str):
             note=public_note,
             changed_by=invoice.created_by,
             ip_address=client_ip,
-            user_agent=user_agent,
+            user_agent=client_user_agent,
         )
 
         content_hash = compute_document_content_hash("invoice", InvoiceSerializer(invoice).data)
@@ -255,7 +255,7 @@ def public_invoice_decision_view(request, public_token: str):
             email_verified=ceremony_session is not None,
             content_hash=content_hash,
             ip_address=client_ip,
-            user_agent=user_agent,
+            user_agent=client_user_agent,
             consent_text_version=consent_version,
             consent_text_snapshot=consent_text,
             note=str(request.data.get("note", "") or "").strip(),
@@ -340,7 +340,6 @@ def project_invoices_view(request, project_id: int):
             "issue_date": "YYYY-MM-DD (optional, defaults to today)",
             "due_date": "YYYY-MM-DD (optional, defaults to issue_date + org delta)",
             "sender_name": "string (optional, defaults to org name)",
-            "sender_email": "string (optional)",
             "sender_address": "string (optional, defaults to org address)",
             "terms_text": "string (optional, defaults to org terms)",
             "tax_percent": "decimal (optional, default=0)",
@@ -392,7 +391,6 @@ def project_invoices_view(request, project_id: int):
             default_issue_date=timezone.localdate(),
             default_due_days=default_due_days,
             default_sender_name=(organization.display_name or "").strip(),
-            default_sender_email="",
             default_sender_address=organization.formatted_billing_address,
             default_sender_logo_url=request.build_absolute_uri(organization.logo.url) if organization.logo else "",
             default_terms_text=(organization.invoice_terms_and_conditions or "").strip(),
@@ -511,7 +509,6 @@ def project_invoices_view(request, project_id: int):
                 issue_date=issue_date,
                 due_date=due_date,
                 sender_name=ingress.sender_name,
-                sender_email=ingress.sender_email,
                 sender_address=ingress.sender_address,
                 sender_logo_url=ingress.sender_logo_url,
                 terms_text=ingress.terms_text,

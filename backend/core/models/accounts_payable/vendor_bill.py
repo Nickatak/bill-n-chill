@@ -66,8 +66,8 @@ class VendorBill(StatusTransitionMixin, models.Model):
     issue_date = models.DateField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    shipping_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    tax_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    shipping_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     balance_due = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     notes = models.TextField(blank=True)
@@ -133,8 +133,8 @@ class VendorBill(StatusTransitionMixin, models.Model):
                 "issue_date": self.issue_date.isoformat() if self.issue_date else None,
                 "due_date": self.due_date.isoformat() if self.due_date else None,
                 "subtotal": str(self.subtotal),
-                "tax_amount": str(self.tax_amount),
-                "shipping_amount": str(self.shipping_amount),
+                "tax_total": str(self.tax_total),
+                "shipping_total": str(self.shipping_total),
                 "total": str(self.total),
                 "balance_due": str(self.balance_due),
                 "notes": self.notes,
