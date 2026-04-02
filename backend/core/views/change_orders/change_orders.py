@@ -157,7 +157,7 @@ def public_change_order_decision_view(request, public_token):
 
     Success 200::
 
-        { "data": { ... }, "meta": { "applied_financial_delta": "5000.00" } }
+        { "data": { ... } }
 
     Errors:
         - 400: Invalid decision value.
@@ -312,12 +312,7 @@ def public_change_order_decision_view(request, public_token):
             ChangeOrderSerializer(co).data for co in sibling_cos
         ]
 
-    return Response(
-        {
-            "data": serialized,
-            "meta": {"applied_financial_delta": str(financial_delta)},
-        }
-    )
+    return Response({"data": serialized})
 
 
 @api_view(["GET"])

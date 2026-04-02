@@ -160,7 +160,7 @@ def public_invoice_decision_view(request, public_token: str):
 
     Success 200::
 
-        { "data": { ... }, "meta": { "public_decision_applied": "approve|dispute" } }
+        { "data": { ... } }
 
     Errors:
         - 400: Invalid decision value or disallowed status transition.
@@ -283,7 +283,7 @@ def public_invoice_decision_view(request, public_token: str):
     invoice_data["project_context"] = _serialize_public_project_context(refreshed.project)
     invoice_data["organization_context"] = _serialize_public_organization_context(organization, request=request)
 
-    return Response({"data": invoice_data, "meta": {"public_decision_applied": decision_type}})
+    return Response({"data": invoice_data})
 
 
 @api_view(["GET"])

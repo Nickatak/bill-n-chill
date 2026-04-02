@@ -1,5 +1,8 @@
 """QuickBooks Online OAuth2 connection endpoints.
 
+STATUS: Incomplete — scaffolded but not yet production-ready. Feature-gated
+behind QBO_ENABLED env var. No test coverage yet.
+
 Provides connect (redirect to Intuit), callback (exchange code for tokens),
 disconnect, and status endpoints. All endpoints require authentication and
 are gated behind the QBO_ENABLED environment variable.
