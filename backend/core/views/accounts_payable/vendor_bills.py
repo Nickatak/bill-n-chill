@@ -10,10 +10,10 @@ from rest_framework.response import Response
 from core.models import (
     Vendor,
     VendorBill,
-    VendorBillSnapshot,
+    VendorBillStatusEvent,
 )
 from core.policies import get_vendor_bill_policy_contract
-from core.serializers import VendorBillSerializer, VendorBillSnapshotSerializer, VendorBillWriteSerializer
+from core.serializers import VendorBillSerializer, VendorBillWriteSerializer
 from core.utils.money import quantize_money
 from core.views.accounts_payable.vendor_bills_helpers import (
     _apply_vendor_bill_lines_and_totals,
@@ -281,6 +281,14 @@ def project_vendor_bills_view(request, project_id: int):
             vendor_bill.balance_due = vendor_bill.total
             vendor_bill.save(update_fields=["balance_due", "updated_at"])
 
+            VendorBillStatusEvent.record(
+                vendor_bill=vendor_bill,
+                from_status=None,
+                to_status=VendorBill.Status.OPEN,
+                note="Vendor bill created.",
+                changed_by=request.user,
+            )
+
             _promote_prospect_to_active(project)
 
         return Response(
@@ -433,40 +441,3 @@ def vendor_bill_detail_view(request, vendor_bill_id: int):
             return _handle_vb_document_save(request, vendor_bill, data)
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def vendor_bill_snapshots_view(request, vendor_bill_id: int):
-    """Return the immutable status transition history for a vendor bill.
-
-    Flow:
-        1. Validate the bill belongs to the user's org.
-        2. Query all snapshots ordered by most recent first.
-        3. Return serialized snapshot list.
-
-    URL: ``GET /api/v1/vendor-bills/<vendor_bill_id>/snapshots/``
-
-    Request body: (none)
-
-    Success 200::
-
-        { "data": [ { "capture_status": "...", "previous_status": "...", ... }, ... ] }
-
-    Errors:
-        - 404: Vendor bill not found or not in user's org.
-    """
-    membership = _ensure_org_membership(request.user)
-    try:
-        vendor_bill = VendorBill.objects.get(
-            id=vendor_bill_id,
-            project__organization_id=membership.organization_id,
-        )
-    except VendorBill.DoesNotExist:
-        return Response(
-            {"error": {"code": "not_found", "message": "Vendor bill not found.", "fields": {}}},
-            status=404,
-        )
-
-    snapshots = VendorBillSnapshot.objects.filter(vendor_bill=vendor_bill).select_related(
-        "acted_by",
-    ).order_by("-created_at")
-    return Response({"data": VendorBillSnapshotSerializer(snapshots, many=True).data})

@@ -9,6 +9,7 @@ from core.models.financial_auditing.organization_membership_record import Organi
 from core.models.financial_auditing.organization_record import OrganizationRecord
 from core.models.financial_auditing.payment_record import PaymentRecord
 from core.models.financial_auditing.vendor_bill_snapshot import VendorBillSnapshot
+from core.models.financial_auditing.vendor_bill_status_event import VendorBillStatusEvent
 
 __all__ = [
     "AccountingSyncRecord",
@@ -22,4 +23,5 @@ __all__ = [
     "OrganizationRecord",
     "PaymentRecord",
     "VendorBillSnapshot",
+    "VendorBillStatusEvent",
 ]

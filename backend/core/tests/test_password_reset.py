@@ -1,10 +1,33 @@
 """Tests for the forgot-password / reset-password flow."""
 
 from datetime import timedelta
+from importlib import import_module
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
+
+
+def _sync_async_task(task_path, *args, **kwargs):
+    """Run an async_task synchronously by importing and calling the function."""
+    module_path, func_name = task_path.rsplit(".", 1)
+    func = getattr(import_module(module_path), func_name)
+    func(*args, **kwargs)
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class SyncEmailTestCase(TestCase):
+    """Base test class that patches async_task to run synchronously."""
+
+    def setUp(self):
+        super().setUp()
+        p1 = patch("core.views.auth_helpers.async_task", side_effect=_sync_async_task)
+        p2 = patch("core.views.auth.async_task", side_effect=_sync_async_task)
+        p1.start()
+        p2.start()
+        self.addCleanup(p1.stop)
+        self.addCleanup(p2.stop)
 
 from core.models import (
     EmailRecord,
@@ -88,8 +111,9 @@ class PasswordResetTokenModelTests(TestCase):
 # ---------------------------------------------------------------------------
 
 
-class ForgotPasswordTests(TestCase):
+class ForgotPasswordTests(SyncEmailTestCase):
     def setUp(self):
+        super().setUp()
         self.user = _bootstrap_user()
 
     def test_returns_200_for_valid_email(self):
@@ -296,7 +320,7 @@ class ResetPasswordTests(TestCase):
 # ---------------------------------------------------------------------------
 
 
-class RegisterDuplicateEmailTests(TestCase):
+class RegisterDuplicateEmailTests(SyncEmailTestCase):
     def test_verified_user_gets_password_reset_email(self):
         """Re-registering with a verified user's email sends a password reset."""
         _bootstrap_user(email="verified@test.com")

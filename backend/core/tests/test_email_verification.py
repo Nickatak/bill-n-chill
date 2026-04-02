@@ -1,8 +1,32 @@
 from datetime import timedelta
+from importlib import import_module
+from unittest.mock import patch
 from django.core import mail
 from django.core.exceptions import ValidationError
+from django.test import override_settings
 from django.utils import timezone
 from core.tests.common import *
+
+
+def _sync_async_task(task_path, *args, **kwargs):
+    """Run an async_task synchronously by importing and calling the function."""
+    module_path, func_name = task_path.rsplit(".", 1)
+    func = getattr(import_module(module_path), func_name)
+    func(*args, **kwargs)
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class SyncEmailTestCase(TestCase):
+    """Base test class that patches async_task to run synchronously."""
+
+    def setUp(self):
+        super().setUp()
+        p1 = patch("core.views.auth_helpers.async_task", side_effect=_sync_async_task)
+        p2 = patch("core.views.auth.async_task", side_effect=_sync_async_task)
+        p1.start()
+        p2.start()
+        self.addCleanup(p1.stop)
+        self.addCleanup(p2.stop)
 
 
 class EmailVerificationTokenModelTests(TestCase):
@@ -88,7 +112,7 @@ class EmailRecordModelTests(TestCase):
             record.delete()
 
 
-class RegisterFlowAVerificationTests(TestCase):
+class RegisterFlowAVerificationTests(SyncEmailTestCase):
     """Registration Flow A now returns 200 with message, creates verification token."""
 
     def test_register_returns_check_email_message(self):
@@ -274,10 +298,11 @@ class VerifyEmailTests(TestCase):
         self.assertEqual(response.status_code, 400)
 
 
-class ResendVerificationTests(TestCase):
+class ResendVerificationTests(SyncEmailTestCase):
     """Tests for the resend-verification endpoint."""
 
     def setUp(self):
+        super().setUp()
         self.user = User.objects.create_user(
             username="unverified@example.com",
             email="unverified@example.com",

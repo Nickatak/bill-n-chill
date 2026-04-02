@@ -82,7 +82,6 @@ from core.views.accounts_payable.vendor_bills import (
     project_vendor_bills_view,
     vendor_bill_contract_view,
     vendor_bill_detail_view,
-    vendor_bill_snapshots_view,
 )
 from core.views.public_signing import (
     public_request_otp_view,
@@ -169,7 +168,6 @@ __all__ = [
     "project_vendor_bills_view",
     "vendor_bill_contract_view",
     "vendor_bill_detail_view",
-    "vendor_bill_snapshots_view",
     "push_status_view",
     "push_subscribe_view",
     "push_unsubscribe_view",

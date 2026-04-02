@@ -50,7 +50,12 @@ class CostCode(models.Model):
 
     class Meta:
         ordering = ["code", "name"]
-        unique_together = ("organization", "code")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "code"],
+                name="unique_cost_code_per_organization",
+            ),
+        ]
 
     @classmethod
     def seed_defaults(cls, *, organization, created_by) -> int:

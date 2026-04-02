@@ -13,7 +13,7 @@ from django.db.models import QuerySet
 from rest_framework.request import Request
 from rest_framework.response import Response
 
-from core.models import VendorBill, VendorBillLine, VendorBillSnapshot
+from core.models import VendorBill, VendorBillLine, VendorBillSnapshot, VendorBillStatusEvent
 from core.serializers import VendorBillSerializer
 from core.utils.money import MONEY_ZERO, quantize_money
 from core.views.helpers import _resolve_cost_codes_for_user
@@ -456,6 +456,14 @@ def _handle_vb_status_transition(
             )
             logger.info("Vendor bill status transition: id=%s %s (%s → %s) by %s", vendor_bill.id, vendor_bill.bill_number or "(no number)", previous_status, next_status, request.user.email)
 
+        VendorBillStatusEvent.record(
+            vendor_bill=vendor_bill,
+            from_status=previous_status,
+            to_status=next_status,
+            note=(data.get("status_note", "") or "").strip() or "Vendor bill status updated.",
+            changed_by=request.user,
+        )
+
     vendor_bill = _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()
     return Response(
         {"data": VendorBillSerializer(vendor_bill).data}
@@ -483,6 +491,13 @@ def _handle_vb_status_note(request: Request, vendor_bill: VendorBill, data: dict
             previous_status=vendor_bill.status,
             acted_by=request.user,
             status_note=note_text,
+        )
+        VendorBillStatusEvent.record(
+            vendor_bill=vendor_bill,
+            from_status=vendor_bill.status,
+            to_status=vendor_bill.status,
+            note=note_text,
+            changed_by=request.user,
         )
 
     vendor_bill = _prefetch_vendor_bill_qs(VendorBill.objects.filter(id=vendor_bill.id)).get()

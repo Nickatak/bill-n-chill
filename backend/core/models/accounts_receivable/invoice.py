@@ -105,8 +105,11 @@ class Invoice(StatusTransitionMixin, models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        unique_together = ("project", "invoice_number")
         constraints = [
+            models.UniqueConstraint(
+                fields=["project", "invoice_number"],
+                name="unique_invoice_number_per_project",
+            ),
             models.CheckConstraint(
                 condition=Q(due_date__gte=F("issue_date")),
                 name="invoice_due_date_on_or_after_issue_date",

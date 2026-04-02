@@ -106,7 +106,12 @@ class Quote(StatusTransitionMixin, models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        unique_together = ("project", "title", "version")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "title", "version"],
+                name="unique_quote_title_version_per_project",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.project.name} v{self.version}"

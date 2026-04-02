@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 
-from core.models import Payment, VendorBill, VendorBillLine, VendorBillSnapshot
+from core.models import Payment, VendorBill, VendorBillLine
 
 
 class VendorBillPaymentSerializer(serializers.ModelSerializer):
@@ -114,45 +114,6 @@ class VendorBillSerializer(serializers.ModelSerializer):
         if balance < total:
             return "partial"
         return "unpaid"
-
-
-class VendorBillSnapshotSerializer(serializers.ModelSerializer):
-    """Read-only vendor bill snapshot with computed action type and actor display."""
-
-    acted_by_email = serializers.CharField(source="acted_by.email", read_only=True)
-    acted_by_display = serializers.SerializerMethodField()
-    action_type = serializers.SerializerMethodField()
-
-    def get_action_type(self, obj: VendorBillSnapshot) -> str:
-        """Classify the snapshot as transition, notate, or unchanged."""
-        decision = (obj.snapshot_json or {}).get("decision_context", {})
-        previous = decision.get("previous_status", "")
-        current = obj.capture_status or ""
-        note = (obj.status_note or "").strip()
-        if previous != current:
-            return "transition"
-        if note:
-            return "notate"
-        return "unchanged"
-
-    def get_acted_by_display(self, obj: VendorBillSnapshot) -> str:
-        """Return a human-readable display name for the actor."""
-        return obj.acted_by.email if obj.acted_by_id else ""
-
-    class Meta:
-        model = VendorBillSnapshot
-        fields = [
-            "id",
-            "vendor_bill",
-            "capture_status",
-            "status_note",
-            "acted_by",
-            "acted_by_email",
-            "acted_by_display",
-            "created_at",
-            "action_type",
-        ]
-        read_only_fields = fields
 
 
 class VendorBillLineInputSerializer(serializers.Serializer):

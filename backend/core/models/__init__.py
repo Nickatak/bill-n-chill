@@ -15,6 +15,7 @@ from core.models.financial_auditing import (
     OrganizationRecord,
     PaymentRecord,
     VendorBillSnapshot,
+    VendorBillStatusEvent,
 )
 from core.models.shared_operations import (
     AccountingSyncEvent,
@@ -62,6 +63,7 @@ __all__ = [
     "AccountingSyncEvent",
     "AccountingSyncRecord",
     "VendorBillSnapshot",
+    "VendorBillStatusEvent",
     "Invoice",
     "InvoiceLine",
     "InvoiceStatusEvent",

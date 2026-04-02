@@ -58,7 +58,7 @@ from core.serializers.projects import (
     ProjectSerializer,
     QuickJumpSearchSerializer,
 )
-from core.serializers.vendor_bills import VendorBillSerializer, VendorBillSnapshotSerializer, VendorBillWriteSerializer
+from core.serializers.vendor_bills import VendorBillSerializer, VendorBillWriteSerializer
 from core.serializers.vendors import VendorSerializer, VendorWriteSerializer
 
 __all__ = [
@@ -90,7 +90,6 @@ __all__ = [
     "VendorSerializer",
     "VendorWriteSerializer",
     "VendorBillSerializer",
-    "VendorBillSnapshotSerializer",
     "VendorBillWriteSerializer",
     "QuoteLineItemSerializer",
     "QuoteSectionSerializer",

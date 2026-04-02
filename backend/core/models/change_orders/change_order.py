@@ -103,8 +103,11 @@ class ChangeOrder(StatusTransitionMixin, models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        unique_together = ("project", "family_key")
         constraints = [
+            models.UniqueConstraint(
+                fields=["project", "family_key"],
+                name="unique_co_family_key_per_project",
+            ),
             models.CheckConstraint(
                 condition=Q(status="approved", approved_by__isnull=False, approved_at__isnull=False)
                 | ~Q(status="approved"),

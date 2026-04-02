@@ -82,7 +82,6 @@ from core.views import (
     quick_add_customer_intake_view,
     vendor_bill_detail_view,
     vendor_bill_contract_view,
-    vendor_bill_snapshots_view,
     vendor_detail_view,
     vendors_list_create_view,
 )
@@ -306,11 +305,6 @@ urlpatterns = [
         "vendor-bills/<int:vendor_bill_id>/",
         vendor_bill_detail_view,
         name="vendor-bill-detail",
-    ),
-    path(
-        "vendor-bills/<int:vendor_bill_id>/snapshots/",
-        vendor_bill_snapshots_view,
-        name="vendor-bill-snapshots",
     ),
     path("payments/", org_payments_view, name="org-payments"),
     path("payments/<int:payment_id>/", payment_detail_view, name="payment-detail"),
