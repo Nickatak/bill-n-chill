@@ -47,6 +47,9 @@ docs/legal_questions.md
 work/*
 saas_plans/
 
+# Scratch / working documents (never committed)
+temp/
+
 # Misc OS / logs / backups
 logs/
 backups/

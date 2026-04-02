@@ -5,7 +5,7 @@
 For the first wave of users, bill-n-chill will use itself to manage its own subscription billing.
 
 ### How it works
-- Each paying user/org is a **Customer** in Nick's own bill-n-chill org
+- Each paying user/org is a **Customer** in the operator's own bill-n-chill org
 - A **Project** per customer tracks their subscription
 - **Invoices** sent on whatever cadence via the existing sent-email + public preview flow
 - **Payments** recorded manually when they pay
