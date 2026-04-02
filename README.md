@@ -1,93 +1,43 @@
 # bill-n-chill
 
-`bill-n-chill` is a full-stack construction finance workflow app using:
+Construction finance workflow app for small general contractors (1–10 person shops). Quotes, invoices, change orders, vendor bills, payments — all from the field or the office.
 
-- Backend: Django + Django REST Framework (DRF)
-- Frontend: Next.js
+**Live:** [https://bill-n-chill.com](https://bill-n-chill.com)
 
-## Current Stack
+## Stack
 
-- Backend: Django + Django REST Framework
-- Frontend: Next.js
-- Database: MySQL (local via Docker Compose)
+- **Backend:** Django + Django REST Framework, Python 3.12, MySQL 8.4
+- **Frontend:** Next.js (App Router), React 19, TypeScript 5
+- **Infra:** Docker Compose, GitHub Actions CI/CD
+- **Auth:** Token-based with capability-driven RBAC (5 system roles, custom role support)
 
-## Architecture (High-Level)
+## Architecture Highlights
 
-- `backend` handles business logic, authentication, persistence, and API endpoints.
-- `frontend` handles UI rendering, routing, and API consumption.
-- Frontend communicates with backend over JSON HTTP APIs.
-
-```text
-Next.js App  <----HTTP/JSON---->  Django/DRF API  <---->  Database
-```
-
-## Backend Domain Layout
-
-- `backend/core/models/shared_operations`: project/org/role/cost-code/vendor/accounting-sync/customer shared operational models
-- `backend/core/models/quoting`: quote authoring + quote lines
-- `backend/core/models/change_orders`: change-order workflow models
-- `backend/core/models/accounts_receivable`: invoice + invoice lines
-- `backend/core/models/accounts_payable`: vendor bill + allocations
-- `backend/core/models/cash_management`: cross-domain cash movement models (`Payment`, `PaymentAllocation`)
-- `backend/core/models/financial_auditing`: immutable snapshots/events and canonical scope identity
-
-## Backend View Layout
-
-- `backend/core/views/shared_operations`: auth-adjacent/project-wide operational endpoints (`accounting`, `intake`, `projects`, `cost_codes`, `vendors`)
-- `backend/core/views/quoting`: quote + budget endpoints
-- `backend/core/views/change_orders`: change-order endpoints
-- `backend/core/views/accounts_receivable`: invoice endpoints
-- `backend/core/views/accounts_payable`: vendor-bill endpoints
-- `backend/core/views/cash_management`: payment/allocation endpoints
-- `backend/core/views/helpers.py`: shared orchestration helpers (RBAC, guardrails, capture helpers)
-- `backend/core/views/__init__.py`: canonical export surface used by `backend/core/urls.py`
-
-## Architecture Decisions
-
-- Enforcement hierarchy: DB constraints first, model-level guards second, views/serializers last.
-- Mutable + immutable policy:
-  - allow user-managed operational workflow entry/edit where needed
-  - append immutable audit captures for financially relevant writes
-  - system-managed state machines must append immutable capture rows for lifecycle transitions
-- Cross-domain placement policy:
-  - if a model is shared across AR/AP flows and does not fit one lane cleanly, keep it in a dedicated shared domain package (for example `cash_management`) instead of forcing it into one side.
-- View write-path policy:
-  - when an endpoint performs multiple financially relevant writes (operational row + immutable record/event), perform them inside one `transaction.atomic()` block to avoid partial persistence.
-- Details and examples live in:
-  - `docs/contributing.md`
-  - `docs/domain-model.md`
+- **Mutable + immutable split** — operational records are editable; financially relevant changes append immutable audit snapshots/events for full traceability
+- **Enforcement hierarchy** — DB constraints first, model-level guards second, serializer/view validation third
+- **Atomic financial writes** — multi-write money operations wrapped in `transaction.atomic()`
+- **Public tokenized routes** — customers approve/reject/dispute documents via signed public URLs with OTP verification
+- **Domain-driven model layout** — models organized by business domain (`quoting/`, `accounts_receivable/`, `accounts_payable/`, `cash_management/`, `financial_auditing/`)
+- **Capability-based RBAC** — granular per-resource, per-action permissions resolved from role templates with additive overrides
+- **Mobile-first** — every flow works at 375px; PWA-ready for field use
 
 ## Local Setup
 
-- Use `docs/setup.md` for full backend/frontend setup and run steps.
-- Use `docs/api.md` and `docs/domain-model.md` as the current contract references.
+See [`docs/setup.md`](docs/setup.md) for full instructions. Quick start:
 
-## Docker Compose Layout
-
-- `docker-compose.yml` — base service definitions (shared across all environments)
-- `docker-compose.local.yml` — local dev override (publishes ports to host)
-- `docker-compose.prod.yml` — production override (gunicorn, `npm run build`, localhost-only ports for Caddy)
-- Runtime config is environment-variable driven (no required service `env_file`)
-- Local host ports are configurable with `FRONTEND_PORT`, `BACKEND_PORT`, and `MYSQL_PORT`
-
-Service names: `frontend`, `backend`, `db`
-
-## Live
-
-[https://bill-n-chill.com](https://bill-n-chill.com)
+```bash
+make docker-up        # Start full dev stack (backend + frontend + MySQL)
+make db-seed          # Seed test accounts
+```
 
 ## Documentation
 
-- `docs/setup.md`: local setup instructions.
-- `docs/architecture.md`: detailed system boundaries and conventions.
-- `docs/api.md`: endpoint reference and API standards.
-- `docs/contributing.md`: workflow, branching, testing, and code style.
-- `docs/domain-model.md`: core entities, lifecycles, and API direction for construction billing workflows.
-- `docs/feature-list.md`: compact implementation ledger for shipped feature slices.
-- `docs/meta/mvp-v1.md`: initial MVP scope, acceptance criteria, and phased delivery.
-- `docs/phase-2-operational-hardening-and-product-development.md`: next-phase plan for operational hardening and product development.
-- `docs/quick-add-ux-v2.md`: Quick Add Customer v2 UX goals and acceptance checks.
-
-## Notes
-
-This file is intentionally lightweight and practical; detailed behavior/contracts live in `docs/`.
+| Doc | Purpose |
+|-----|---------|
+| [`setup.md`](docs/setup.md) | Local dev setup and run instructions |
+| [`architecture.md`](docs/architecture.md) | System boundaries, runtime flows, enforcement layers |
+| [`domain-model.md`](docs/domain-model.md) | Core entities, lifecycles, and modeling conventions |
+| [`api.md`](docs/api.md) | Endpoint reference and API contracts |
+| [`auth.md`](docs/auth.md) | Auth system, session management, RBAC deep-dive |
+| [`contributing.md`](docs/contributing.md) | Code style, conventions, and review expectations |
+| [`feature-list.md`](docs/feature-list.md) | Shipped feature inventory |

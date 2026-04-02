@@ -407,6 +407,6 @@ Normal registration ([Flow A](#flow-a-standard-registration-no-invite)) also goe
   - 24-hour expiry limits exposure window.
   - Email-bound: only the invited email can consume the token.
   - [Flow C](#flow-c-invited-existing-user-org-switch) requires password confirmation to prevent silent org-switching.
-- **Email enumeration:** Registration currently reveals whether an email is taken (standard Django behavior). Deferred.
+- **Email enumeration:** Fixed. Registration returns the same 200 response regardless of whether the email exists. See [`docs/decisions/email-enumeration-fix.md`](decisions/email-enumeration-fix.md).
 - **Org scoping:** All data queries filter by `organization_id=membership.organization_id` (direct org scoping via `_ensure_org_membership()`), ensuring users can only access data belonging to their org. This is the primary data isolation boundary.
 - **Optimistic auth:** The frontend [auth gate](#auth-gate) optimistically shows the authorized UI while [`/me/`](#get-authme) verification is in flight. Only hard 401/403 triggers logout. Transient errors (network, 5xx) preserve the session to avoid login-screen flicker.
