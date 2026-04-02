@@ -72,48 +72,9 @@ Next.js App  <----HTTP/JSON---->  Django/DRF API  <---->  Database
 
 Service names: `frontend`, `backend`, `db`
 
-## Production Deployment
+## Live
 
-**Live at:** [https://bill-n-chill.com](https://bill-n-chill.com)
-
-- **Host:** Hostinger VPS (16GB / 4 vCPU / 200GB NVMe), Ubuntu
-- **Reverse proxy:** Caddy (auto-SSL via Let's Encrypt)
-- **Stack:** Same Docker Compose as local, with production override
-
-### Domain Routing
-
-| Domain | Service |
-|---|---|
-| `bill-n-chill.com` | Next.js frontend (port 3000) |
-| `api.bill-n-chill.com` | Django/Gunicorn backend (port 8000) |
-| `mg.bill-n-chill.com` | Mailgun sender domain |
-
-### Deployment Files
-
-- `docker-compose.yml` — base service definitions (shared with local dev)
-- `docker-compose.prod.yml` — production overrides (gunicorn, `npm run build`, localhost-only ports)
-- `/etc/caddy/Caddyfile` — reverse proxy config (on VPS, not in repo)
-- `.env` on VPS — production secrets (not committed)
-
-### Deploy Process
-
-```bash
-ssh bnc
-cd ~/bill-n-chill
-git pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate
-```
-
-### SSH Access
-
-Configured via `~/.ssh/config` (WSL):
-
-```
-Host bnc
-    HostName REDACTED_IP
-    User deploy
-    IdentityFile ~/.ssh/bill_n_chill_vps
-```
+[https://bill-n-chill.com](https://bill-n-chill.com)
 
 ## Documentation
 

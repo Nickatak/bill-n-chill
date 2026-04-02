@@ -239,7 +239,11 @@ db-prod-reset-hard: local-env-prod
 	$(PROD_COMPOSE) up -d $(DB_SERVICE)
 
 nuke-account:
-	$(DEV_COMPOSE) exec backend python manage.py nuke_account REDACTED_EMAIL
+ifndef EMAIL
+	@echo "Usage: make nuke-account EMAIL=user@example.com"
+	@exit 1
+endif
+	$(DEV_COMPOSE) exec backend python manage.py nuke_account $(EMAIL)
 
 docker-shell-backend:
 	$(DEV_COMPOSE) exec backend bash
