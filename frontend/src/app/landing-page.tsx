@@ -91,11 +91,11 @@ export function LandingPage() {
       <footer className={styles.footer}>
         <span>&copy; {new Date().getFullYear()} Bill n&apos; Chill</span>
         <span className={styles.footerDot}>&middot;</span>
-        <span>Built in Los Angeles</span>
-        <span className={styles.footerDot}>&middot;</span>
         <Link href="/terms" className={styles.footerLink}>Terms</Link>
         <span className={styles.footerDot}>&middot;</span>
         <Link href="/privacy" className={styles.footerLink}>Privacy</Link>
+        <span className={styles.footerDot}>&middot;</span>
+        <a href="https://github.com/Nickatak/bill-n-chill" className={styles.footerLink} target="_blank" rel="noopener noreferrer">GitHub</a>
       </footer>
     </div>
   );
