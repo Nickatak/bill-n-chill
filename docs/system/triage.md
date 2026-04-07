@@ -19,7 +19,8 @@ These are correctness, durability, and observability concerns — they matter wi
 PostgreSQL's WAL is a unified write-ahead log with built-in archive hooks (`archive_command`). This gives us continuous log shipping to B2 with minutes of RPO instead of hours — without running a second database instance. See [mysql-vs-postgres.md](mysql-vs-postgres.md) for the full comparison.
 
 - [x] Switch MySQL → PostgreSQL (done)
-- [ ] Configure `archive_command` to ship completed WAL segments to B2
+- [x] Configure `archive_command` to ship completed WAL segments to B2 (done — `db/archive-wal.sh`, enabled in prod compose overlay)
+- [ ] Set B2_KEY_ID + B2_APPLICATION_KEY in prod .env and verify first WAL segment uploads
 - [ ] Update `backup-db.sh` to use `pg_basebackup` (WAL-position-aware)
 - [ ] Update `restore-db.sh` to use `pg_restore` + WAL replay
 - [ ] Add media directory (logos, contract PDFs) to B2 backup — gap introduced by recent PDF attachment feature

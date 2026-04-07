@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16
+    build: ./db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-bill_n_chill}
