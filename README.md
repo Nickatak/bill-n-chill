@@ -6,7 +6,7 @@ Construction finance workflow app for small general contractors (1–10 person s
 
 ## Stack
 
-- **Backend:** Django + Django REST Framework, Python 3.12, MySQL 8.4
+- **Backend:** Django + Django REST Framework, Python 3.12, PostgreSQL 16
 - **Frontend:** Next.js (App Router), React 19, TypeScript 5
 - **Infra:** Docker Compose, GitHub Actions CI/CD
 - **Auth:** Token-based with capability-driven RBAC (5 system roles, custom role support)
@@ -26,7 +26,7 @@ Construction finance workflow app for small general contractors (1–10 person s
 See [`docs/setup.md`](docs/setup.md) for full instructions. Quick start:
 
 ```bash
-make docker-up        # Start full dev stack (backend + frontend + MySQL)
+make docker-up        # Start full dev stack (backend + frontend + PostgreSQL)
 make db-seed          # Seed test accounts
 ```
 

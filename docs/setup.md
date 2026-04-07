@@ -40,11 +40,10 @@ Backend:
 - `DJANGO_SECRET_KEY`
 - `DJANGO_DEBUG`
 - `DATABASE_URL`
-- `MYSQL_DATABASE`
-- `MYSQL_USER`
-- `MYSQL_PASSWORD`
-- `MYSQL_ROOT_PASSWORD`
-- `MYSQL_PORT`
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `POSTGRES_PORT`
 - `CORS_ALLOWED_ORIGINS`
 
 Frontend:
@@ -106,7 +105,7 @@ npx create-next-app@latest frontend
 make docker-up
 ```
 
-This starts frontend + backend + MySQL in detached mode.
+This starts frontend + backend + PostgreSQL in detached mode.
 
 ### 2) Replace services locally (optional)
 

@@ -15,7 +15,7 @@ Stable service names: `frontend`, `backend`, `db`
 Local host ports are env-configurable:
 - `FRONTEND_PORT` (default `3000`)
 - `BACKEND_PORT` (default `8000`)
-- `MYSQL_PORT` (default `3306`)
+- `POSTGRES_PORT` (default `5432`)
 
 ## Production Deploy
 
@@ -43,5 +43,5 @@ Production `.env` lives on the VPS at `~/bill-n-chill/.env` (not committed).
 
 - Backend: `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `DATABASE_URL`
 - Frontend: `NEXT_PUBLIC_API_BASE_URL`
-- MySQL: `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD`
+- PostgreSQL: `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
 - Email: `EMAIL_BACKEND`, `MAILGUN_API_KEY`, `MAILGUN_SENDER_DOMAIN`, `DEFAULT_FROM_EMAIL`

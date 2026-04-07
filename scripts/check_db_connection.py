@@ -17,7 +17,7 @@ def main() -> int:
     setup()
     db_settings = connections["default"].settings_dict
     host = db_settings.get("HOST") or "127.0.0.1"
-    port = str(db_settings.get("PORT") or "3306")
+    port = str(db_settings.get("PORT") or "5432")
 
     max_attempts = 15
     last_exception: Exception | None = None
@@ -27,8 +27,8 @@ def main() -> int:
                 return 0
         except OperationalError as exc:
             last_exception = exc
-            message = str(exc)
-            if "Can't connect to MySQL server on" in message and "Connection refused" in message:
+            message = str(exc).lower()
+            if "could not connect to server" in message or "connection refused" in message:
                 time.sleep(1)
                 continue
             raise
@@ -37,14 +37,14 @@ def main() -> int:
             raise
 
     if last_exception:
-        message = str(last_exception)
-        if "Can't connect to MySQL server on" in message and "Connection refused" in message:
+        message = str(last_exception).lower()
+        if "could not connect to server" in message or "connection refused" in message:
             print(
-                f"\n[DB Connection Error] Could not connect to MySQL on {host}:{port} after {max_attempts}s.\n"
-                "MySQL container may still be starting, or host/port may be mismatched.\n\n"
+                f"\n[DB Connection Error] Could not connect to PostgreSQL on {host}:{port} after {max_attempts}s.\n"
+                "PostgreSQL container may still be starting, or host/port may be mismatched.\n\n"
                 "Checks:\n"
-                "  make db-up\n"
-                "  make db-logs\n"
+                "  make docker-up\n"
+                "  make docker-logs\n"
                 "  grep DATABASE_URL .env\n\n"
                 "Then retry:\n"
                 "  make local-run-backend\n",

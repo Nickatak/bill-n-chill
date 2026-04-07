@@ -12,17 +12,13 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
-import pymysql
 
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
 from corsheaders.defaults import default_headers
-
-pymysql.version_info = (2, 2, 1, "final", 0)
-pymysql.install_as_MySQLdb()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -119,18 +115,14 @@ def database_config_from_url(database_url: str) -> dict:
     parsed = urlparse(database_url)
     scheme = parsed.scheme.lower()
 
-    if scheme in {"mysql", "mysql2"}:
-        query = parse_qs(parsed.query)
+    if scheme in {"postgres", "postgresql"}:
         return {
-            "ENGINE": "django.db.backends.mysql",
+            "ENGINE": "django.db.backends.postgresql",
             "NAME": parsed.path.lstrip("/"),
             "USER": parsed.username or "",
             "PASSWORD": parsed.password or "",
             "HOST": parsed.hostname or "127.0.0.1",
-            "PORT": str(parsed.port or 3306),
-            "OPTIONS": {
-                "charset": query.get("charset", ["utf8mb4"])[0],
-            },
+            "PORT": str(parsed.port or 5432),
         }
 
     if scheme == "sqlite":
@@ -151,13 +143,12 @@ def load_database_config() -> dict:
         return database_config_from_url(database_url)
 
     return {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("MYSQL_DATABASE", "bill_n_chill"),
-        "USER": os.getenv("MYSQL_USER", "bnc"),
-        "PASSWORD": os.getenv("MYSQL_PASSWORD", "bnc_password"),
-        "HOST": os.getenv("MYSQL_HOST", "127.0.0.1"),
-        "PORT": os.getenv("MYSQL_PORT", "3306"),
-        "OPTIONS": {"charset": "utf8mb4"},
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("POSTGRES_DB", "bill_n_chill"),
+        "USER": os.getenv("POSTGRES_USER", "bnc"),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "bnc_password"),
+        "HOST": os.getenv("POSTGRES_HOST", "127.0.0.1"),
+        "PORT": os.getenv("POSTGRES_PORT", "5432"),
     }
 
 
@@ -247,7 +238,7 @@ ANYMAIL = {
 # Frontend URL for building verification links in emails.
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
-# Django-Q2 async task queue (uses existing MySQL as broker).
+# Django-Q2 async task queue (uses existing Postgres as broker).
 Q_CLUSTER = {
     "name": "bill-n-chill",
     "workers": 2,

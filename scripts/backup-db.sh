@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Nightly MySQL backup with optional Backblaze B2 upload.
+# Nightly PostgreSQL backup with optional Backblaze B2 upload.
 #
 # Usage:
 #   ./scripts/backup-db.sh              # dump + upload (if B2 configured)
@@ -9,13 +9,9 @@
 #   0 3 * * * cd /home/deploy/bill-n-chill && ./scripts/backup-db.sh >> logs/backup.log 2>&1
 #
 # Environment (read from .env in the project root):
-#   MYSQL_ROOT_PASSWORD  — required
-#   MYSQL_DATABASE       — defaults to bill_n_chill
-#
-# B2 setup (one-time):
-#   pip install b2-cli  (or: apt install backblaze-b2)
-#   b2 authorize-account <keyId> <applicationKey>
-#   Then set B2_BUCKET_NAME in .env (e.g., B2_BUCKET_NAME=bnc-backups)
+#   POSTGRES_PASSWORD  — required
+#   POSTGRES_DB        — defaults to bill_n_chill
+#   POSTGRES_USER      — defaults to bnc
 
 set -euo pipefail
 
@@ -40,13 +36,15 @@ _env_val() {
     echo "$val"
 }
 
-MYSQL_ROOT_PASSWORD="$(_env_val MYSQL_ROOT_PASSWORD)"
-MYSQL_DATABASE="$(_env_val MYSQL_DATABASE)"
-MYSQL_DATABASE="${MYSQL_DATABASE:-bill_n_chill}"
+POSTGRES_PASSWORD="$(_env_val POSTGRES_PASSWORD)"
+POSTGRES_DB="$(_env_val POSTGRES_DB)"
+POSTGRES_DB="${POSTGRES_DB:-bill_n_chill}"
+POSTGRES_USER="$(_env_val POSTGRES_USER)"
+POSTGRES_USER="${POSTGRES_USER:-bnc}"
 B2_BUCKET_NAME="$(_env_val B2_BUCKET_NAME)"
 
-if [[ -z "$MYSQL_ROOT_PASSWORD" ]]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') ERROR: MYSQL_ROOT_PASSWORD not found in .env"
+if [[ -z "$POSTGRES_PASSWORD" ]]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') ERROR: POSTGRES_PASSWORD not found in .env"
     exit 1
 fi
 
@@ -57,15 +55,14 @@ mkdir -p "$BACKUP_DIR"
 BACKUP_FILE="bnc_${TIMESTAMP}.sql.gz"
 BACKUP_PATH="${BACKUP_DIR}/${BACKUP_FILE}"
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') Starting backup: ${MYSQL_DATABASE} → ${BACKUP_FILE}"
+echo "$(date '+%Y-%m-%d %H:%M:%S') Starting backup: ${POSTGRES_DB} → ${BACKUP_FILE}"
 
 docker compose -f "${PROJECT_DIR}/docker-compose.yml" -f "${PROJECT_DIR}/docker-compose.prod.yml" \
-    exec -T db mysqldump \
-    -u root -p"${MYSQL_ROOT_PASSWORD}" \
-    --single-transaction \
-    --routines \
-    --triggers \
-    "${MYSQL_DATABASE}" \
+    exec -T db pg_dump \
+    -U "${POSTGRES_USER}" \
+    -d "${POSTGRES_DB}" \
+    --no-owner \
+    --no-acl \
     | gzip > "$BACKUP_PATH"
 
 DUMP_SIZE="$(du -h "$BACKUP_PATH" | cut -f1)"

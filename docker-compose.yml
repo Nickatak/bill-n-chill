@@ -1,17 +1,15 @@
 services:
   db:
-    image: mysql:8.4
+    image: postgres:16
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-bill_n_chill}
-      MYSQL_USER: ${MYSQL_USER:-bnc}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bnc_password}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      POSTGRES_DB: ${POSTGRES_DB:-bill_n_chill}
+      POSTGRES_USER: ${POSTGRES_USER:-bnc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bnc_password}
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./scripts/mysql/init:/docker-entrypoint-initdb.d:ro
+      - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root_password}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bnc} -d ${POSTGRES_DB:-bill_n_chill}"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -21,7 +19,7 @@ services:
     working_dir: /app/backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: mysql://${MYSQL_USER:-bnc}:${MYSQL_PASSWORD:-bnc_password}@db:3306/${MYSQL_DATABASE:-bill_n_chill}
+      DATABASE_URL: postgres://${POSTGRES_USER:-bnc}:${POSTGRES_PASSWORD:-bnc_password}@db:5432/${POSTGRES_DB:-bill_n_chill}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-dev-only-change-me}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1},backend
@@ -57,7 +55,7 @@ services:
     working_dir: /app/backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: mysql://${MYSQL_USER:-bnc}:${MYSQL_PASSWORD:-bnc_password}@db:3306/${MYSQL_DATABASE:-bill_n_chill}
+      DATABASE_URL: postgres://${POSTGRES_USER:-bnc}:${POSTGRES_PASSWORD:-bnc_password}@db:5432/${POSTGRES_DB:-bill_n_chill}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-dev-only-change-me}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1},backend
@@ -104,5 +102,5 @@ services:
       - "${MAILPIT_SMTP_PORT:-1025}:1025"
 
 volumes:
-  mysql_data:
+  pg_data:
   media_data:

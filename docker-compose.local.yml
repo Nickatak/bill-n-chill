@@ -1,7 +1,7 @@
 services:
   db:
     ports:
-      - "${MYSQL_PORT:-3306}:3306"
+      - "${POSTGRES_PORT:-5432}:5432"
 
   backend:
     ports:

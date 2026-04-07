@@ -46,7 +46,7 @@ help:
 	@echo ""
 	@echo "Dev DB Utilities (.env.local)"
 	@echo "  make db-reset-hard          Drop dev DB volume and recreate DB container"
-	@echo "  make db-grant-test-db-perms Grant MySQL CREATE/DROP perms for Django tests"
+	@echo "  make db-grant-test-db-perms Grant test DB perms for Django tests"
 	@echo ""
 	@echo "Prod Docker Workflow (.env.prod)"
 	@echo "  make docker-prod-up         Full cycle: force-recreate all prod containers"
@@ -69,7 +69,7 @@ help:
 	@echo "Shell Access"
 	@echo "  make docker-shell-backend   Shell into dev backend container"
 	@echo "  make docker-shell-frontend  Shell into dev frontend container"
-	@echo "  make docker-shell-db        MySQL shell into dev DB container"
+	@echo "  make docker-shell-db        psql shell into dev DB container"
 
 # ============================================================================
 # LOCAL (HOST PROCESSES)
@@ -209,7 +209,7 @@ db-reset-hard: local-env-local
 	$(DEV_COMPOSE) up -d $(DB_SERVICE)
 
 db-grant-test-db-perms: local-env-local
-	$(DEV_COMPOSE) exec -T $(DB_SERVICE) sh -lc 'mysql -uroot -p"$$MYSQL_ROOT_PASSWORD" -e "GRANT CREATE, DROP ON *.* TO '\''$$MYSQL_USER'\''@'\''%'\''; GRANT ALL PRIVILEGES ON test_bill_n_chill.* TO '\''$$MYSQL_USER'\''@'\''%'\''; FLUSH PRIVILEGES;"'
+	$(DEV_COMPOSE) exec -T $(DB_SERVICE) psql -U $${POSTGRES_USER:-bnc} -d $${POSTGRES_DB:-bill_n_chill} -c "ALTER USER $${POSTGRES_USER:-bnc} CREATEDB;"
 
 # ============================================================================
 # DOCKER PROD (.env.prod)
@@ -252,6 +252,6 @@ docker-shell-frontend:
 	$(DEV_COMPOSE) exec frontend sh
 
 docker-shell-db:
-	$(DEV_COMPOSE) exec $(DB_SERVICE) mysql -u$${MYSQL_USER:-bnc} -p$${MYSQL_PASSWORD:-bnc_password} $${MYSQL_DATABASE:-bill_n_chill}
+	$(DEV_COMPOSE) exec $(DB_SERVICE) psql -U $${POSTGRES_USER:-bnc} -d $${POSTGRES_DB:-bill_n_chill}
 
 .DEFAULT_GOAL := help

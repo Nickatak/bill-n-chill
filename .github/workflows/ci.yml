@@ -10,17 +10,16 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     services:
-      mysql:
-        image: mysql:8.4
+      postgres:
+        image: postgres:16
         env:
-          MYSQL_DATABASE: test_bill_n_chill
-          MYSQL_USER: bnc
-          MYSQL_PASSWORD: ci_password
-          MYSQL_ROOT_PASSWORD: ci_root_password
+          POSTGRES_DB: test_bill_n_chill
+          POSTGRES_USER: bnc
+          POSTGRES_PASSWORD: ci_password
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci_root_password"
+          --health-cmd="pg_isready -U bnc -d test_bill_n_chill"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
@@ -34,15 +33,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
 
-      - name: Install MySQL client
-        run: sudo apt-get update && sudo apt-get install -y mysql-client
-
       - name: Grant test DB permissions
-        run: |
-          mysql -h 127.0.0.1 -uroot -pci_root_password -e "
-            GRANT ALL PRIVILEGES ON *.* TO 'bnc'@'%';
-            FLUSH PRIVILEGES;
-          "
+        env:
+          PGPASSWORD: ci_password
+        run: psql -h 127.0.0.1 -U bnc -d test_bill_n_chill -c "ALTER USER bnc CREATEDB;"
 
       - name: Lint Python
         run: pip install ruff && ruff check backend/
@@ -53,7 +47,7 @@ jobs:
       - name: Run tests
         working-directory: backend
         env:
-          DATABASE_URL: mysql://bnc:ci_password@127.0.0.1:3306/test_bill_n_chill
+          DATABASE_URL: postgres://bnc:ci_password@127.0.0.1:5432/test_bill_n_chill
           DJANGO_SECRET_KEY: ci-test-secret-key
           DJANGO_DEBUG: "False"
           DJANGO_ALLOWED_HOSTS: localhost

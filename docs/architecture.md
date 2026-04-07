@@ -22,7 +22,7 @@ Last reviewed: 2026-03-04
 ## Architecture Snapshot
 
 ```text
-Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> MySQL
+Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> PostgreSQL
 ```
 
 ## System Boundaries
@@ -103,7 +103,7 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
 
 ## Runtime and Deployment
 
-- Local development: run full stack via Docker Compose, or run frontend/backend on host with Docker MySQL.
+- Local development: run full stack via Docker Compose, or run frontend/backend on host with Docker PostgreSQL.
 - Deployment posture: this repo is a base app consumed by host orchestration with environment-specific compose overrides.
 - Stable compose service identities: `frontend`, `backend`, `db`.
 
@@ -130,8 +130,8 @@ Next.js App (frontend/) <---- HTTP JSON ----> Django/DRF API (backend/) <----> M
 
 ## Data and Persistence
 
-- Use MySQL for local, dev, and prod-like environments.
-- Local host workflows can run Django/Next.js directly while MySQL runs in Docker.
+- Use PostgreSQL for local, dev, and prod-like environments.
+- Local host workflows can run Django/Next.js directly while PostgreSQL runs in Docker.
 
 ## Auth and RBAC
 

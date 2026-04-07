@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Restore a MySQL backup from a .sql.gz dump file.
+# Restore a PostgreSQL backup from a .sql.gz dump file.
 #
 # Usage:
 #   ./scripts/restore-db.sh backups/bnc_20260324_030000.sql.gz
@@ -10,8 +10,9 @@
 #   - Pass --yes to skip the prompt (e.g., in scripts).
 #
 # Environment (read from .env in the project root):
-#   MYSQL_ROOT_PASSWORD  — required
-#   MYSQL_DATABASE       — defaults to bill_n_chill
+#   POSTGRES_PASSWORD  — required
+#   POSTGRES_DB        — defaults to bill_n_chill
+#   POSTGRES_USER      — defaults to bnc
 
 set -euo pipefail
 
@@ -41,12 +42,14 @@ _env_val() {
     echo "$val"
 }
 
-MYSQL_ROOT_PASSWORD="$(_env_val MYSQL_ROOT_PASSWORD)"
-MYSQL_DATABASE="$(_env_val MYSQL_DATABASE)"
-MYSQL_DATABASE="${MYSQL_DATABASE:-bill_n_chill}"
+POSTGRES_PASSWORD="$(_env_val POSTGRES_PASSWORD)"
+POSTGRES_DB="$(_env_val POSTGRES_DB)"
+POSTGRES_DB="${POSTGRES_DB:-bill_n_chill}"
+POSTGRES_USER="$(_env_val POSTGRES_USER)"
+POSTGRES_USER="${POSTGRES_USER:-bnc}"
 
-if [[ -z "$MYSQL_ROOT_PASSWORD" ]]; then
-    echo "ERROR: MYSQL_ROOT_PASSWORD not found in .env"
+if [[ -z "$POSTGRES_PASSWORD" ]]; then
+    echo "ERROR: POSTGRES_PASSWORD not found in .env"
     exit 1
 fi
 
@@ -82,14 +85,14 @@ fi
 
 DUMP_SIZE="$(du -h "$BACKUP_PATH" | cut -f1)"
 echo "Backup file: $(basename "$BACKUP_PATH") (${DUMP_SIZE})"
-echo "Target database: ${MYSQL_DATABASE}"
+echo "Target database: ${POSTGRES_DB}"
 
 # ---------------------------------------------------------------------------
 # Confirmation
 # ---------------------------------------------------------------------------
 if [[ "$SKIP_CONFIRM" == false ]]; then
     echo ""
-    echo "WARNING: This will DROP and recreate the '${MYSQL_DATABASE}' database."
+    echo "WARNING: This will DROP and recreate the '${POSTGRES_DB}' database."
     echo "         All existing data will be replaced with the backup contents."
     read -rp "Continue? [y/N] " confirm
     if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
@@ -103,15 +106,16 @@ fi
 # ---------------------------------------------------------------------------
 echo "$(date '+%Y-%m-%d %H:%M:%S') Starting restore..."
 
+# Terminate existing connections and recreate the database
 docker compose -f "${PROJECT_DIR}/docker-compose.yml" -f "${PROJECT_DIR}/docker-compose.prod.yml" \
-    exec -T db mysql \
-    -u root -p"${MYSQL_ROOT_PASSWORD}" \
-    -e "DROP DATABASE IF EXISTS \`${MYSQL_DATABASE}\`; CREATE DATABASE \`${MYSQL_DATABASE}\`;"
+    exec -T db psql -U "${POSTGRES_USER}" -d postgres -c "
+        SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${POSTGRES_DB}' AND pid <> pg_backend_pid();
+        DROP DATABASE IF EXISTS \"${POSTGRES_DB}\";
+        CREATE DATABASE \"${POSTGRES_DB}\" OWNER \"${POSTGRES_USER}\";
+    "
 
 gunzip -c "$BACKUP_PATH" \
     | docker compose -f "${PROJECT_DIR}/docker-compose.yml" -f "${PROJECT_DIR}/docker-compose.prod.yml" \
-        exec -T db mysql \
-        -u root -p"${MYSQL_ROOT_PASSWORD}" \
-        "${MYSQL_DATABASE}"
+        exec -T db psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" --quiet
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') Restore complete: $(basename "$BACKUP_PATH") → ${MYSQL_DATABASE}"
+echo "$(date '+%Y-%m-%d %H:%M:%S') Restore complete: $(basename "$BACKUP_PATH") → ${POSTGRES_DB}"

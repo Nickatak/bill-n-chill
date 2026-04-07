@@ -4,9 +4,9 @@ import os
 import sys
 
 
-def _print_mysql_connection_help() -> None:
+def _print_db_connection_help() -> None:
     print(
-        "\n[DB Connection Error] Could not connect to MySQL at 127.0.0.1.\n"
+        "\n[DB Connection Error] Could not connect to PostgreSQL at 127.0.0.1.\n"
         "Start the Dockerized database first:\n"
         "  make db-up\n\n"
         "Then retry your command (for example):\n"
@@ -30,8 +30,8 @@ def main():
         execute_from_command_line(sys.argv)
     except Exception as exc:
         message = str(exc)
-        if "Can't connect to MySQL server on '127.0.0.1'" in message:
-            _print_mysql_connection_help()
+        if "could not connect to server" in message.lower() or "connection refused" in message.lower():
+            _print_db_connection_help()
             raise SystemExit(1) from exc
         raise
 

@@ -17,7 +17,7 @@ class PushSubscription(models.Model):
     replaces the existing row (upsert on endpoint_hash).
 
     Fields mirror the PushSubscription JS object:
-    - endpoint: the push service URL (stored as TextField, too long for MySQL unique index)
+    - endpoint: the push service URL (stored as TextField; hash used for unique constraint)
     - endpoint_hash: SHA-256 of endpoint for unique constraint
     - p256dh: client public key (base64url)
     - auth: shared auth secret (base64url)

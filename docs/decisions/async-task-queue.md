@@ -20,7 +20,7 @@ Zero dependencies, zero infra. Spawn a daemon thread after the view commits.
 
 ### 2. Django-Q2 with ORM broker
 
-Task queue backed by the existing MySQL database. One new pip dependency (`django-q2`), one new process (`qcluster` worker in Docker Compose). Provides retry, admin visibility, scheduled tasks, and result storage out of the box.
+Task queue backed by the existing PostgreSQL database. One new pip dependency (`django-q2`), one new process (`qcluster` worker in Docker Compose). Provides retry, admin visibility, scheduled tasks, and result storage out of the box.
 
 **Chosen.** Right-sized for the product's scale and infrastructure. Same philosophy as Docker Compose + Caddy over Kubernetes — use the simplest tool that solves the actual problem.
 
@@ -38,7 +38,7 @@ Write pending notifications to a table, process with a cron'd management command
 
 ## Decision
 
-Use **Django-Q2 with the ORM broker** (MySQL) for all async work.
+Use **Django-Q2 with the ORM broker** (PostgreSQL) for all async work.
 
 ### What changes
 
@@ -51,7 +51,7 @@ Use **Django-Q2 with the ORM broker** (MySQL) for all async work.
 
 - **ORM broker polls the database** — adds minor DB load vs. Redis pub/sub. Irrelevant at our task volume (handful of notifications per day).
 - **Smaller ecosystem than Celery** — fewer plugins, less community knowledge. We don't need the plugin ecosystem; we need `async_task()` and retry.
-- **Extra process** — one more container to monitor. Acceptable given we already run backend + frontend + MySQL + Caddy.
+- **Extra process** — one more container to monitor. Acceptable given we already run backend + frontend + PostgreSQL + Caddy.
 
 ### Upgrade path
 
