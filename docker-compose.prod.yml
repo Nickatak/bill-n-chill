@@ -4,7 +4,7 @@ services:
       - "127.0.0.1:5432:5432"
     environment:
       B2_BUCKET_NAME: ${B2_BUCKET_NAME:-}
-      B2_KEY_ID: ${B2_KEY_ID:-}
+      B2_APPLICATION_KEY_ID: ${B2_APPLICATION_KEY_ID:-}
       B2_APPLICATION_KEY: ${B2_APPLICATION_KEY:-}
     command: >-
       postgres
