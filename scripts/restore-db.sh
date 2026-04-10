@@ -157,14 +157,23 @@ else
     fi
 
     echo "Fetching latest base backup from B2..."
-    LATEST_BASE=$(b2 ls "$B2_BUCKET_NAME" "base/" | sort | tail -1)
-    if [[ -z "$LATEST_BASE" ]]; then
-        echo "ERROR: No base backups found in B2 bucket"
+    _compose run --rm --no-deps \
+        --entrypoint bash \
+        -v "${RESTORE_DIR}:/restore" \
+        db -c '
+            LATEST=$(b2 ls "b2://${B2_BUCKET_NAME}/base/" | sort | tail -1)
+            if [ -z "$LATEST" ]; then
+                echo "ERROR: No base backups found in B2 bucket"
+                exit 1
+            fi
+            echo "Downloading: $LATEST"
+            b2 file download "b2://${B2_BUCKET_NAME}/${LATEST}" /restore/base_backup.tar.gz
+        '
+    if [[ ! -f "${RESTORE_DIR}/base_backup.tar.gz" ]]; then
+        echo "ERROR: Base backup download failed"
         rm -rf "$RESTORE_DIR"
         exit 1
     fi
-    echo "Downloading: ${LATEST_BASE}"
-    b2 download-file-by-name "$B2_BUCKET_NAME" "$LATEST_BASE" "${RESTORE_DIR}/base_backup.tar.gz"
 fi
 
 # ---------------------------------------------------------------------------
@@ -174,11 +183,15 @@ WAL_COUNT=0
 
 if [[ -n "$B2_BUCKET_NAME" ]]; then
     echo "Downloading WAL segments from B2..."
-    while IFS= read -r wal_file; do
-        [[ -z "$wal_file" ]] && continue
-        b2 download-file-by-name "$B2_BUCKET_NAME" "$wal_file" "${RESTORE_DIR}/wal/$(basename "$wal_file")"
-        WAL_COUNT=$((WAL_COUNT + 1))
-    done < <(b2 ls "$B2_BUCKET_NAME" "wal/")
+    _compose run --rm --no-deps \
+        --entrypoint bash \
+        -v "${RESTORE_DIR}:/restore" \
+        db -c '
+            for f in $(b2 ls "b2://${B2_BUCKET_NAME}/wal/"); do
+                b2 file download "b2://${B2_BUCKET_NAME}/${f}" "/restore/wal/$(basename "$f")"
+            done
+        '
+    WAL_COUNT=$(find "${RESTORE_DIR}/wal" -type f 2>/dev/null | wc -l)
     echo "Downloaded ${WAL_COUNT} WAL segment(s)"
 else
     echo "WARNING: B2_BUCKET_NAME not set, skipping WAL download."

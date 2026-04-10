@@ -119,18 +119,20 @@ fi
 # Upload to Backblaze B2
 # ---------------------------------------------------------------------------
 if [[ "$LOCAL_ONLY" == false && -n "$B2_BUCKET_NAME" ]]; then
-    if command -v b2 &>/dev/null; then
-        _log "Uploading base backup to B2: ${B2_BUCKET_NAME}"
-        b2 upload-file "$B2_BUCKET_NAME" "$BACKUP_PATH" "base/${BACKUP_FILE}"
-        _log "Base backup upload complete"
+    _log "Uploading base backup to B2: ${B2_BUCKET_NAME}"
+    _compose run --rm --no-deps \
+        --entrypoint bash \
+        -v "${BACKUP_DIR}:/backups:ro" \
+        db -c "b2 upload-file \$B2_BUCKET_NAME /backups/${BACKUP_FILE} base/${BACKUP_FILE}"
+    _log "Base backup upload complete"
 
-        if [[ -n "$MEDIA_PATH" ]]; then
-            _log "Uploading media backup to B2"
-            b2 upload-file "$B2_BUCKET_NAME" "$MEDIA_PATH" "media/${MEDIA_FILE}"
-            _log "Media upload complete"
-        fi
-    else
-        _log "WARNING: b2 CLI not found, skipping upload"
+    if [[ -n "$MEDIA_PATH" ]]; then
+        _log "Uploading media backup to B2"
+        _compose run --rm --no-deps \
+            --entrypoint bash \
+            -v "${BACKUP_DIR}:/backups:ro" \
+            db -c "b2 upload-file \$B2_BUCKET_NAME /backups/${MEDIA_FILE} media/${MEDIA_FILE}"
+        _log "Media upload complete"
     fi
 elif [[ "$LOCAL_ONLY" == false && -z "$B2_BUCKET_NAME" ]]; then
     _log "B2_BUCKET_NAME not set, skipping upload (local-only)"
