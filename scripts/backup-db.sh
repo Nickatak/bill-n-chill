@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Nightly PostgreSQL backup with optional Backblaze B2 upload.
+# Nightly PostgreSQL base backup with media backup and Backblaze B2 upload.
+#
+# Creates a pg_basebackup (physical, WAL-position-aware) base backup.
+# Combined with continuous WAL archival (db/archive-wal.sh), this enables
+# point-in-time recovery (PITR) via restore-db.sh.
 #
 # Usage:
-#   ./scripts/backup-db.sh              # dump + upload (if B2 configured)
-#   ./scripts/backup-db.sh --local-only # dump only, skip upload
+#   ./scripts/backup-db.sh              # base backup + media + upload (if B2 configured)
+#   ./scripts/backup-db.sh --local-only # backup only, skip upload
 #
 # Cron (nightly at 3 AM):
 #   0 3 * * * cd /home/deploy/bill-n-chill && ./scripts/backup-db.sh >> logs/backup.log 2>&1
@@ -12,6 +16,7 @@
 #   POSTGRES_PASSWORD  — required
 #   POSTGRES_DB        — defaults to bill_n_chill
 #   POSTGRES_USER      — defaults to bnc
+#   B2_BUCKET_NAME     — required for B2 upload
 
 set -euo pipefail
 
@@ -25,17 +30,25 @@ LOCAL_ONLY=false
 [[ "${1:-}" == "--local-only" ]] && LOCAL_ONLY=true
 
 # ---------------------------------------------------------------------------
-# Read .env
+# Helpers
 # ---------------------------------------------------------------------------
 _env_val() {
     local val
     val="$(grep "^${1}=" "${PROJECT_DIR}/.env" 2>/dev/null | head -1 | cut -d= -f2-)"
-    # Strip surrounding quotes if present
     val="${val%\"}" ; val="${val#\"}"
     val="${val%\'}" ; val="${val#\'}"
     echo "$val"
 }
 
+_compose() {
+    docker compose -f "${PROJECT_DIR}/docker-compose.yml" -f "${PROJECT_DIR}/docker-compose.prod.yml" "$@"
+}
+
+_log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*"; }
+
+# ---------------------------------------------------------------------------
+# Read .env
+# ---------------------------------------------------------------------------
 POSTGRES_PASSWORD="$(_env_val POSTGRES_PASSWORD)"
 POSTGRES_DB="$(_env_val POSTGRES_DB)"
 POSTGRES_DB="${POSTGRES_DB:-bill_n_chill}"
@@ -44,69 +57,95 @@ POSTGRES_USER="${POSTGRES_USER:-bnc}"
 B2_BUCKET_NAME="$(_env_val B2_BUCKET_NAME)"
 
 if [[ -z "$POSTGRES_PASSWORD" ]]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') ERROR: POSTGRES_PASSWORD not found in .env"
+    _log "ERROR: POSTGRES_PASSWORD not found in .env"
     exit 1
 fi
 
 # ---------------------------------------------------------------------------
-# Dump
+# Base backup (pg_basebackup)
 # ---------------------------------------------------------------------------
 mkdir -p "$BACKUP_DIR"
-BACKUP_FILE="bnc_${TIMESTAMP}.sql.gz"
+BACKUP_FILE="base_${TIMESTAMP}.tar.gz"
 BACKUP_PATH="${BACKUP_DIR}/${BACKUP_FILE}"
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') Starting backup: ${POSTGRES_DB} → ${BACKUP_FILE}"
+_log "Starting base backup: ${POSTGRES_DB} → ${BACKUP_FILE}"
 
-docker compose -f "${PROJECT_DIR}/docker-compose.yml" -f "${PROJECT_DIR}/docker-compose.prod.yml" \
-    exec -T db pg_dump \
+_compose exec -T db pg_basebackup \
     -U "${POSTGRES_USER}" \
-    -d "${POSTGRES_DB}" \
-    --no-owner \
-    --no-acl \
-    | gzip > "$BACKUP_PATH"
+    -D - -Ft -z \
+    --wal-method=none \
+    --label="bnc_${TIMESTAMP}" \
+    > "$BACKUP_PATH"
 
-DUMP_SIZE="$(du -h "$BACKUP_PATH" | cut -f1)"
-DUMP_BYTES="$(stat --format=%s "$BACKUP_PATH" 2>/dev/null || stat -f%z "$BACKUP_PATH")"
-echo "$(date '+%Y-%m-%d %H:%M:%S') Dump complete: ${BACKUP_FILE} (${DUMP_SIZE})"
+BACKUP_SIZE="$(du -h "$BACKUP_PATH" | cut -f1)"
+BACKUP_BYTES="$(stat --format=%s "$BACKUP_PATH" 2>/dev/null || stat -f%z "$BACKUP_PATH")"
+_log "Base backup complete: ${BACKUP_FILE} (${BACKUP_SIZE})"
 
 # ---------------------------------------------------------------------------
 # Integrity checks
 # ---------------------------------------------------------------------------
-if [[ "$DUMP_BYTES" -lt 1024 ]]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') ERROR: Backup file suspiciously small (${DUMP_BYTES} bytes). Aborting."
+if [[ "$BACKUP_BYTES" -lt 1024 ]]; then
+    _log "ERROR: Backup file suspiciously small (${BACKUP_BYTES} bytes). Aborting."
     rm -f "$BACKUP_PATH"
     exit 1
 fi
 
 if ! gunzip -t "$BACKUP_PATH" 2>/dev/null; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') ERROR: Backup file failed gzip integrity check. Aborting."
+    _log "ERROR: Backup file failed gzip integrity check. Aborting."
     rm -f "$BACKUP_PATH"
     exit 1
 fi
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') Integrity checks passed (${DUMP_BYTES} bytes, gzip OK)"
+_log "Integrity checks passed (${BACKUP_BYTES} bytes, gzip OK)"
+
+# ---------------------------------------------------------------------------
+# Media backup (logos, contract PDFs, etc.)
+# ---------------------------------------------------------------------------
+MEDIA_DIR="${PROJECT_DIR}/media"
+MEDIA_PATH=""
+
+if [[ -d "$MEDIA_DIR" ]] && [[ -n "$(ls -A "$MEDIA_DIR" 2>/dev/null)" ]]; then
+    MEDIA_FILE="media_${TIMESTAMP}.tar.gz"
+    MEDIA_PATH="${BACKUP_DIR}/${MEDIA_FILE}"
+    _log "Backing up media directory..."
+    tar czf "$MEDIA_PATH" -C "$PROJECT_DIR" media/
+    MEDIA_SIZE="$(du -h "$MEDIA_PATH" | cut -f1)"
+    _log "Media backup complete: ${MEDIA_FILE} (${MEDIA_SIZE})"
+else
+    _log "No media files to back up, skipping"
+fi
 
 # ---------------------------------------------------------------------------
 # Upload to Backblaze B2
 # ---------------------------------------------------------------------------
 if [[ "$LOCAL_ONLY" == false && -n "$B2_BUCKET_NAME" ]]; then
     if command -v b2 &>/dev/null; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') Uploading to B2 bucket: ${B2_BUCKET_NAME}"
-        b2 upload-file "$B2_BUCKET_NAME" "$BACKUP_PATH" "db/${BACKUP_FILE}"
-        echo "$(date '+%Y-%m-%d %H:%M:%S') Upload complete"
+        _log "Uploading base backup to B2: ${B2_BUCKET_NAME}"
+        b2 upload-file "$B2_BUCKET_NAME" "$BACKUP_PATH" "base/${BACKUP_FILE}"
+        _log "Base backup upload complete"
+
+        if [[ -n "$MEDIA_PATH" ]]; then
+            _log "Uploading media backup to B2"
+            b2 upload-file "$B2_BUCKET_NAME" "$MEDIA_PATH" "media/${MEDIA_FILE}"
+            _log "Media upload complete"
+        fi
     else
-        echo "$(date '+%Y-%m-%d %H:%M:%S') WARNING: b2 CLI not found, skipping upload"
+        _log "WARNING: b2 CLI not found, skipping upload"
     fi
 elif [[ "$LOCAL_ONLY" == false && -z "$B2_BUCKET_NAME" ]]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') B2_BUCKET_NAME not set, skipping upload (local-only)"
+    _log "B2_BUCKET_NAME not set, skipping upload (local-only)"
 fi
 
 # ---------------------------------------------------------------------------
-# Retention: delete local dumps older than N days
+# Retention: delete local backups older than N days
 # ---------------------------------------------------------------------------
-DELETED=$(find "$BACKUP_DIR" -name "bnc_*.sql.gz" -mtime +${RETENTION_DAYS} -delete -print | wc -l)
+DELETED=0
+for pattern in "base_*.tar.gz" "media_*.tar.gz" "bnc_*.sql.gz"; do
+    COUNT=$(find "$BACKUP_DIR" -name "$pattern" -mtime +${RETENTION_DAYS} -delete -print | wc -l)
+    DELETED=$((DELETED + COUNT))
+done
 if [[ "$DELETED" -gt 0 ]]; then
-    echo "$(date '+%Y-%m-%d %H:%M:%S') Cleaned up ${DELETED} backup(s) older than ${RETENTION_DAYS} days"
+    _log "Cleaned up ${DELETED} backup(s) older than ${RETENTION_DAYS} days"
 fi
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') Backup finished"
+_log "Backup finished"

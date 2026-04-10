@@ -20,19 +20,21 @@ PostgreSQL's WAL is a unified write-ahead log with built-in archive hooks (`arch
 
 - [x] Switch MySQL → PostgreSQL (done)
 - [x] Configure `archive_command` to ship completed WAL segments to B2 (done — `db/archive-wal.sh`, enabled in prod compose overlay)
-- [ ] Set B2_KEY_ID + B2_APPLICATION_KEY in prod .env and verify first WAL segment uploads
-- [ ] Update `backup-db.sh` to use `pg_basebackup` (WAL-position-aware)
-- [ ] Update `restore-db.sh` to use `pg_restore` + WAL replay
-- [ ] Add media directory (logos, contract PDFs) to B2 backup — gap introduced by recent PDF attachment feature
+- [x] Set B2 credentials in prod .env and verify WAL upload (done — 4 segments archived)
+- [x] Update `backup-db.sh` to use `pg_basebackup` (WAL-position-aware)
+- [x] Update `restore-db.sh` to use PITR (base backup + WAL replay)
+- [x] Add media directory (logos, contract PDFs) to B2 backup (included in nightly `backup-db.sh`)
 - [ ] Test full recovery: base backup + WAL replay to a target timestamp
 
 ### 2. Health monitoring + alerting
 
-**Why now:** Right now the only health signal is "a user complains." For a financial tool, that's unacceptable — if invoices aren't sending or the DB is down, you need to know before your customer does.
+**What exists:** Sentry captures unhandled exceptions in Django views and django-q2 task failures (explicit `_report_to_sentry` decorator). Health endpoint at `/api/v1/health/` checks DB connectivity.
 
-- Health endpoint already exists (`/health/` — checks DB connectivity)
-- Need something external that polls it and alerts (uptime monitor, cron ping, whatever)
-- Django-Q2 worker health is a separate concern — if the worker dies, emails and push notifications silently stop
+**Gap:** Sentry only fires when code runs and fails. If the VPS is down, Postgres is unreachable, Caddy stops routing, or the django-q2 worker dies entirely — Sentry sees nothing. Need an external observer.
+
+**Plan:**
+- [ ] External uptime monitor (UptimeRobot / Betteruptime / similar) pinging `/api/v1/health/` every 60s — catches VPS, Caddy, Django, and Postgres failures
+- [ ] Worker liveness check — heartbeat task on a schedule + staleness check, so a dead worker doesn't go unnoticed
 
 ### 3. Circuit breaking on external services
 
