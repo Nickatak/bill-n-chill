@@ -24,7 +24,7 @@ PostgreSQL's WAL is a unified write-ahead log with built-in archive hooks (`arch
 - [x] Update `backup-db.sh` to use `pg_basebackup` (WAL-position-aware)
 - [x] Update `restore-db.sh` to use PITR (base backup + WAL replay)
 - [x] Add media directory (logos, contract PDFs) to B2 backup (included in nightly `backup-db.sh`)
-- [ ] Test full recovery: base backup + WAL replay to a target timestamp
+- [x] Test full recovery: base backup + WAL replay (tested on prod 2026-04-10)
 
 ### 2. Health monitoring + alerting
 
