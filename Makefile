@@ -10,7 +10,8 @@
 	docker-up docker-down docker-logs db-migrate \
 	db-seed db-reset db-reset-hard db-grant-test-db-perms \
 	docker-prod-up docker-prod-down docker-prod-logs \
-	db-prod-migrate db-prod-reset db-prod-reset-hard
+	db-prod-migrate db-prod-reset db-prod-reset-hard \
+	e2e-install e2e-test e2e-test-headed e2e-report
 
 BACKEND_PYTHON := .venv/bin/python
 BACKEND_MANAGE := $(BACKEND_PYTHON) backend/manage.py
@@ -65,6 +66,12 @@ help:
 	@echo "  make local-superuser        Create Django admin user"
 	@echo "  make local-clean            Clear local build/cache artifacts"
 	@echo "  make local-kill-ports       Manual rescue for ports 3000-3005/8000"
+	@echo ""
+	@echo "E2E Tests (Playwright)"
+	@echo "  make e2e-install            Install Playwright + browsers"
+	@echo "  make e2e-test               Run e2e tests (stack must be running)"
+	@echo "  make e2e-test-headed        Run e2e tests in headed browser"
+	@echo "  make e2e-report             Open last Playwright HTML report"
 	@echo ""
 	@echo "Shell Access"
 	@echo "  make docker-shell-backend   Shell into dev backend container"
@@ -244,6 +251,26 @@ ifndef EMAIL
 	@exit 1
 endif
 	$(DEV_COMPOSE) exec backend python manage.py nuke_account $(EMAIL)
+
+# ============================================================================
+# E2E TESTS (PLAYWRIGHT)
+# ============================================================================
+
+e2e-install:
+	cd e2e && npm install && npx playwright install --with-deps chromium
+
+e2e-test:
+	cd e2e && npx playwright test
+
+e2e-test-headed:
+	cd e2e && npx playwright test --headed
+
+e2e-report:
+	cd e2e && npx playwright show-report
+
+# ============================================================================
+# SHELL ACCESS
+# ============================================================================
 
 docker-shell-backend:
 	$(DEV_COMPOSE) exec backend bash
