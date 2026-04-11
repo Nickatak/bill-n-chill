@@ -28,13 +28,15 @@ PostgreSQL's WAL is a unified write-ahead log with built-in archive hooks (`arch
 
 ### 2. Health monitoring + alerting
 
-**What exists:** Sentry captures unhandled exceptions in Django views and django-q2 task failures (explicit `_report_to_sentry` decorator). Health endpoint at `/api/v1/health/` checks DB connectivity.
+**What exists:** Sentry captures unhandled exceptions in Django views and django-q2 task failures (explicit `_report_to_sentry` decorator). Health endpoint at `/api/v1/health/` checks DB connectivity and worker liveness. Worker heartbeat task runs every 5 min via django-q2 Schedule, writes to `WorkerHeartbeat` model. Health response includes `worker.healthy` and `worker.last_seen`.
 
-**Gap:** Sentry only fires when code runs and fails. If the VPS is down, Postgres is unreachable, Caddy stops routing, or the django-q2 worker dies entirely — Sentry sees nothing. Need an external observer.
+**Gap:** External observer still needed. Sentry and the health endpoint only fire when code runs. If the VPS is down, nothing reports.
 
-**Plan:**
-- [ ] External uptime monitor (UptimeRobot / Betteruptime / similar) pinging `/api/v1/health/` every 60s — catches VPS, Caddy, Django, and Postgres failures
-- [ ] Worker liveness check — heartbeat task on a schedule + staleness check, so a dead worker doesn't go unnoticed
+**Done:**
+- [x] Worker liveness check — heartbeat task on 5-min schedule, staleness check in health endpoint (10-min threshold)
+
+**TODO:**
+- [ ] External uptime monitor (UptimeRobot / Betteruptime / similar) pinging `/api/v1/health/` every 60s — catches VPS, Caddy, Django, and Postgres failures. Can also keyword-match `"healthy":true` for worker status.
 
 ### 3. Circuit breaking on external services
 

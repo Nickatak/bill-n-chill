@@ -36,6 +36,7 @@ from core.models.shared_operations import (
     Vendor,
 )
 from core.models.cash_management import Payment
+from core.models.system import WorkerHeartbeat
 __all__ = [
     "Customer",
     "DocumentAccessSession",
@@ -77,4 +78,5 @@ __all__ = [
     "VendorBillLine",
     "BillingPeriod",
     "Payment",
+    "WorkerHeartbeat",
 ]

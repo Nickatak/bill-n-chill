@@ -26,6 +26,18 @@ def _report_to_sentry(func):
 
 
 # ---------------------------------------------------------------------------
+# Worker heartbeat
+# ---------------------------------------------------------------------------
+
+@_report_to_sentry
+def worker_heartbeat_task():
+    """Update the worker heartbeat timestamp. Scheduled every 5 minutes."""
+    from core.models import WorkerHeartbeat
+
+    WorkerHeartbeat.pulse()
+
+
+# ---------------------------------------------------------------------------
 # Auth emails
 # ---------------------------------------------------------------------------
 

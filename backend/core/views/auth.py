@@ -39,14 +39,16 @@ logger = logging.getLogger(__name__)
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def health_view(_request):
-    """Health probe endpoint used by infra and local readiness checks.
+    """Health probe endpoint used by infra, Docker healthcheck, and external monitors.
 
-    Verifies database connectivity with a lightweight query before
-    reporting healthy.
+    Checks database connectivity and worker liveness. The HTTP status code
+    reflects only DB health (so Docker healthcheck doesn't restart the backend
+    when the worker container dies). Worker status is in the response body.
 
     Flow:
-        1. Execute a trivial DB query to confirm connectivity.
-        2. Return OK if reachable, 503 if not.
+        1. Check database connectivity.
+        2. Check worker heartbeat staleness (informational).
+        3. Return 200 with component status, or 503 if DB is unreachable.
 
     URL: ``GET /api/v1/health/``
 
@@ -54,7 +56,7 @@ def health_view(_request):
 
     Success 200::
 
-        { "data": { "status": "ok" } }
+        { "data": { "status": "ok", "worker": { "healthy": true, "last_seen": "..." } } }
 
     Error 503::
 
@@ -68,7 +70,16 @@ def health_view(_request):
             {"error": {"code": "service_unavailable", "message": "Database unreachable."}},
             status=503,
         )
-    return Response({"data": {"status": "ok"}})
+
+    from core.models import WorkerHeartbeat
+
+    return Response({"data": {
+        "status": "ok",
+        "worker": {
+            "healthy": WorkerHeartbeat.is_healthy(),
+            "last_seen": WorkerHeartbeat.last_seen_iso(),
+        },
+    }})
 
 
 @api_view(["POST"])

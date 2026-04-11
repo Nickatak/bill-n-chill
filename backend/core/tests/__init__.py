@@ -14,6 +14,7 @@ from core.tests.test_organization_management import OrganizationManagementTests
 from core.tests.test_organization_invoice_defaults_backfill import (
     OrganizationInvoiceDefaultsBackfillCommandTests,
 )
+from core.tests.test_worker_heartbeat import WorkerHeartbeatModelTests, WorkerHeartbeatTaskTests
 
 __all__ = [
     "HealthEndpointTests",
@@ -32,4 +33,6 @@ __all__ = [
     "AccountingSyncEventTests",
     "OrganizationManagementTests",
     "OrganizationInvoiceDefaultsBackfillCommandTests",
+    "WorkerHeartbeatModelTests",
+    "WorkerHeartbeatTaskTests",
 ]

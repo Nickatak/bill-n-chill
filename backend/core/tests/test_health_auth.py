@@ -9,6 +9,41 @@ class HealthEndpointTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["data"]["status"], "ok")
+        self.assertIn("worker", payload["data"])
+
+    def test_health_reports_worker_unhealthy_when_no_heartbeat(self):
+        response = self.client.get("/api/v1/health/")
+
+        self.assertEqual(response.status_code, 200)
+        worker = response.json()["data"]["worker"]
+        self.assertFalse(worker["healthy"])
+        self.assertIsNone(worker["last_seen"])
+
+    def test_health_reports_worker_healthy_after_pulse(self):
+        from core.models import WorkerHeartbeat
+
+        WorkerHeartbeat.pulse()
+        response = self.client.get("/api/v1/health/")
+
+        self.assertEqual(response.status_code, 200)
+        worker = response.json()["data"]["worker"]
+        self.assertTrue(worker["healthy"])
+        self.assertIsNotNone(worker["last_seen"])
+
+    def test_health_reports_worker_stale_after_timeout(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from core.models import WorkerHeartbeat
+
+        WorkerHeartbeat.objects.update_or_create(
+            pk=1, defaults={"last_seen": timezone.now() - timedelta(minutes=15)},
+        )
+        response = self.client.get("/api/v1/health/")
+
+        self.assertEqual(response.status_code, 200)
+        worker = response.json()["data"]["worker"]
+        self.assertFalse(worker["healthy"])
+        self.assertIsNotNone(worker["last_seen"])
 
 
 class AuthEndpointTests(TestCase):
