@@ -105,6 +105,22 @@ export async function createProject(
   return apiRequest(token, "POST", `/customers/${customerId}/projects/`, data);
 }
 
+/** Patch a project record (name, status). */
+export async function patchProject(
+  token: string,
+  projectId: number,
+  data: Partial<{ name: string; status: string }>,
+): Promise<Record<string, unknown>> {
+  return apiRequest(token, "PATCH", `/projects/${projectId}/`, data);
+}
+
+/** Fetch all projects. */
+export async function getProjects(
+  token: string,
+): Promise<Array<{ id: number; name: string; status: string; customer: number }>> {
+  return apiRequest(token, "GET", "/projects/");
+}
+
 /** Fetch customers list (for verifying state in tests). */
 export async function getCustomers(
   token: string,
