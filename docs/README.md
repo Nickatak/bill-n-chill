@@ -7,6 +7,7 @@ See the [root README](../README.md) for project overview and quickstart.
 - [setup.md](setup.md) — local setup instructions
 - [architecture.md](architecture.md) — system boundaries and conventions
 - [api.md](api.md) — endpoint reference and API standards
+- [testing.md](testing.md) — test layers, running tests, e2e coverage map
 - [contributing.md](contributing.md) — workflow, branching, testing, and code style
 - [domain-model.md](domain-model.md) — core entities, lifecycles, and API direction
 - [orchestration.md](orchestration.md) — production deployment and Docker Compose layout
