@@ -79,7 +79,7 @@ services:
       python manage.py qcluster"
 
   frontend:
-    image: node:20-alpine
+    image: node:24-alpine
     working_dir: /app/frontend
     restart: unless-stopped
     environment:
